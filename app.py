@@ -31,6 +31,11 @@ def accumulator_page():
     return send_from_directory(STATIC, "accumulator.html")
 
 
+@app.route("/strategy")
+def strategy_page():
+    return send_from_directory(STATIC, "strategy.html")
+
+
 @app.route("/api/accumulators")
 def api_accumulators():
     _ensure_cache()

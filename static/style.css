@@ -153,9 +153,8 @@ h1 {
 .sep { margin: 0 6px; }
 
 .baselines {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }

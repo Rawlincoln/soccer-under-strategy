@@ -51,6 +51,34 @@ class OneXBetMatch:
     raw: dict = field(default_factory=dict)
 
 
+def parse_match_stats(st: Any) -> dict[str, int]:
+    """Parse 1xBet SC.ST block into home/away/total stat counters."""
+    result: dict[str, int] = {}
+    if not st:
+        return result
+
+    entries = st[0].get("Value", []) if isinstance(st, list) and st else []
+    id_to_key = {v: k for k, v in STAT_MAP.items()}
+
+    for item in entries:
+        stat_id = item.get("ID")
+        key = id_to_key.get(stat_id)
+        if not key:
+            continue
+        s1 = int(item.get("S1") or 0)
+        s2 = int(item.get("S2") or 0)
+        result[f"{key}_home"] = s1
+        result[f"{key}_away"] = s2
+        if key == "possession":
+            result["possession_home"] = s1
+            result["possession_away"] = s2
+        else:
+            result[key] = s1 + s2
+
+    result["total_shots"] = result.get("shots_on_target", 0) + result.get("shots_off_target", 0)
+    return result
+
+
 class OneXBetClient:
     def __init__(self, base_url: str = BASE_URL):
         self.base_url = base_url.rstrip("/")
@@ -176,30 +204,7 @@ class OneXBetClient:
         )
 
     def _parse_stats(self, st: Any) -> dict[str, int]:
-        result: dict[str, int] = {}
-        if not st:
-            return result
-
-        entries = st[0].get("Value", []) if isinstance(st, list) and st else []
-        id_to_key = {v: k for k, v in STAT_MAP.items()}
-
-        for item in entries:
-            stat_id = item.get("ID")
-            key = id_to_key.get(stat_id)
-            if not key:
-                continue
-            s1 = int(item.get("S1") or 0)
-            s2 = int(item.get("S2") or 0)
-            result[f"{key}_home"] = s1
-            result[f"{key}_away"] = s2
-            if key == "possession":
-                result["possession_home"] = s1
-                result["possession_away"] = s2
-            else:
-                result[key] = s1 + s2
-
-        result["total_shots"] = result.get("shots_on_target", 0) + result.get("shots_off_target", 0)
-        return result
+        return parse_match_stats(st)
 
     def fetch_period_subgame_stats(self, match: OneXBetMatch, half: str) -> dict[str, int]:
         subgame_id = match.fh_subgame_id if half == "fh" else match.sh_subgame_id

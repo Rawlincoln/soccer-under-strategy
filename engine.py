@@ -15,7 +15,7 @@ import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
 from combined_analysis import build_combined_analysis, combined_to_dict
-from filters import is_excluded_match, is_excluded_raw
+from filters import has_red_cards, is_excluded_match, is_excluded_raw
 from onexbet_client import OneXBetClient, OneXBetMatch
 from prophitbet_stats import PROPHIT_PROVIDER
 
@@ -643,6 +643,10 @@ def build_dashboard_payload() -> dict[str, Any]:
             excluded_count += 1
             continue
 
+        if has_red_cards(m.stats):
+            excluded_count += 1
+            continue
+
         if not m.is_first_half and not m.is_second_half:
             continue
 
@@ -655,6 +659,8 @@ def build_dashboard_payload() -> dict[str, Any]:
 
         for half in halves:
             period_stats = ONEXBET_CLIENT.fetch_period_subgame_stats(m, half)
+            if has_red_cards(period_stats):
+                continue
             preds, combined = analyze_onexbet_match(
                 m, half=half, prophit_stats=prophit_stats, period_stats=period_stats,
             )

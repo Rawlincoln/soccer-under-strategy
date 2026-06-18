@@ -1,4 +1,4 @@
-"""Live Under Goals — web dashboard."""
+"""Pro Punter — live under-goals web dashboard."""
 
 import os
 from pathlib import Path
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     _ensure_cache()
     port = int(os.environ.get("PORT", 5050))
     print("=" * 60)
-    print("  Under Goals Live Dashboard")
+    print("  Pro Punter")
     print(f"  Open: http://localhost:{port}")
     print(f"  Auto-refresh: every {REFRESH_SECONDS}s")
     print("=" * 60)

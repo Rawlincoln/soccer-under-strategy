@@ -1,4 +1,4 @@
-"""Exclude virtual, esoccer, small-sided, and MLS matches from predictions."""
+"""Exclude virtual, esoccer, small-sided, MLS, and red-card matches from predictions."""
 
 from __future__ import annotations
 
@@ -82,11 +82,34 @@ def is_excluded_match(
     return False
 
 
+def has_red_cards(stats: dict | None) -> bool:
+    """Return True if either team has at least one red card."""
+    if not stats:
+        return False
+    total = int(stats.get("red_cards") or 0)
+    if total > 0:
+        return True
+    home = int(stats.get("red_cards_home") or 0)
+    away = int(stats.get("red_cards_away") or 0)
+    return (home + away) > 0
+
+
 def is_excluded_raw(raw: dict) -> bool:
     """Check exclusion on a 1xBet raw match dict."""
-    return is_excluded_match(
+    if is_excluded_match(
         home_team=raw.get("O1", ""),
         away_team=raw.get("O2", ""),
         league=raw.get("L", ""),
         country=raw.get("CN", ""),
-    )
+    ):
+        return True
+
+    sc = raw.get("SC") or {}
+    st = sc.get("ST")
+    if st:
+        from onexbet_client import parse_match_stats
+
+        if has_red_cards(parse_match_stats(st)):
+            return True
+
+    return False

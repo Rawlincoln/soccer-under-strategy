@@ -1,5 +1,5 @@
 @echo off
-title Under Goals — Online (Cloudflare Tunnel)
+title Pro Punter — Online (Cloudflare Tunnel)
 cd /d "%~dp0"
 
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5050" ^| findstr "LISTENING"') do (

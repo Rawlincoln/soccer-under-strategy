@@ -1,4 +1,4 @@
-# Pro Punter — background watcher: auto-commit and push on file changes
+# Pro Punter - background watcher: auto-commit and push on file changes
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
@@ -6,8 +6,13 @@ $pollSeconds = 5
 $debounceSeconds = 8
 $syncScript = Join-Path $PSScriptRoot "sync-github.ps1"
 
-Write-Host "Pro Punter — GitHub auto-sync watching $PSScriptRoot" -ForegroundColor Cyan
-Write-Host "Pushes ~${debounceSeconds}s after changes. Keep this window open. Ctrl+C to stop." -ForegroundColor DarkGray
+function Write-Log([string]$Message, [string]$Color = "White") {
+  $ts = Get-Date -Format "HH:mm:ss"
+  Write-Host "[$ts] $Message" -ForegroundColor $Color
+}
+
+Write-Log "Pro Punter GitHub auto-sync watching $PSScriptRoot" "Cyan"
+Write-Log "Pushes ~$debounceSeconds s after changes. Keep this window open. Ctrl+C to stop." "DarkGray"
 
 function Test-HasChanges {
   git add -A 2>$null | Out-Null
@@ -18,9 +23,9 @@ function Test-HasChanges {
 function Invoke-Sync {
   try {
     & $syncScript -Quiet
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pushed to GitHub." -ForegroundColor Green
+    Write-Log "Pushed to GitHub." "Green"
   } catch {
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Sync failed: $_" -ForegroundColor Red
+    Write-Log "Sync failed: $_" "Red"
   }
 }
 
@@ -30,7 +35,7 @@ while ($true) {
   if (Test-HasChanges) {
     if (-not $dirtySince) {
       $dirtySince = Get-Date
-      Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Changes detected, waiting ${debounceSeconds}s..." -ForegroundColor DarkYellow
+      Write-Log "Changes detected, waiting $debounceSeconds s..." "DarkYellow"
     } elseif (((Get-Date) - $dirtySince).TotalSeconds -ge $debounceSeconds) {
       Invoke-Sync
       $dirtySince = $null

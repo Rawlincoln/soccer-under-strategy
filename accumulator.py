@@ -35,6 +35,7 @@ class AccaLeg:
     prophit_goals_form: float = 0.0
     fusion_verdict: str = ""
     fusion_agreement: str = ""
+    is_half_time: bool = False
 
 
 @dataclass
@@ -155,6 +156,7 @@ def _all_qualified_picks(matches: list[dict]) -> list[dict]:
                 "minute": card.get("minute", 0),
                 "period_score": card.get("period_score", card.get("fh_score", "0-0")),
                 "fusion_verdict": (card.get("combined_analysis") or {}).get("verdict", ""),
+                "is_half_time": card.get("is_half_time", False),
             })
     picks.sort(key=lambda x: -x["confidence"])
     return picks
@@ -223,6 +225,7 @@ def _make_leg(entry: dict) -> AccaLeg:
         prophit_goals_form=pb.get("combined_goals_last_n", 0),
         fusion_verdict=fusion.get("verdict", ""),
         fusion_agreement=fusion.get("agreement", ""),
+        is_half_time=card.get("is_half_time", False),
     )
 
 

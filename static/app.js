@@ -34,6 +34,7 @@ function renderBaselines(b, meta, pb) {
     <div class="baseline-card"><div class="label">Live football (1xBet)</div><div class="value">${meta?.total_live ?? 0}</div></div>
     <div class="baseline-card"><div class="label">1st half</div><div class="value green">${meta?.first_half ?? 0}</div></div>
     <div class="baseline-card"><div class="label">2nd half</div><div class="value green">${meta?.second_half ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Half-time</div><div class="value">${meta?.half_time ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Scored · under alive</div><div class="value green">${meta?.scored_filter ?? 0}</div></div>
     <div class="baseline-card"><div class="label">ProphitBet form DB</div><div class="value">${pbLabel}</div></div>
   `;
@@ -47,21 +48,33 @@ function halfLabel(h) {
   return h === "sh" ? "2H" : "1H";
 }
 
+function isHalfTime(item) {
+  return !!(item?.is_half_time || item?.half === "ht" || item?.status === "HT");
+}
+
 function matchMinute(item) {
+  if (isHalfTime(item)) return 45;
   const m = item?.minute ?? item?.live_stats?.minute;
   return m != null && m !== "" ? Number(m) : null;
 }
 
 function fmtMinute(item, half) {
+  if (isHalfTime(item)) return "HT";
   const m = matchMinute(item);
   if (m == null || Number.isNaN(m)) return "—";
   const h = half ?? item?.half;
+  if (h === "ht") return "HT";
   return h ? `${halfLabel(h)} ${m}'` : `${m}'`;
 }
 
 function minuteBadge(item, half) {
   const text = fmtMinute(item, half);
-  return `<span class="minute-badge">${text}</span>`;
+  const cls = isHalfTime(item) ? "minute-badge ht" : "minute-badge";
+  return `<span class="${cls}">${text}</span>`;
+}
+
+function halfTimeBadge() {
+  return '<span class="half-time-badge">HALF TIME</span>';
 }
 
 function minuteStatItem(item, half) {
@@ -166,7 +179,8 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
         <div class="scored-meta">${item.league}</div>
         <div style="font-weight:700;font-size:1.05rem">${item.home_team} vs ${item.away_team}</div>
         <div class="scored-line">
-          <span class="fh-score">${halfLabel(item.half)}: ${item.period_score || item.fh_score}</span>
+          ${isHalfTime(item) ? halfTimeBadge() : ""}
+          <span class="fh-score">${isHalfTime(item) ? "HT" : halfLabel(item.half)}: ${item.period_score || item.fh_score}</span>
           ${minuteBadge(item, item.half)}
         </div>
         <div style="font-size:0.82rem;color:var(--muted);margin:8px 0">${marketLabel}</div>
@@ -199,7 +213,7 @@ function renderBetSignals(signals) {
     <div class="signal-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
         <div style="font-weight:700">${p.match}</div>
-        ${minuteBadge(p, p.half)}
+        <div style="display:flex;gap:6px;align-items:center">${isHalfTime(p) ? halfTimeBadge() : ""}${minuteBadge(p, p.half)}</div>
       </div>
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
         ${p.market}${p.period_score ? ` · ${halfLabel(p.half)} ${p.period_score}` : ""}
@@ -217,13 +231,16 @@ function renderMatchCard(m) {
   const stats = m.live_stats;
   const allSignals = [...new Set(m.predictions?.flatMap((p) => p.signals || []) || [])];
 
-  const hl = halfLabel(m.half);
+  const atHt = isHalfTime(m);
+  const hl = atHt ? "HT" : halfLabel(m.half);
   const entryLabel = m.half === "sh" ? "ENTRY 60-65'" : "ENTRY 15-20'";
-  const statusBadge = m.in_entry_window
-    ? `<span class="status-badge window">${entryLabel}</span>`
-    : m.scored_filter
-      ? '<span class="status-badge scored">SCORED · UNDER ALIVE</span>'
-      : `<span class="status-badge live">${hl} LIVE</span>`;
+  const statusBadge = atHt
+    ? '<span class="status-badge ht">HALF TIME</span>'
+    : m.in_entry_window
+      ? `<span class="status-badge window">${entryLabel}</span>`
+      : m.scored_filter
+        ? '<span class="status-badge scored">SCORED · UNDER ALIVE</span>'
+        : `<span class="status-badge live">${hl} LIVE</span>`;
 
   const statsHtml = stats ? `
     <div class="stats-row">
@@ -253,6 +270,7 @@ function renderMatchCard(m) {
 
   const cardClass = [
     "match-card", "live",
+    atHt ? "half-time" : "",
     m.in_entry_window ? "entry-window" : "",
     m.scored_filter ? "scored-alive" : "",
   ].filter(Boolean).join(" ");
@@ -260,12 +278,12 @@ function renderMatchCard(m) {
   return `
     <div class="${cardClass}" data-scored="${m.scored_filter}" data-window="${m.in_entry_window}">
       <div class="match-header">
-        <div class="match-league">${m.league || "Football"} <span class="source-tag">${hl}</span> <span class="source-tag">1xBet</span></div>
+        <div class="match-league">${m.league || "Football"} ${atHt ? halfTimeBadge() : `<span class="source-tag">${hl}</span>`} <span class="source-tag">1xBet</span></div>
         <div class="teams-row">
           <div class="team home"><span>${m.home_team}</span></div>
           <div class="score-block">
             <div class="score">${m.score}</div>
-            <div class="minute">${m.minute}' · ${hl} ${m.period_goals ?? m.fh_goals} goals · FT ${m.full_score || "—"}</div>
+            <div class="minute">${fmtMinute(m, m.half)} · ${atHt ? `FH ${m.period_score || m.fh_score}` : `${hl} ${m.period_goals ?? m.fh_goals} goals`} · FT ${m.full_score || "—"}</div>
             ${statusBadge}
             <div class="alive-tags">${aliveTags}</div>
           </div>
@@ -273,15 +291,16 @@ function renderMatchCard(m) {
         </div>
       </div>
       ${statsHtml}
-      ${renderFusionAnalysis(m)}
+      ${atHt ? '<div class="ht-note">Break between halves — 2nd half picks open at 60′. FH score locked.</div>' : renderFusionAnalysis(m)}
       <div class="predictions">
-        ${predsHtml}
+        ${atHt ? '<div class="empty-ht">No live bets at half-time. Check back for 2H entry (60′–65′).</div>' : predsHtml}
         ${allSignals.length ? `<ul class="signals-list">${allSignals.slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>` : ""}
       </div>
     </div>`;
 }
 
 function filterMatches(matches) {
+  if (currentFilter === "ht") return matches.filter((m) => isHalfTime(m));
   if (currentFilter === "fh") return matches.filter((m) => m.half === "fh");
   if (currentFilter === "sh") return matches.filter((m) => m.half === "sh");
   if (currentFilter === "scored") return matches.filter((m) => m.scored_filter);
@@ -314,7 +333,8 @@ async function fetchData() {
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
     const fh = data.first_half_count ?? 0;
     const sh = data.second_half_count ?? 0;
-    $("matchCount").textContent = `${fh} FH · ${sh} SH`;
+    const ht = data.half_time_count ?? 0;
+    $("matchCount").textContent = `${fh} FH · ${sh} SH${ht ? ` · ${ht} HT` : ""}`;
     const excluded = data.excluded_count ?? 0;
     $("liveTotal").textContent = `${data.total_live_football ?? 0} live (${excluded} excluded)`;
 

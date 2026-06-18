@@ -143,6 +143,8 @@ class MatchCard:
     period_goals: int = 0
     period_score: str = "0-0"
     full_score: str = "0-0"
+    is_half_time: bool = False
+    period_name: str = ""
 
 
 class DataCache:
@@ -616,6 +618,37 @@ def _build_match_card(
         period_goals=p_goals,
         period_score=f"{p_home}-{p_away}",
         full_score=f"{m.home_score}-{m.away_score}",
+        is_half_time=m.is_half_time,
+        period_name=m.period_name,
+    )
+
+
+def _build_half_time_card(m: OneXBetMatch, prophit_stats: Optional[dict]) -> MatchCard:
+    return MatchCard(
+        event_id=str(m.game_id),
+        home_team=m.home_team,
+        away_team=m.away_team,
+        league=m.league,
+        kickoff=m.period_name or "Half-time",
+        status="HT",
+        score=f"{m.fh_home} - {m.fh_away}",
+        minute=45,
+        live_stats=_stats_to_dict(_onexbet_to_live_stats(m, half="fh")),
+        predictions=[],
+        fh_goals=m.fh_goals,
+        fh_score=f"{m.fh_home}-{m.fh_away}",
+        source="1xbet",
+        under_15_alive=m.fh_goals <= 1,
+        under_25_alive=m.fh_goals <= 2,
+        scored_filter=m.fh_goals >= 1,
+        prophit_stats=prophit_stats,
+        combined_analysis=None,
+        half="ht",
+        period_goals=m.fh_goals,
+        period_score=f"{m.fh_home}-{m.fh_away}",
+        full_score=f"{m.home_score}-{m.away_score}",
+        is_half_time=True,
+        period_name=m.period_name or "Half-time",
     )
 
 
@@ -632,6 +665,7 @@ def build_dashboard_payload() -> dict[str, Any]:
     excluded_count = 0
     fh_count = 0
     sh_count = 0
+    ht_count = 0
 
     for raw in raw_live:
         if is_excluded_raw(raw):
@@ -647,10 +681,15 @@ def build_dashboard_payload() -> dict[str, Any]:
             excluded_count += 1
             continue
 
-        if not m.is_first_half and not m.is_second_half:
+        prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
+
+        if m.is_half_time:
+            cards.append(_build_half_time_card(m, prophit_stats))
+            ht_count += 1
             continue
 
-        prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
+        if not m.is_first_half and not m.is_second_half:
+            continue
         halves: list[str] = []
         if m.is_first_half:
             halves.append("fh")
@@ -688,6 +727,7 @@ def build_dashboard_payload() -> dict[str, Any]:
                 pd["half"] = card.half
                 pd["period_score"] = card.period_score
                 pd["full_score"] = card.full_score
+                pd["is_half_time"] = card.is_half_time
                 if p.recommendation in ("BET", "WATCH"):
                     bet_signals.append(pd)
 
@@ -719,6 +759,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         "excluded_count": excluded_count,
         "first_half_count": fh_count,
         "second_half_count": sh_count,
+        "half_time_count": ht_count,
         "match_count": len(cards),
         "bet_signal_count": len(bet_signals),
         "scored_filter_count": sum(1 for c in cards if c.scored_filter),

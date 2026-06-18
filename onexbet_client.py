@@ -48,7 +48,18 @@ class OneXBetMatch:
     sh_subgame_id: Optional[int] = None
     is_first_half: bool = False
     is_second_half: bool = False
+    is_half_time: bool = False
     raw: dict = field(default_factory=dict)
+
+
+def detect_half_time(period: int, period_name: str) -> bool:
+    """Return True when the match is at half-time (break between halves)."""
+    pn = (period_name or "").lower().strip()
+    if pn in ("half-time", "halftime", "ht", "half time", "break"):
+        return True
+    if ("half-time" in pn or "halftime" in pn) and "1st" not in pn and "2nd" not in pn:
+        return True
+    return False
 
 
 def parse_match_stats(st: Any) -> dict[str, int]:
@@ -154,15 +165,22 @@ class OneXBetClient:
                 sh_away = int(val.get("S2") or 0)
 
         period = int(sc.get("CP") or 0)
+        period_name = sc.get("CPS") or ""
+        is_half_time = detect_half_time(period, period_name)
 
-        if sh_home == 0 and sh_away == 0 and period == 2:
+        if sh_home == 0 and sh_away == 0 and period == 2 and not is_half_time:
             sh_home = max(home_score - fh_home, 0)
             sh_away = max(away_score - fh_away, 0)
-        period_name = sc.get("CPS") or ""
+
         timer_sec = int(sc.get("TS") or 0)
-        minute = timer_sec // 60 if period == 1 else 0
-        if period == 2:
+        if is_half_time:
+            minute = 45
+        elif period == 1:
+            minute = timer_sec // 60
+        elif period == 2:
             minute = 45 + timer_sec // 60
+        else:
+            minute = 0
 
         stats = self._parse_stats(sc.get("ST"))
         home_poss = float(stats.get("possession_home", 50))
@@ -198,8 +216,9 @@ class OneXBetClient:
             home_possession=home_poss,
             fh_subgame_id=fh_subgame_id,
             sh_subgame_id=sh_subgame_id,
-            is_first_half=period == 1 or "1st" in period_name.lower(),
-            is_second_half=period == 2 or "2nd" in period_name.lower(),
+            is_first_half=not is_half_time and (period == 1 or "1st" in period_name.lower()),
+            is_second_half=not is_half_time and (period == 2 or "2nd" in period_name.lower()),
+            is_half_time=is_half_time,
             raw=raw,
         )
 

@@ -1,3 +1,4 @@
+# Render Blueprint — connect this repo at https://dashboard.render.com/blueprints
 services:
   - type: web
     name: soccer-under-strategy

@@ -1,0 +1,285 @@
+.nav-links {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.nav-links a:hover { color: var(--text); border-color: var(--border); }
+.nav-links a.active { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+
+.acca-summary {
+  max-width: 1200px;
+  margin: 0 auto 20px;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.stake-panel {
+  max-width: 1200px;
+  margin: 0 auto 24px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.stake-panel label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.stake-panel input {
+  width: 90px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 1rem;
+}
+
+.acca-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 48px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.acca-slip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.acca-slip.risk-low { border-top: 3px solid var(--green); }
+.acca-slip.risk-medium { border-top: 3px solid var(--amber); }
+.acca-slip.risk-high { border-top: 3px solid var(--red); }
+
+.acca-header {
+  padding: 18px 20px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.acca-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.acca-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.risk-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.risk-badge.low { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.risk-badge.medium { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
+.risk-badge.high { background: #3d1a1a; color: var(--red); border: 1px solid var(--red); }
+
+.acca-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.acca-stat .label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; }
+.acca-stat .value { font-family: var(--mono); font-size: 1.1rem; font-weight: 700; }
+.acca-stat .value.odds { color: var(--green); }
+.acca-stat .value.return { color: var(--amber); }
+
+.acca-legs { padding: 8px 0; flex: 1; }
+
+.acca-leg {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.acca-leg:last-child { border-bottom: none; }
+
+.leg-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.leg-match { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
+.leg-league { font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; }
+.leg-pick {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #1a3d2a;
+  color: var(--green);
+  margin-right: 6px;
+}
+.leg-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+
+.leg-prophit {
+  font-size: 0.68rem;
+  color: var(--blue);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+
+.picks-60-section {
+  max-width: 1200px;
+  margin: 0 auto 24px;
+  padding: 0 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.picks-60-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.picks-60-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.pick-60-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.pick-60-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pick-60-half {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--blue);
+}
+
+.pick-60-conf {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--green);
+  font-size: 1rem;
+}
+
+.pick-60-match {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.pick-60-market {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pick-60-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  margin-top: 6px;
+}
+
+.acca-title {
+  margin-bottom: 16px;
+}
+
+.leg-odds {
+  text-align: right;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.leg-conf {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.acca-footer {
+  padding: 16px 20px;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.acca-footer .total-label { font-size: 0.8rem; color: var(--muted); }
+.acca-footer .total-return {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.insufficient-msg {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
+.insufficient-msg strong { color: var(--amber); display: block; margin-bottom: 8px; font-size: 1.1rem; }

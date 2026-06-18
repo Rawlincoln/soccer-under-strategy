@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Under Goals Live · 1xBet</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">⚽</span>
+        <div>
+          <h1>Under Goals Live</h1>
+          <p class="subtitle">1xBet + ProphitBet fusion · 1st & 2nd half unders</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/" class="active">Live Dashboard</a>
+        <a href="/accumulator">Accumulators</a>
+      </nav>
+      <div class="status-pill" id="connectionStatus">
+        <span class="pulse"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+      <div class="meta">
+        <span id="lastUpdate">—</span>
+        <span class="sep">·</span>
+        <span id="matchCount">0 FH matches</span>
+        <span class="sep">·</span>
+        <span id="liveTotal">0 live</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="baselines" id="baselines"></section>
+
+  <section class="bet-signals" id="scoredU15Section" hidden>
+    <h2 class="section-title bet-title">
+      <span class="badge-scored">SCORED</span>
+      Under 1.5 FH still alive (1 goal)
+    </h2>
+    <div class="signals-grid" id="scoredU15"></div>
+  </section>
+
+  <section class="bet-signals" id="scoredU25Section" hidden>
+    <h2 class="section-title bet-title">
+      <span class="badge-scored">SCORED</span>
+      Under 2.5 FH still alive (1–2 goals)
+    </h2>
+    <div class="signals-grid" id="scoredU25"></div>
+  </section>
+
+  <section class="bet-signals" id="betSignalsSection" hidden>
+    <h2 class="section-title bet-title">
+      <span class="badge-live">BET</span>
+      Active bet signals
+    </h2>
+    <div class="signals-grid" id="betSignals"></div>
+  </section>
+
+  <section class="matches-section">
+    <div class="section-header">
+      <h2 class="section-title">Live matches · 60% and above only</h2>
+      <div class="filter-tabs">
+        <button class="tab" data-filter="all">All 60%+</button>
+        <button class="tab active" data-filter="bet60">60% and above</button>
+        <button class="tab" data-filter="fh">1st half</button>
+        <button class="tab" data-filter="sh">2nd half</button>
+        <button class="tab" data-filter="scored">Scored · under alive</button>
+        <button class="tab" data-filter="window">Entry window</button>
+      </div>
+      <button class="btn-refresh" id="btnRefresh" title="Force refresh">↻ Refresh</button>
+    </div>
+    <div class="matches-grid" id="matchesGrid">
+      <div class="loading">Loading 1xBet live data…</div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Data: 1xBet live feed · refreshes every <span id="refreshInterval">30</span>s ·
+    Excludes 4x4/5x5/2x2/3x3, FIFA, esoccer, virtual, MLS, student league
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accumulator Bets · FH Under Live</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/accumulator.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">🎯</span>
+        <div>
+          <h1>Accumulator Bets</h1>
+          <p class="subtitle">60%+ confidence picks · 1H & 2H · 3–10 legs per slip</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/">Live Dashboard</a>
+        <a href="/accumulator" class="active">Accumulators</a>
+      </nav>
+      <div class="status-pill" id="connectionStatus">
+        <span class="pulse"></span>
+        <span id="statusText">Loading…</span>
+      </div>
+      <div class="meta">
+        <span id="lastUpdate">—</span>
+        <span class="sep">·</span>
+        <span id="accaCount">0 accas</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="acca-summary" id="accaSummary"></section>
+
+  <section class="stake-panel">
+    <label for="stakeInput">Stake per acca (£)</label>
+    <input type="number" id="stakeInput" value="10" min="1" max="1000" step="1" />
+    <button class="btn-refresh" id="btnRefresh">↻ Refresh</button>
+  </section>
+
+  <section class="picks-60-section">
+    <h2 class="section-title">60% and above — all qualifying predictions</h2>
+    <p class="picks-60-note">Only picks at 60% confidence or higher. Accumulator slips below are built from these.</p>
+    <div class="picks-60-grid" id="picks60Grid">
+      <div class="loading">Loading predictions…</div>
+    </div>
+  </section>
+
+  <section class="acca-container" id="accaContainer">
+    <div class="loading">Building accumulator slips…</div>
+  </section>
+
+  <footer class="footer">
+    Each acca uses 3–10 real football matches · excludes virtual/esoccer/student league ·
+    refreshes every <span id="refreshInterval">30</span>s
+  </footer>
+
+  <script src="/static/accumulator.js"></script>
+</body>
+</html>

@@ -47,6 +47,31 @@ function halfLabel(h) {
   return h === "sh" ? "2H" : "1H";
 }
 
+function matchMinute(item) {
+  const m = item?.minute ?? item?.live_stats?.minute;
+  return m != null && m !== "" ? Number(m) : null;
+}
+
+function fmtMinute(item, half) {
+  const m = matchMinute(item);
+  if (m == null || Number.isNaN(m)) return "—";
+  const h = half ?? item?.half;
+  return h ? `${halfLabel(h)} ${m}'` : `${m}'`;
+}
+
+function minuteBadge(item, half) {
+  const text = fmtMinute(item, half);
+  return `<span class="minute-badge">${text}</span>`;
+}
+
+function minuteStatItem(item, half) {
+  const m = matchMinute(item);
+  const num = m != null && !Number.isNaN(m) ? m : "—";
+  const h = half ?? item?.half;
+  const lbl = h ? `${halfLabel(h)} Min` : "Minute";
+  return `<div class="stat-item minute-stat"><div class="num">${num}${m != null ? "'" : ""}</div><div class="lbl">${lbl}</div></div>`;
+}
+
 function fusionClass(verdict) {
   if (verdict === "STRONG BET" || verdict === "BET") return "fusion-bet";
   if (verdict === "CAUTION") return "fusion-caution";
@@ -62,7 +87,7 @@ function agreementClass(a) {
 
 function renderFusionAnalysis(m) {
   const f = m.combined_analysis;
-  if (!f) return renderProphitStats(m.prophit_stats);
+  if (!f) return renderProphitStats(m.prophit_stats, m);
 
   const live = f.live_summary || {};
   const form = f.form_summary || {};
@@ -80,6 +105,7 @@ function renderFusionAnalysis(m) {
         <div class="fusion-col">
           <div class="fusion-col-title">1xBet Live @ ${live.minute ?? m.minute}'</div>
           <div class="mini-stats">
+            <span class="mini-minute">${fmtMinute(m, m.half)}</span>
             <span>${live.shots ?? 0} shots</span>
             <span>${live.sot ?? 0} SoT</span>
             <span>${live.corners ?? 0} ck</span>
@@ -108,12 +134,14 @@ function renderFusionAnalysis(m) {
     </div>`;
 }
 
-function renderProphitStats(pb) {
+function renderProphitStats(pb, matchCtx) {
   if (!pb?.home && !pb?.away) return "";
   const h = pb.home || {};
   const a = pb.away || {};
+  const minLine = matchCtx ? `<div class="prophit-minute">${minuteBadge(matchCtx)}</div>` : "";
   return `
     <div class="prophit-stats">
+      ${minLine}
       <div class="prophit-title">ProphitBet form (last ${pb.form_window ?? 3})</div>
       <div class="prophit-teams">
         <span class="prophit-team">${h.matched_name || h.team || "Home"}: ${h.goals_scored ?? "—"}GF ${h.goals_conceded ?? "—"}GA</span>
@@ -139,7 +167,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
         <div style="font-weight:700;font-size:1.05rem">${item.home_team} vs ${item.away_team}</div>
         <div class="scored-line">
           <span class="fh-score">${halfLabel(item.half)}: ${item.period_score || item.fh_score}</span>
-          <span class="minute-tag">${item.minute}'</span>
+          ${minuteBadge(item, item.half)}
         </div>
         <div style="font-size:0.82rem;color:var(--muted);margin:8px 0">${marketLabel}</div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
@@ -147,6 +175,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
           <span class="rec-badge ${recClass(p.recommendation)}">${p.recommendation}</span>
         </div>
         <div class="mini-stats">
+          <span class="mini-minute">${fmtMinute(item, item.half)}</span>
           <span>Shots ${st.total_shots ?? 0}</span>
           <span>SoT ${st.shots_on_target ?? 0}</span>
           <span>Corners ${st.corners ?? 0}</span>
@@ -168,8 +197,13 @@ function renderBetSignals(signals) {
   section.hidden = false;
   grid.innerHTML = signals.map((p) => `
     <div class="signal-card">
-      <div style="font-weight:700;margin-bottom:4px">${p.match}</div>
-      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">${p.market}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
+        <div style="font-weight:700">${p.match}</div>
+        ${minuteBadge(p, p.half)}
+      </div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
+        ${p.market}${p.period_score ? ` · ${halfLabel(p.half)} ${p.period_score}` : ""}
+      </div>
       <div style="display:flex;align-items:center;gap:12px">
         <span class="conf-big">${Math.round(p.confidence)}%</span>
         <span class="rec-badge bet">BET NOW</span>
@@ -193,6 +227,7 @@ function renderMatchCard(m) {
 
   const statsHtml = stats ? `
     <div class="stats-row">
+      ${minuteStatItem({ minute: stats.minute ?? m.minute, half: m.half }, m.half)}
       <div class="stat-item"><div class="num">${stats.total_shots ?? 0}</div><div class="lbl">Shots</div></div>
       <div class="stat-item"><div class="num">${stats.shots_on_target ?? 0}</div><div class="lbl">On Target</div></div>
       <div class="stat-item"><div class="num">${stats.corners ?? 0}</div><div class="lbl">Corners</div></div>

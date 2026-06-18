@@ -684,6 +684,10 @@ def build_dashboard_payload() -> dict[str, Any]:
                 if not _qualifies_60(p):
                     continue
                 pd = _pred_to_dict(p)
+                pd["minute"] = card.minute
+                pd["half"] = card.half
+                pd["period_score"] = card.period_score
+                pd["full_score"] = card.full_score
                 if p.recommendation in ("BET", "WATCH"):
                     bet_signals.append(pd)
 

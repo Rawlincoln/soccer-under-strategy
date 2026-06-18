@@ -17,6 +17,22 @@ function halfTag(h) {
   return h === "sh" ? "2H" : "1H";
 }
 
+function matchMinute(item) {
+  const m = item?.minute;
+  return m != null && m !== "" ? Number(m) : null;
+}
+
+function fmtMinute(item, half) {
+  const m = matchMinute(item);
+  if (m == null || Number.isNaN(m)) return "—";
+  const h = half ?? item?.half;
+  return h ? `${halfTag(h)} ${m}'` : `${m}'`;
+}
+
+function minuteBadge(item, half) {
+  return `<span class="minute-badge">${fmtMinute(item, half)}</span>`;
+}
+
 function riskClass(level) {
   return { LOW: "low", MEDIUM: "medium", HIGH: "high" }[level] || "medium";
 }
@@ -48,12 +64,17 @@ function renderPicks60(data) {
     <div class="pick-60-card">
       <div class="pick-60-top">
         <span class="pick-60-half">${halfTag(item.half)}</span>
+        ${minuteBadge(item, item.half)}
         <span class="pick-60-conf">${fmtConf(item.confidence)}%</span>
         <span class="rec-badge ${item.recommendation === "BET" ? "bet" : "watch"}">${item.recommendation}</span>
       </div>
       <div class="pick-60-match">${item.match}</div>
       <div class="pick-60-market">${item.market?.replace("First Half Goals", "FH").replace("Second Half Goals", "SH")}</div>
-      <div class="pick-60-meta">${halfTag(item.half)} ${item.period_score} · ${item.minute}'${item.fusion_verdict ? ` · ${item.fusion_verdict}` : ""}</div>
+      <div class="pick-60-stats">
+        <div class="pick-60-stat"><div class="num">${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}</div><div class="lbl">${halfTag(item.half)} Min</div></div>
+        <div class="pick-60-stat"><div class="num">${item.period_score || "—"}</div><div class="lbl">Score</div></div>
+      </div>
+      <div class="pick-60-meta">${item.fusion_verdict ? item.fusion_verdict : "Live pick"}</div>
     </div>
   `).join("");
 }
@@ -63,11 +84,20 @@ function renderAcca(acca, stake) {
     <div class="acca-leg">
       <div class="leg-num">${i + 1}</div>
       <div>
-        <div class="leg-match">${leg.home_team} vs ${leg.away_team}</div>
+        <div class="leg-match-row">
+          <div class="leg-match">${leg.home_team} vs ${leg.away_team}</div>
+          ${minuteBadge(leg, leg.half)}
+        </div>
         <div class="leg-league">${leg.league} · ${halfTag(leg.half)}</div>
+        <div class="leg-stats">
+          <div class="leg-stat"><div class="num">${leg.minute ?? "—"}${leg.minute != null ? "'" : ""}</div><div class="lbl">${halfTag(leg.half)} Min</div></div>
+          <div class="leg-stat"><div class="num">${leg.period_score || leg.fh_score || "—"}</div><div class="lbl">Period</div></div>
+          <div class="leg-stat"><div class="num">${leg.full_score || "—"}</div><div class="lbl">FT</div></div>
+          <div class="leg-stat"><div class="num">${fmtConf(leg.confidence)}%</div><div class="lbl">Conf</div></div>
+        </div>
         <span class="leg-pick">${leg.selection}</span>
         <span class="rec-badge ${leg.recommendation === "BET" ? "bet" : "watch"}">${leg.recommendation}</span>
-        <div class="leg-meta">${halfTag(leg.half)} ${leg.period_score || leg.fh_score} · FT ${leg.full_score || "—"} · ${leg.minute}' · ${fmtConf(leg.confidence)}%</div>
+        <div class="leg-meta">${halfTag(leg.half)} ${leg.period_score || leg.fh_score} · FT ${leg.full_score || "—"} · ${fmtMinute(leg, leg.half)}</div>
         ${leg.fusion_verdict ? `<div class="leg-prophit">${leg.fusion_verdict} · ${leg.fusion_agreement}</div>` : ""}
       </div>
       <div class="leg-odds">

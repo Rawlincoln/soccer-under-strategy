@@ -226,7 +226,20 @@ h1 {
 .scored-line { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
 .fh-score { font-family: var(--mono); font-weight: 700; color: #f97316; }
 .minute-tag { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); }
+.minute-badge {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--amber);
+  background: var(--amber-dim);
+  border: 1px solid #f59e0b44;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
 .mini-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
+.mini-stats .mini-minute { color: var(--amber); font-weight: 700; }
+.prophit-minute { margin-bottom: 6px; }
 
 .filter-tabs { display: flex; gap: 6px; }
 .tab {
@@ -382,7 +395,7 @@ h1 {
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   padding: 12px 18px;
   background: var(--surface2);
@@ -391,6 +404,10 @@ h1 {
 
 .stat-item {
   text-align: center;
+}
+
+.stat-item.minute-stat .num {
+  color: var(--amber);
 }
 
 .stat-item .num {

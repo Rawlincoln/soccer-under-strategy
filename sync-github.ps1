@@ -16,8 +16,11 @@ if (-not $remote) {
   throw "No git remote. Run .\deploy.ps1 -GitHubUser Rawlincoln first."
 }
 
-git add -A
-git diff --cached --quiet 2>$null
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git add -A 2>&1 | Out-Null
+git diff --cached --quiet 2>&1 | Out-Null
+$ErrorActionPreference = $prev
 if ($LASTEXITCODE -eq 0) {
   if (-not $Quiet) { Write-Host "No changes to sync." -ForegroundColor DarkGray }
   exit 0

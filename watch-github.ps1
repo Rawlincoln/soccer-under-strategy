@@ -15,9 +15,13 @@ Write-Log "Pro Punter GitHub auto-sync watching $PSScriptRoot" "Cyan"
 Write-Log "Pushes ~$debounceSeconds s after changes. Keep this window open. Ctrl+C to stop." "DarkGray"
 
 function Test-HasChanges {
-  git add -A 2>$null | Out-Null
-  git diff --cached --quiet 2>$null
-  return $LASTEXITCODE -ne 0
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  git add -A 2>&1 | Out-Null
+  git diff --cached --quiet 2>&1 | Out-Null
+  $changed = $LASTEXITCODE -ne 0
+  $ErrorActionPreference = $prev
+  return $changed
 }
 
 function Invoke-Sync {

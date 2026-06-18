@@ -34,7 +34,7 @@ function renderBaselines(b, meta, pb) {
     <div class="baseline-card"><div class="label">Live football (1xBet)</div><div class="value">${meta?.total_live ?? 0}</div></div>
     <div class="baseline-card"><div class="label">1st half</div><div class="value green">${meta?.first_half ?? 0}</div></div>
     <div class="baseline-card"><div class="label">2nd half</div><div class="value green">${meta?.second_half ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Half-time</div><div class="value">${meta?.half_time ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Half-time</div><div class="value">${meta?.half_time_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Scored · under alive</div><div class="value green">${meta?.scored_filter ?? 0}</div></div>
     <div class="baseline-card"><div class="label">ProphitBet form DB</div><div class="value">${pbLabel}</div></div>
   `;

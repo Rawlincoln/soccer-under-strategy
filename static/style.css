@@ -153,6 +153,7 @@ h1 {
 .sep { margin: 0 6px; }
 
 .baselines {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
@@ -236,6 +237,46 @@ h1 {
   padding: 2px 8px;
   border-radius: 6px;
   white-space: nowrap;
+}
+
+.minute-badge.ht,
+.half-time-badge {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #a5b4fc;
+  background: #312e8144;
+  border: 1px solid #6366f166;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+.match-card.half-time {
+  border-color: #6366f1;
+  box-shadow: 0 0 18px #6366f122;
+}
+
+.status-badge.ht {
+  background: #312e81;
+  color: #a5b4fc;
+}
+
+.ht-note {
+  margin: 0 18px 12px;
+  padding: 10px 12px;
+  background: #312e8144;
+  border: 1px solid #6366f144;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #c7d2fe;
+}
+
+.empty-ht {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 4px 0;
 }
 .mini-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
 .mini-stats .mini-minute { color: var(--amber); font-weight: 700; }

@@ -115,9 +115,8 @@ def _leg_score(pick: dict, card: dict) -> float:
     if mkt.get("market_lean") == "strong_under":
         bonus += 2
     sd = card.get("sportsdb_stats") or {}
-    af = card.get("apifootball_stats") or {}
-    if sd.get("total_shots") and af.get("total_shots"):
-        bonus += 2
+    if sd.get("total_shots"):
+        bonus += 1
     return conf + bonus
 
 

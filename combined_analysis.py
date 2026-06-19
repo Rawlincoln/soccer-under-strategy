@@ -31,6 +31,7 @@ HALF_CONFIG = {
 @dataclass
 class ScoreBreakdown:
     historical: float = 0.0
+    soccer_punter: float = 0.0
     live_tempo: float = 0.0
     time_context: float = 0.0
     agreement: float = 0.0
@@ -47,11 +48,13 @@ class CombinedAnalysis:
     breakdown: ScoreBreakdown
     live_profile: str
     form_profile: str
+    sp_profile: str = "unknown"
     half: str = "fh"
     period_minute: int = 0
     fusion_signals: list[str] = field(default_factory=list)
     live_summary: dict[str, Any] = field(default_factory=dict)
     form_summary: dict[str, Any] = field(default_factory=dict)
+    sp_summary: dict[str, Any] = field(default_factory=dict)
 
 
 def _period_elapsed(minute: int, half: str) -> int:

@@ -18,8 +18,11 @@ from combined_analysis import build_combined_analysis, combined_to_dict
 from filters import has_red_cards, is_excluded_match, is_excluded_raw
 from onexbet_client import OneXBetClient, OneXBetMatch
 from prophitbet_stats import PROPHIT_PROVIDER
+from api_football_stats import APIFOOTBALL_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
+from market_odds import lookup_market_odds
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
+from thesportsdb_stats import SPORTSDB_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
 REFRESH_SECONDS = 30
@@ -118,6 +121,9 @@ class Prediction:
     prophit_stats: Optional[dict] = None
     soccerpunter_stats: Optional[dict] = None
     fotmob_stats: Optional[dict] = None
+    sportsdb_stats: Optional[dict] = None
+    apifootball_stats: Optional[dict] = None
+    market_odds: Optional[dict] = None
     combined_analysis: Optional[dict] = None
 
 
@@ -145,6 +151,9 @@ class MatchCard:
     prophit_stats: Optional[dict] = None
     soccerpunter_stats: Optional[dict] = None
     fotmob_stats: Optional[dict] = None
+    sportsdb_stats: Optional[dict] = None
+    apifootball_stats: Optional[dict] = None
+    market_odds: Optional[dict] = None
     combined_analysis: Optional[dict] = None
     half: str = "fh"
     period_goals: int = 0
@@ -556,6 +565,9 @@ def analyze_onexbet_match(
     prophit_stats: Optional[dict] = None,
     soccerpunter_stats: Optional[dict] = None,
     fotmob_stats: Optional[dict] = None,
+    sportsdb_stats: Optional[dict] = None,
+    apifootball_stats: Optional[dict] = None,
+    market_odds: Optional[dict] = None,
     period_stats: Optional[dict] = None,
 ) -> tuple[list[Prediction], dict]:
     live = _onexbet_to_live_stats(m, half=half, period_stats=period_stats)
@@ -566,6 +578,9 @@ def analyze_onexbet_match(
         live, prophit_stats, period_goals, m.minute, baseline[bl_key], half=half,
         soccer_punter_stats=soccerpunter_stats,
         fotmob_stats=fotmob_stats,
+        sportsdb_stats=sportsdb_stats,
+        apifootball_stats=apifootball_stats,
+        market_odds=market_odds,
     ))
     preds = list(score_period_under(
         live, m.home_team, m.away_team, m.league, half=half,
@@ -592,6 +607,9 @@ def _build_match_card(
     prophit_stats: Optional[dict],
     soccerpunter_stats: Optional[dict],
     fotmob_stats: Optional[dict],
+    sportsdb_stats: Optional[dict],
+    apifootball_stats: Optional[dict],
+    market_odds: Optional[dict],
     preds: list[Prediction],
     combined: dict,
     live_stats: LiveStats,
@@ -631,6 +649,9 @@ def _build_match_card(
         prophit_stats=prophit_stats,
         soccerpunter_stats=soccerpunter_stats,
         fotmob_stats=fotmob_stats,
+        sportsdb_stats=sportsdb_stats,
+        apifootball_stats=apifootball_stats,
+        market_odds=market_odds,
         combined_analysis=combined,
         half=half,
         period_goals=p_goals,
@@ -646,6 +667,9 @@ def _build_half_time_card(
     prophit_stats: Optional[dict],
     soccerpunter_stats: Optional[dict],
     fotmob_stats: Optional[dict],
+    sportsdb_stats: Optional[dict],
+    apifootball_stats: Optional[dict],
+    market_odds: Optional[dict],
 ) -> MatchCard:
     return MatchCard(
         event_id=str(m.game_id),
@@ -668,6 +692,9 @@ def _build_half_time_card(
         prophit_stats=prophit_stats,
         soccerpunter_stats=soccerpunter_stats,
         fotmob_stats=fotmob_stats,
+        sportsdb_stats=sportsdb_stats,
+        apifootball_stats=apifootball_stats,
+        market_odds=market_odds,
         combined_analysis=None,
         half="ht",
         period_goals=m.fh_goals,
@@ -687,6 +714,8 @@ def build_dashboard_payload() -> dict[str, Any]:
     PROPHIT_PROVIDER.ensure_loaded(background=True)
     SOCCERPUNTER_PROVIDER.ensure_loaded(background=True)
     FOTMOB_PROVIDER.ensure_loaded(background=True)
+    SPORTSDB_PROVIDER.ensure_loaded(background=True)
+    APIFOOTBALL_PROVIDER.ensure_loaded(background=True)
 
     raw_live = ONEXBET_CLIENT.fetch_live_football()
     total_live = len(raw_live)
@@ -712,9 +741,20 @@ def build_dashboard_payload() -> dict[str, Any]:
         prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
         soccerpunter_stats = SOCCERPUNTER_PROVIDER.lookup_match(m.home_team, m.away_team)
         fotmob_stats = FOTMOB_PROVIDER.lookup_match(m.home_team, m.away_team, half="fh")
+        sportsdb_stats = SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
+        apifootball_stats = APIFOOTBALL_PROVIDER.lookup_match(m.home_team, m.away_team)
+        game_detail = ONEXBET_CLIENT.fetch_game_detail(m.game_id)
+        market_odds_fh = lookup_market_odds(
+            ONEXBET_CLIENT, m.game_id, half="fh",
+            apifb_fixture_id=(apifootball_stats or {}).get("fixture_id"),
+            cached_detail=game_detail,
+        )
 
         if m.is_half_time:
-            cards.append(_build_half_time_card(m, prophit_stats, soccerpunter_stats, fotmob_stats))
+            cards.append(_build_half_time_card(
+                m, prophit_stats, soccerpunter_stats, fotmob_stats,
+                sportsdb_stats, apifootball_stats, market_odds_fh,
+            ))
             ht_count += 1
             continue
 
@@ -731,17 +771,25 @@ def build_dashboard_payload() -> dict[str, Any]:
             if has_red_cards(period_stats):
                 continue
             fm_half = FOTMOB_PROVIDER.lookup_match(m.home_team, m.away_team, half=half)
+            odds_half = lookup_market_odds(
+                ONEXBET_CLIENT, m.game_id, half=half,
+                apifb_fixture_id=(apifootball_stats or {}).get("fixture_id"),
+                cached_detail=game_detail,
+            )
             preds, combined = analyze_onexbet_match(
                 m, half=half, prophit_stats=prophit_stats,
                 soccerpunter_stats=soccerpunter_stats, fotmob_stats=fm_half,
-                period_stats=period_stats,
+                sportsdb_stats=sportsdb_stats, apifootball_stats=apifootball_stats,
+                market_odds=odds_half, period_stats=period_stats,
             )
             if not preds:
                 continue
 
             live_stats = _onexbet_to_live_stats(m, half=half, period_stats=period_stats)
             card = _build_match_card(
-                m, half, prophit_stats, soccerpunter_stats, fm_half, preds, combined, live_stats,
+                m, half, prophit_stats, soccerpunter_stats, fm_half,
+                sportsdb_stats, apifootball_stats, odds_half,
+                preds, combined, live_stats,
             )
             if not card.predictions:
                 continue
@@ -813,6 +861,8 @@ def build_dashboard_payload() -> dict[str, Any]:
         "prophitbet": PROPHIT_PROVIDER.status(),
         "soccerpunter": SOCCERPUNTER_PROVIDER.status(),
         "fotmob": FOTMOB_PROVIDER.status(),
+        "thesportsdb": SPORTSDB_PROVIDER.status(),
+        "api_football": APIFOOTBALL_PROVIDER.status(),
         "min_confidence": MIN_CONFIDENCE,
         "error": None,
     }

@@ -8,7 +8,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
+from api_football_stats import apifootball_live_agreement
 from fotmob_stats import fotmob_live_agreement, fotmob_tempo_profile
+from market_odds import market_odds_score
+from thesportsdb_stats import sportsdb_live_agreement
 
 HALF_CONFIG = {
     "fh": {
@@ -35,6 +38,8 @@ class ScoreBreakdown:
     historical: float = 0.0
     soccer_punter: float = 0.0
     fotmob_verify: float = 0.0
+    external_verify: float = 0.0
+    market_odds: float = 0.0
     live_tempo: float = 0.0
     time_context: float = 0.0
     agreement: float = 0.0
@@ -60,6 +65,9 @@ class CombinedAnalysis:
     form_summary: dict[str, Any] = field(default_factory=dict)
     sp_summary: dict[str, Any] = field(default_factory=dict)
     fotmob_summary: dict[str, Any] = field(default_factory=dict)
+    sportsdb_summary: dict[str, Any] = field(default_factory=dict)
+    apifootball_summary: dict[str, Any] = field(default_factory=dict)
+    market_odds_summary: dict[str, Any] = field(default_factory=dict)
 
 
 def _period_elapsed(minute: int, half: str) -> int:
@@ -387,27 +395,42 @@ def build_combined_analysis(
     half: str = "fh",
     soccer_punter_stats: Optional[dict[str, Any]] = None,
     fotmob_stats: Optional[dict[str, Any]] = None,
+    sportsdb_stats: Optional[dict[str, Any]] = None,
+    apifootball_stats: Optional[dict[str, Any]] = None,
+    market_odds: Optional[dict[str, Any]] = None,
 ) -> CombinedAnalysis:
     live_score, live_profile, live_summary = _live_tempo_profile(live_stats, minute, half)
     form_score, form_profile, form_summary = _form_profile(prophit_stats, half)
     sp_score, sp_prof, sp_summary = _sp_profile(soccer_punter_stats, half)
     fm_score, fm_prof, fm_summary = fotmob_tempo_profile(fotmob_stats, minute, half)
     fm_agree, fm_signals = fotmob_live_agreement(live_profile, fm_prof)
+    sd_agree, sd_signals = sportsdb_live_agreement(
+        live_stats.total_shots, live_stats.shots_on_target, sportsdb_stats,
+    )
+    af_agree, af_signals = apifootball_live_agreement(
+        live_stats.total_shots, live_stats.shots_on_target, apifootball_stats,
+    )
+    mkt_score, mkt_signals = market_odds_score(market_odds, half, total_goals)
     time_score, time_signals = _time_context_score(total_goals, minute, half)
     agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile, sp_prof)
 
     hist_score = form_score if prophit_stats else league_baseline_under_15 / 100 * 25
     fotmob_total = round(fm_score + fm_agree, 1)
+    external_total = round(min(sd_agree + af_agree, 12.0), 1)
 
     breakdown = ScoreBreakdown(
         historical=round(hist_score, 1),
         soccer_punter=round(sp_score, 1),
         fotmob_verify=round(fotmob_total, 1),
+        external_verify=external_total,
+        market_odds=round(mkt_score, 1),
         live_tempo=round(live_score, 1),
         time_context=round(time_score, 1),
         agreement=round(agree_score, 1),
         total=round(
-            hist_score + sp_score + fotmob_total + live_score + time_score + agree_score, 1
+            hist_score + sp_score + fotmob_total + external_total + mkt_score
+            + live_score + time_score + agree_score,
+            1,
         ),
     )
 
@@ -416,12 +439,17 @@ def build_combined_analysis(
         confidence = round(max(confidence - 12, 20), 1)
     if fm_agree <= -4:
         confidence = round(max(confidence - 8, 20), 1)
+    if mkt_score <= -4:
+        confidence = round(max(confidence - 10, 20), 1)
 
     best_market, best_rec = _pick_best_market(total_goals, confidence, minute, half)
     if agreement == "CONFLICT" and best_rec == "BET":
         best_rec = "WATCH"
 
-    fusion_signals = list(agree_signals) + list(fm_signals) + list(time_signals)
+    fusion_signals = (
+        list(agree_signals) + list(fm_signals) + list(sd_signals)
+        + list(af_signals) + list(mkt_signals) + list(time_signals)
+    )
     elapsed = _period_elapsed(minute, half)
     if live_profile in ("very_slow", "slow"):
         fusion_signals.append(
@@ -449,6 +477,20 @@ def build_combined_analysis(
             f"FotMob: {fm_prof.replace('_', ' ')} xG tempo "
             f"({fm_summary.get('total_xg', '—')} xG, {fm_summary.get('shots', '—')} shots)"
         )
+    if sportsdb_stats and sportsdb_stats.get("total_shots"):
+        fusion_signals.append(
+            f"TheSportsDB: {sportsdb_stats.get('total_shots')} shots "
+            f"({sportsdb_stats.get('shots_on_target')} SoT) cross-check"
+        )
+    if apifootball_stats and apifootball_stats.get("total_shots"):
+        fusion_signals.append(
+            f"API-Football: {apifootball_stats.get('total_shots')} shots live verify"
+        )
+    if market_odds and market_odds.get("under_15_implied_pct"):
+        fusion_signals.append(
+            f"Market: {market_odds.get('under_15_implied_pct')}% implied U1.5 "
+            f"@ {market_odds.get('under_15_odds', '—')} ({market_odds.get('source', '1xbet')})"
+        )
 
     return CombinedAnalysis(
         verdict=_verdict(confidence, agreement, best_rec),
@@ -468,6 +510,9 @@ def build_combined_analysis(
         form_summary=form_summary,
         sp_summary=sp_summary,
         fotmob_summary=fm_summary,
+        sportsdb_summary=sportsdb_stats or {},
+        apifootball_summary=apifootball_stats or {},
+        market_odds_summary=market_odds or {},
     )
 
 

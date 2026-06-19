@@ -8,3 +8,4 @@ venv/
 # Large / local-only
 cloudflared.exe
 data/prophitbet/
+data/soccerpunter/

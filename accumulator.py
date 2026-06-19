@@ -86,6 +86,13 @@ def _leg_score(pick: dict, card: dict) -> float:
     pb = card.get("prophit_stats") or {}
     if pb.get("combined_under_15_fh_pct", 0) >= 65:
         bonus += 3
+    sp = card.get("soccerpunter_stats") or {}
+    if sp.get("combined_under_225_pct", 0) >= 60:
+        bonus += 2
+    if sp.get("h2h_under_25_pct", 0) >= 70:
+        bonus += 2
+    if (fusion.get("sp_profile") or "") in ("defensive", "low_scoring"):
+        bonus += 2
     return conf + bonus
 
 

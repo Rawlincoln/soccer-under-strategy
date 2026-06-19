@@ -502,8 +502,21 @@ class SoccerPunterStatsProvider:
 
         html = self._fetch_h2h_html(slug, home_id, away_id)
         if not html:
-            if cached:
-                return asdict(MatchSoccerPunterStats(home_team=home, away_team=away, partial=True))
+            with self._lock:
+                stale = self._h2h_cache.get(f"{home_id}:{away_id}")
+            if stale:
+                parsed = stale[1]
+                stats = MatchSoccerPunterStats(
+                    home_team=home,
+                    away_team=away,
+                    home_id=home_id,
+                    away_id=away_id,
+                    match_id=pair.get("match_id", ""),
+                    league=pair.get("league", parsed.get("league", "")),
+                    partial=True,
+                    **{k: v for k, v in parsed.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
+                )
+                return asdict(stats)
             return None
 
         parsed = _parse_h2h_page(html, home, away)

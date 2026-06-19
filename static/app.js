@@ -143,6 +143,7 @@ function renderFusionAnalysis(m) {
 
   const live = f.live_summary || {};
   const form = f.form_summary || {};
+  const sp = f.sp_summary || {};
   const bd = f.breakdown || {};
 
   return `
@@ -174,15 +175,25 @@ function renderFusionAnalysis(m) {
           </div>
           <div class="fusion-profile">${(f.form_profile || "").replace(/_/g, " ")} teams</div>
         </div>
+        <div class="fusion-col">
+          <div class="fusion-col-title">SoccerPunter H2H</div>
+          <div class="mini-stats">
+            <span>H2H ${sp.h2h_avg_goals ?? "—"} avg</span>
+            <span>U2.25 ${sp.under_225_pct ?? "—"}%</span>
+            <span>FH U0.5 ${sp.fh_under_05_pct ?? "—"}%</span>
+          </div>
+          <div class="fusion-profile">${(f.sp_profile || "unknown").replace(/_/g, " ")} trend</div>
+        </div>
       </div>
       <div class="fusion-breakdown">
         <span>Form ${bd.historical ?? 0}</span>
+        <span>SP ${bd.soccer_punter ?? 0}</span>
         <span>Live ${bd.live_tempo ?? 0}</span>
         <span>Time ${bd.time_context ?? 0}</span>
         <span>Agree ${bd.agreement > 0 ? "+" : ""}${bd.agreement ?? 0}</span>
         <span class="fusion-total">= ${bd.total ?? 0}</span>
       </div>
-      <ul class="signals-list">${(f.fusion_signals || []).slice(0, 3).map((s) => `<li>${s}</li>`).join("")}</ul>
+      <ul class="signals-list">${(f.fusion_signals || []).slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>
     </div>`;
 }
 
@@ -380,9 +391,11 @@ async function fetchData() {
     $("connectionStatus").classList.add("live");
     $("connectionStatus").classList.remove("error");
     const pb = data.prophitbet;
-    const pbNote = pb?.loaded ? ` · ProphitBet ${pb.teams_count} teams` : pb?.loading ? " · ProphitBet loading" : "";
+    const sp = data.soccerpunter;
+    const pbNote = pb?.loaded ? ` · PB ${pb.teams_count} teams` : pb?.loading ? " · PB loading" : "";
+    const spNote = sp?.index_pairs ? ` · SP ${sp.index_pairs} pairs` : sp?.loading_index ? " · SP loading" : "";
     const minC = data.min_confidence ?? MIN_CONF;
-    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}`;
+    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}`;
 
     renderBaselines(data.baselines, data, data.prophitbet);
     renderScoredPicks("scoredU15Section", "scoredU15", data.scored_under_15, "Under 1.5 First Half");

@@ -27,13 +27,26 @@ function matchMinute(item) {
   return m != null && m !== "" ? Number(m) : null;
 }
 
+function periodMinute(item) {
+  const pm = item?.period_minute;
+  if (pm != null && pm !== "") return Number(pm);
+  const m = matchMinute(item);
+  if (m == null || Number.isNaN(m)) return null;
+  if ((item?.half ?? half) === "sh") return Math.max(0, m - 45);
+  return m;
+}
+
 function fmtMinute(item, half) {
   if (isHalfTime(item)) return "HT";
   const m = matchMinute(item);
   if (m == null || Number.isNaN(m)) return "—";
   const h = half ?? item?.half;
   if (h === "ht") return "HT";
-  return h ? `${halfTag(h)} ${m}'` : `${m}'`;
+  if (h === "sh") {
+    const elapsed = periodMinute(item) ?? Math.max(0, m - 45);
+    return `${m}' · 2H ${elapsed}'`;
+  }
+  return h === "fh" ? `1H ${m}'` : `${m}'`;
 }
 
 function minuteBadge(item, half) {
@@ -83,7 +96,7 @@ function renderPicks60(data) {
       <div class="pick-60-match">${item.match}</div>
       <div class="pick-60-market">${item.market?.replace("First Half Goals", "FH").replace("Second Half Goals", "SH")}</div>
       <div class="pick-60-stats">
-        <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : `${halfTag(item.half)} Min`}</div></div>
+        <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : item.half === "sh" ? `2H +${periodMinute(item) ?? 0}'` : `${halfTag(item.half)} Min`}</div></div>
         <div class="pick-60-stat"><div class="num">${item.period_score || "—"}</div><div class="lbl">Score</div></div>
       </div>
       <div class="pick-60-meta">${item.fusion_verdict ? item.fusion_verdict : "Live pick"}</div>
@@ -102,7 +115,7 @@ function renderAcca(acca, stake) {
         </div>
         <div class="leg-league">${leg.league} · ${halfTag(leg.half)}</div>
         <div class="leg-stats">
-          <div class="leg-stat"><div class="num">${leg.is_half_time ? "HT" : `${leg.minute ?? "—"}${leg.minute != null ? "'" : ""}`}</div><div class="lbl">${leg.is_half_time ? "Break" : `${halfTag(leg.half)} Min`}</div></div>
+          <div class="leg-stat"><div class="num">${leg.is_half_time ? "HT" : `${leg.minute ?? "—"}${leg.minute != null ? "'" : ""}`}</div><div class="lbl">${leg.is_half_time ? "Break" : leg.half === "sh" ? `2H +${leg.period_minute ?? Math.max(0, (leg.minute || 0) - 45)}'` : `${halfTag(leg.half)} Min`}</div></div>
           <div class="leg-stat"><div class="num">${leg.period_score || leg.fh_score || "—"}</div><div class="lbl">Period</div></div>
           <div class="leg-stat"><div class="num">${leg.full_score || "—"}</div><div class="lbl">FT</div></div>
           <div class="leg-stat"><div class="num">${fmtConf(leg.confidence)}%</div><div class="lbl">Conf</div></div>

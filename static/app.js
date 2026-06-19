@@ -58,13 +58,27 @@ function matchMinute(item) {
   return m != null && m !== "" ? Number(m) : null;
 }
 
+function periodMinute(item) {
+  const pm = item?.period_minute ?? item?.live_stats?.period_minute;
+  if (pm != null && pm !== "") return Number(pm);
+  const m = matchMinute(item);
+  const h = item?.half ?? half;
+  if (m == null || Number.isNaN(m)) return null;
+  if (h === "sh") return Math.max(0, m - 45);
+  return m;
+}
+
 function fmtMinute(item, half) {
   if (isHalfTime(item)) return "HT";
   const m = matchMinute(item);
   if (m == null || Number.isNaN(m)) return "—";
   const h = half ?? item?.half;
   if (h === "ht") return "HT";
-  return h ? `${halfLabel(h)} ${m}'` : `${m}'`;
+  if (h === "sh") {
+    const elapsed = periodMinute(item) ?? Math.max(0, m - 45);
+    return `${m}' · 2H ${elapsed}'`;
+  }
+  return h === "fh" ? `1H ${m}'` : `${m}'`;
 }
 
 function minuteBadge(item, half) {
@@ -81,7 +95,15 @@ function minuteStatItem(item, half) {
   const m = matchMinute(item);
   const num = m != null && !Number.isNaN(m) ? m : "—";
   const h = half ?? item?.half;
-  const lbl = h ? `${halfLabel(h)} Min` : "Minute";
+  let lbl = "Minute";
+  if (h === "sh" && m != null) {
+    const elapsed = periodMinute(item) ?? Math.max(0, m - 45);
+    lbl = `2H +${elapsed}'`;
+  } else if (h === "fh") {
+    lbl = "1H Min";
+  } else if (h) {
+    lbl = `${halfLabel(h)} Min`;
+  }
   return `<div class="stat-item minute-stat"><div class="num">${num}${m != null ? "'" : ""}</div><div class="lbl">${lbl}</div></div>`;
 }
 
@@ -116,7 +138,7 @@ function renderFusionAnalysis(m) {
       <div class="fusion-best">Best pick: <strong>${f.best_market}</strong> · ${f.best_recommendation}</div>
       <div class="fusion-grid">
         <div class="fusion-col">
-          <div class="fusion-col-title">1xBet Live @ ${live.minute ?? m.minute}'</div>
+          <div class="fusion-col-title">1xBet Live @ ${fmtMinute(m, m.half)}</div>
           <div class="mini-stats">
             <span class="mini-minute">${fmtMinute(m, m.half)}</span>
             <span>${live.shots ?? 0} shots</span>

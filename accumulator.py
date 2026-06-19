@@ -24,6 +24,7 @@ class AccaLeg:
     selection: str
     fh_score: str
     minute: int
+    period_minute: int = 0
     confidence: float
     recommendation: str
     estimated_odds: float
@@ -154,6 +155,7 @@ def _all_qualified_picks(matches: list[dict]) -> list[dict]:
                 "match": f"{card['home_team']} vs {card['away_team']}",
                 "half": card.get("half", "fh"),
                 "minute": card.get("minute", 0),
+                "period_minute": card.get("period_minute", 0),
                 "period_score": card.get("period_score", card.get("fh_score", "0-0")),
                 "fusion_verdict": (card.get("combined_analysis") or {}).get("verdict", ""),
                 "is_half_time": card.get("is_half_time", False),
@@ -214,6 +216,7 @@ def _make_leg(entry: dict) -> AccaLeg:
         selection=market_short,
         fh_score=card.get("period_score", card.get("fh_score", "0-0")),
         minute=card.get("minute", 0),
+        period_minute=card.get("period_minute", 0),
         confidence=round(conf, 1),
         recommendation=pick.get("recommendation", ""),
         estimated_odds=_confidence_to_odds(conf),

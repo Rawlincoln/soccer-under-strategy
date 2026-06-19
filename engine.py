@@ -83,9 +83,9 @@ FINISHED_STATUSES = {"FT", "AET", "PEN"}
 @dataclass
 class LiveStats:
     minute: int
-    period_minute: int = 0
     home_goals: int
     away_goals: int
+    period_minute: int = 0
     total_shots: int = 0
     shots_on_target: int = 0
     corners: int = 0
@@ -526,17 +526,9 @@ def _onexbet_to_live_stats(m: OneXBetMatch, half: str = "fh", period_stats: Opti
         home_goals, away_goals = m.fh_home, m.fh_away
     else:
         home_goals, away_goals = m.sh_home, m.sh_away
-    period_min = m.period_minute if half == ("sh" if m.is_second_half else "fh") else (
-        m.period_minute if half == "sh" else m.period_minute
-    )
-    if half == "fh":
-        period_min = m.period_minute if m.is_first_half or m.is_half_time else min(m.minute, 45)
-    else:
-        period_min = m.period_minute if m.is_second_half else max(0, m.minute - 45)
-
     return LiveStats(
         minute=m.minute,
-        period_minute=period_min,
+        period_minute=m.period_minute,
         home_goals=home_goals,
         away_goals=away_goals,
         total_shots=s.get("total_shots", 0),
@@ -614,6 +606,7 @@ def _build_match_card(
         status=status,
         score=f"{p_home} - {p_away}",
         minute=m.minute,
+        period_minute=m.period_minute,
         live_stats=_stats_to_dict(live_stats),
         predictions=[_pred_to_dict(p) for p in qualified_preds],
         in_entry_window=entry_start <= m.minute <= entry_end,
@@ -644,6 +637,7 @@ def _build_half_time_card(m: OneXBetMatch, prophit_stats: Optional[dict]) -> Mat
         status="HT",
         score=f"{m.fh_home} - {m.fh_away}",
         minute=45,
+        period_minute=45,
         live_stats=_stats_to_dict(_onexbet_to_live_stats(m, half="fh")),
         predictions=[],
         fh_goals=m.fh_goals,
@@ -739,6 +733,7 @@ def build_dashboard_payload() -> dict[str, Any]:
                 pd["period_score"] = card.period_score
                 pd["full_score"] = card.full_score
                 pd["is_half_time"] = card.is_half_time
+                pd["period_minute"] = card.period_minute
                 if p.recommendation in ("BET", "WATCH"):
                     bet_signals.append(pd)
 

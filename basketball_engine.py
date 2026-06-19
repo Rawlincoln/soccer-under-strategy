@@ -5,6 +5,7 @@ Uses Q1+Q2+Q3 quarter scoring stats blended with historical league curves.
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -15,48 +16,56 @@ from basketball_filters import is_excluded_basketball_raw
 from onexbet_basketball import OneXBetBasketballClient, OneXBetBasketballMatch
 
 REFRESH_SECONDS = 30
+MIN_DEFINITE_PCT = 70.0
 CLIENT = OneXBetBasketballClient()
 
 # Historical quarter distributions (combined pts per quarter) + cumulative game shares
 LEAGUE_PROFILES: dict[str, dict[str, Any]] = {
     "nba": {
         "avg_game": 220.0,
+        "game_std": 13.0,
         "quarters": [55.0, 55.0, 54.0, 56.0],
         "cumulative_share": [0.25, 0.50, 0.745, 1.0],
         "q4_vs_h1_avg": 1.02,
     },
     "wnba": {
         "avg_game": 168.0,
+        "game_std": 11.0,
         "quarters": [42.0, 42.0, 41.0, 43.0],
         "cumulative_share": [0.25, 0.50, 0.744, 1.0],
         "q4_vs_h1_avg": 1.01,
     },
     "nbl": {
         "avg_game": 160.0,
+        "game_std": 10.5,
         "quarters": [40.0, 40.0, 39.0, 41.0],
         "cumulative_share": [0.25, 0.50, 0.744, 1.0],
         "q4_vs_h1_avg": 1.0,
     },
     "ibl": {
         "avg_game": 152.0,
+        "game_std": 10.0,
         "quarters": [38.0, 38.0, 37.0, 39.0],
         "cumulative_share": [0.25, 0.50, 0.743, 1.0],
         "q4_vs_h1_avg": 0.98,
     },
     "euroleague": {
         "avg_game": 164.0,
+        "game_std": 11.0,
         "quarters": [41.0, 41.0, 40.0, 42.0],
         "cumulative_share": [0.25, 0.50, 0.744, 1.0],
         "q4_vs_h1_avg": 1.01,
     },
     "philippines": {
         "avg_game": 175.0,
+        "game_std": 11.5,
         "quarters": [44.0, 44.0, 43.0, 44.0],
         "cumulative_share": [0.251, 0.503, 0.749, 1.0],
         "q4_vs_h1_avg": 0.99,
     },
     "default": {
         "avg_game": 160.0,
+        "game_std": 10.5,
         "quarters": [40.0, 40.0, 39.0, 41.0],
         "cumulative_share": [0.25, 0.50, 0.744, 1.0],
         "q4_vs_h1_avg": 0.99,
@@ -81,6 +90,8 @@ class TotalPrediction:
     projected: float
     edge: float
     recommendation: str
+    label: str = ""
+    is_definite: bool = False
     signals: list[str] = field(default_factory=list)
 
 
@@ -103,6 +114,8 @@ class BasketballCard:
     q3_odds: dict[str, Any]
     best_pick: str = ""
     best_confidence: float = 0.0
+    definite_pick: Optional[dict[str, Any]] = None
+    definite_picks: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _interp_cumulative_share(game_pct: float, shares: list[float]) -> float:
@@ -289,6 +302,152 @@ def project_game_total(
     }
 
 
+def _normal_cdf(value: float, mu: float, sigma: float) -> float:
+    if sigma <= 0:
+        return 1.0 if value >= mu else 0.0
+    z = (value - mu) / sigma
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def _estimate_sigma(
+    match: OneXBetBasketballMatch,
+    profile: dict[str, Any],
+    qstats: dict[str, Any],
+    hist_bias: str,
+) -> float:
+    q_len = match.quarter_minutes
+    minutes_played = qstats["minutes_played"]
+    remaining_frac = max((4 * q_len - minutes_played) / (4 * q_len), 0.08)
+    sigma = profile.get("game_std", 10.5) * math.sqrt(remaining_frac)
+
+    q_spread = max(qstats["q1"], qstats["q2"], qstats["q3_pace_to_full"]) - min(
+        qstats["q1"], qstats["q2"], qstats["q3_pace_to_full"],
+    )
+    if q_spread > 14:
+        sigma *= 1.1
+    if qstats["trajectory"] == "stable":
+        sigma *= 0.92
+    if hist_bias in ("OVER", "UNDER"):
+        sigma *= 0.9
+    return max(sigma, 4.0)
+
+
+def _format_line(line: float) -> str:
+    if abs(line * 2 - round(line * 2)) < 0.01:
+        half = round(line * 2)
+        if half % 2 == 0:
+            return str(half // 2)
+        return f"{half // 2}.5"
+    return f"{line:.1f}"
+
+
+def _format_pick_label(pick: str, line: float, prob: float) -> str:
+    return f"{pick} {_format_line(line)} · {prob:.0f}%"
+
+
+def _find_definite_picks(
+    mu: float,
+    sigma: float,
+    odds: dict[str, Any],
+    hist_bias: str,
+    qstats: dict[str, Any],
+    hist: dict[str, float],
+    pace: dict[str, float],
+) -> list[dict[str, Any]]:
+    """Scan all total lines; return picks with >=70% model probability."""
+    lines_map: dict[float, dict[str, float]] = {}
+    for row in odds.get("game_all_lines") or []:
+        line = float(row["line"])
+        lines_map[line] = {
+            "under_prob_pct": row.get("under_prob_pct", 0),
+            "over_prob_pct": row.get("over_prob_pct", 0),
+            "on_market": True,
+        }
+
+    base = int(round(mu))
+    for whole in range(base - 28, base + 29):
+        for half in (0.0, 0.5):
+            lines_map.setdefault(float(whole) + half, {"on_market": False})
+
+    candidates: list[dict[str, Any]] = []
+    for line, meta in lines_map.items():
+        model_p_under = _normal_cdf(line, mu, sigma) * 100.0
+        model_p_over = (1.0 - _normal_cdf(line, mu, sigma)) * 100.0
+
+        if meta.get("under_prob_pct"):
+            p_under = 0.68 * model_p_under + 0.32 * meta["under_prob_pct"]
+        else:
+            p_under = model_p_under
+        if meta.get("over_prob_pct"):
+            p_over = 0.68 * model_p_over + 0.32 * meta["over_prob_pct"]
+        else:
+            p_over = model_p_over
+
+        if hist_bias == "UNDER":
+            p_under = min(p_under + 2.5, 97.0)
+            p_over = max(p_over - 2.0, 3.0)
+        elif hist_bias == "OVER":
+            p_over = min(p_over + 2.5, 97.0)
+            p_under = max(p_under - 2.0, 3.0)
+
+        cushion_under = line - mu
+        cushion_over = mu - line
+
+        if p_under >= MIN_DEFINITE_PCT and cushion_under >= 2:
+            candidates.append({
+                "pick": "UNDER",
+                "line": line,
+                "probability": round(p_under, 1),
+                "cushion": round(cushion_under, 1),
+                "on_market": meta.get("on_market", False),
+                "projected": round(mu, 1),
+                "sigma": round(sigma, 1),
+            })
+        if p_over >= MIN_DEFINITE_PCT and cushion_over >= 2:
+            candidates.append({
+                "pick": "OVER",
+                "line": line,
+                "probability": round(p_over, 1),
+                "cushion": round(cushion_over, 1),
+                "on_market": meta.get("on_market", False),
+                "projected": round(mu, 1),
+                "sigma": round(sigma, 1),
+            })
+
+    market_pool = [c for c in candidates if c.get("on_market")]
+    pick_pool = market_pool if market_pool else candidates
+
+    def _line_quality(c: dict[str, Any]) -> float:
+        """Lower is better: favour ~73% on-market half-point lines."""
+        prob = c["probability"]
+        target = abs(prob - 73.0)
+        if not c.get("on_market"):
+            target += 12.0
+        if prob > 86:
+            target += (prob - 86) * 1.0
+        return target
+
+    def _best_pick(side: str) -> Optional[dict[str, Any]]:
+        pool = [c for c in pick_pool if c["pick"] == side]
+        if not pool:
+            return None
+        band = [c for c in pool if 70.0 <= c["probability"] <= 84.0]
+        chosen = min(band or pool, key=_line_quality)
+        chosen["label"] = _format_pick_label(side, chosen["line"], chosen["probability"])
+        return chosen
+
+    definite: list[dict[str, Any]] = []
+    best_u = _best_pick("UNDER")
+    best_o = _best_pick("OVER")
+    if best_u:
+        definite.append(best_u)
+    if best_o:
+        definite.append(best_o)
+
+    definite.sort(key=lambda x: -x["probability"])
+    return definite[:2]
+
+
 def _historical_pick_bias(qstats: dict[str, Any], hist: dict[str, float]) -> tuple[str, float, list[str]]:
     """Under/over lean from Q1-Q2-Q3 stats vs historical benchmarks."""
     signals: list[str] = []
@@ -361,58 +520,68 @@ def analyze_q3_match(
 
     predictions: list[TotalPrediction] = []
     proj_final = pace["proj_final"]
+    sigma = _estimate_sigma(match, profile, qstats, hist_bias)
 
     signals_base: list[str] = [
         f"Q1 {qstats['q1']} · Q2 {qstats['q2']} · Q3 {qstats['q3_so_far']} "
         f"({qstats['three_q_total']} through 3Q)",
         f"3Q pace {qstats['three_q_ppm']:.2f} ppm · historical expected now {hist['hist_expected_now']:.0f}",
-        f"Blended projection {proj_final:.0f} "
-        f"(pace {pace['proj_pace']:.0f} · quarters {pace['proj_quarters']:.0f} · "
-        f"hist {pace['proj_historical']:.0f})",
+        f"Projected final {proj_final:.0f} ±{sigma:.1f} pts from Q1-Q2-Q3 + history",
     ] + hist_signals
 
-    game_odds = odds.get("game") or {}
-    game_line = game_odds.get("line")
-    if game_line:
-        edge = proj_final - game_line
-        pick = "NEAR LINE"
-        rec = "WAIT"
-        conf = 45.0
+    definite_picks = _find_definite_picks(
+        proj_final, sigma, odds, hist_bias, qstats, hist, pace,
+    )
 
-        if edge >= 3.5:
-            pick = "OVER"
-        elif edge <= -3.5:
-            pick = "UNDER"
-
-        if abs(edge) >= 6:
-            rec = "BET"
-            conf = min(92.0, 58 + abs(edge) * 2.2)
-        elif abs(edge) >= 3:
-            rec = "WATCH"
-            conf = 52 + abs(edge) * 2.0
-
-        if pick != "NEAR LINE" and hist_bias == pick:
-            conf += min(hist_strength * 0.6, 8)
-            signals_base.append(f"Historical Q1-Q2-Q3 stats confirm {pick}")
-        elif pick != "NEAR LINE" and hist_bias != "NEUTRAL" and hist_bias != pick:
-            conf = max(conf - 8, 40)
-            signals_base.append(f"Model {pick} conflicts with historical lean ({hist_bias})")
-
-        if pick in ("OVER", "UNDER") and game_odds.get("market_lean") == pick.lower():
-            conf += 3
-
+    for dp in definite_picks:
+        edge = dp["cushion"] if dp["pick"] == "OVER" else dp["cushion"]
+        prob = dp["probability"]
+        rec = "BET" if prob >= 75 else "BET"
         predictions.append(TotalPrediction(
             market="Game Total",
-            line=game_line,
-            pick=pick,
-            confidence=round(min(conf, 94), 1),
+            line=dp["line"],
+            pick=dp["pick"],
+            confidence=prob,
             projected=proj_final,
-            edge=round(edge, 1),
+            edge=edge,
             recommendation=rec,
+            label=dp["label"],
+            is_definite=True,
             signals=signals_base + [
-                f"Line {game_line} · edge {edge:+.1f} pts · hist final avg {hist['hist_game_avg']:.0f}",
+                dp["label"],
+                f"{dp['pick']} needs final below {dp['line']}" if dp["pick"] == "UNDER"
+                else f"{dp['pick']} needs final above {dp['line']}",
+                f"Cushion {dp['cushion']:+.1f} pts vs projection {proj_final:.0f}",
+                "On 1xBet board" if dp.get("on_market") else "Model line (check 1xBet)",
             ],
         ))
+
+    if not definite_picks:
+        game_odds = odds.get("game") or {}
+        game_line = game_odds.get("line")
+        if game_line:
+            p_under = _normal_cdf(game_line, proj_final, sigma) * 100
+            p_over = 100 - p_under
+            if p_under >= p_over:
+                pick, prob = "UNDER", p_under
+                edge = game_line - proj_final
+            else:
+                pick, prob = "OVER", p_over
+                edge = proj_final - game_line
+            predictions.append(TotalPrediction(
+                market="Game Total",
+                line=game_line,
+                pick=pick,
+                confidence=round(prob, 1),
+                projected=proj_final,
+                edge=round(edge, 1),
+                recommendation="WAIT",
+                label=_format_pick_label(pick, game_line, prob),
+                is_definite=False,
+                signals=signals_base + [
+                    f"No {MIN_DEFINITE_PCT:.0f}%+ line found — best {pick} {game_line} at {prob:.0f}%",
+                ],
+            ))
 
     q3_odds = odds.get("q3_quarter") or {}
     q3_line = q3_odds.get("line")
@@ -450,7 +619,7 @@ def analyze_q3_match(
             ],
         ))
 
-    return predictions, pace, history_summary, qstats
+    return predictions, pace, history_summary, qstats, definite_picks, sigma
 
 
 def _q3_clock_label(match: OneXBetBasketballMatch) -> str:
@@ -488,12 +657,14 @@ def build_basketball_payload() -> dict[str, Any]:
         except Exception:
             odds = {"game": {}, "q3_quarter": {}}
 
-        preds, pace, history, qstats = analyze_q3_match(match, odds)
+        preds, pace, history, qstats, definite_picks, sigma = analyze_q3_match(match, odds)
         if not preds:
             continue
 
         pred_dicts = [asdict(p) for p in preds]
-        best = max(preds, key=lambda p: p.confidence)
+        definite_only = [p for p in preds if p.is_definite]
+        best = max(definite_only or preds, key=lambda p: p.confidence)
+        primary_definite = definite_picks[0] if definite_picks else None
 
         cards.append(BasketballCard(
             event_id=str(match.game_id),
@@ -505,27 +676,34 @@ def build_basketball_payload() -> dict[str, Any]:
             period_name=match.period_name,
             q3_clock=_q3_clock_label(match),
             quarters=_quarters_display(match),
-            quarter_stats=qstats,
+            quarter_stats={**qstats, "proj_sigma": round(sigma, 1)},
             pace=pace,
             history=history,
             predictions=pred_dicts,
             game_odds=odds.get("game") or {},
             q3_odds=odds.get("q3_quarter") or {},
-            best_pick=f"{best.pick} {best.line}" if best.line else best.pick,
+            best_pick=best.label or f"{best.pick} {best.line}",
             best_confidence=best.confidence,
+            definite_pick=primary_definite,
+            definite_picks=definite_picks,
         ))
 
-    cards.sort(key=lambda c: (-c.best_confidence, -c.total_points))
+    cards.sort(key=lambda c: (
+        0 if c.definite_pick else 1,
+        -c.best_confidence,
+        -c.total_points,
+    ))
 
     bet_signals = []
     for card in cards:
         for p in card.predictions:
-            if p["recommendation"] in ("BET", "WATCH") and p["confidence"] >= 52:
+            if p.get("is_definite") and p["confidence"] >= MIN_DEFINITE_PCT:
                 bet_signals.append({
                     "match": f"{card.home_team} vs {card.away_team}",
                     "market": p["market"],
                     "pick": p["pick"],
                     "line": p["line"],
+                    "label": p.get("label") or f"{p['pick']} {p['line']} · {p['confidence']:.0f}%",
                     "confidence": p["confidence"],
                     "recommendation": p["recommendation"],
                     "signals": p["signals"][:4],
@@ -539,7 +717,9 @@ def build_basketball_payload() -> dict[str, Any]:
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
         "sport": "basketball",
-        "filter": "3rd quarter · Q1+Q2+Q3 stats + historical totals",
+        "filter": f"3rd quarter · definite picks ≥{MIN_DEFINITE_PCT:.0f}%",
+        "min_definite_pct": MIN_DEFINITE_PCT,
+        "definite_count": sum(1 for c in cards if c.definite_pick),
         "total_live": total_live,
         "excluded_count": excluded,
         "non_q3_count": q3_excluded_period,

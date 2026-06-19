@@ -23,12 +23,13 @@ function pickClass(pick) {
 }
 
 function renderBaselines(data) {
+  const minPct = data.min_definite_pct ?? 70;
   $("baselines").innerHTML = `
     <div class="baseline-card"><div class="label">Live basketball</div><div class="value orange">${data.total_live ?? 0}</div></div>
     <div class="baseline-card"><div class="label">3rd quarter</div><div class="value orange">${data.match_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">≥${minPct}% definite</div><div class="value orange">${data.definite_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Cyber excluded</div><div class="value">${data.excluded_count ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Other periods</div><div class="value">${data.non_q3_count ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Signals</div><div class="value orange">${data.bet_signal_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">70%+ signals</div><div class="value orange">${data.bet_signal_count ?? 0}</div></div>
   `;
 }
 
@@ -48,9 +49,8 @@ function renderBetSignals(signals) {
         ${s.score} · ${s.q3_clock} · ${s.market}
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        <span class="conf-big">${s.pick} ${s.line}</span>
-        <span class="rec-badge ${recClass(s.recommendation)}">${s.recommendation}</span>
-        <span class="bb-pred-conf">${Number(s.confidence).toFixed(1)}%</span>
+        <span class="conf-big definite-label">${s.label || `${s.pick} ${s.line} · ${Number(s.confidence).toFixed(0)}%`}</span>
+        <span class="rec-badge bet">DEFINITE</span>
       </div>
       <ul class="bb-signals">${(s.signals || []).map((x) => `<li>${x}</li>`).join("")}</ul>
     </div>
@@ -58,18 +58,23 @@ function renderBetSignals(signals) {
 }
 
 function renderMatchCard(m) {
-  const hasBet = (m.predictions || []).some((p) => p.recommendation === "BET");
+  const definite = m.definite_pick;
+  const hasBet = !!definite || (m.predictions || []).some((p) => p.is_definite);
   const qChips = Object.entries(m.quarters || {}).map(([q, val]) => {
     const active = q === "Q3" ? " active" : "";
     return `<span class="bb-q-chip${active}">${q}: ${val}</span>`;
   }).join("");
 
+  const definiteBanner = definite
+    ? `<div class="bb-definite-pick ${pickClass(definite.pick)}">${definite.label}</div>`
+    : `<div class="bb-no-definite">No ${lastData?.min_definite_pct ?? 70}%+ pick — see best below</div>`;
+
   const predsHtml = (m.predictions || []).map((p) => `
-    <div class="bb-pred">
+    <div class="bb-pred${p.is_definite ? " definite" : ""}">
       <span class="bb-pred-market">${p.market}</span>
-      <span class="bb-pred-pick ${pickClass(p.pick)}">${p.pick} ${p.line}</span>
-      <span class="bb-pred-conf">${Number(p.confidence).toFixed(1)}%</span>
-      <span class="rec-badge ${recClass(p.recommendation)}">${p.recommendation}</span>
+      <span class="bb-pred-pick ${pickClass(p.pick)}">${p.label || `${p.pick} ${p.line}`}</span>
+      <span class="bb-pred-conf">${Number(p.confidence).toFixed(0)}%</span>
+      <span class="rec-badge ${p.is_definite ? "bet" : recClass(p.recommendation)}">${p.is_definite ? "DEFINITE" : p.recommendation}</span>
     </div>
     <ul class="bb-signals">${(p.signals || []).slice(0, 5).map((s) => `<li>${s}</li>`).join("")}</ul>
   `).join("");
@@ -96,6 +101,7 @@ function renderMatchCard(m) {
         <span class="bb-score">${m.score}</span>
         <span class="bb-total">${m.total_points} pts · 3Q sum ${qs.three_q_total ?? "—"} · proj ${pace.proj_final ?? "—"}</span>
       </div>
+      ${definiteBanner}
       <div class="bb-quarters">${qChips}</div>
       <div class="bb-stats-table">
         <div class="bb-stats-row head"><span>Quarter</span><span>Live</span><span>Hist</span><span>vs Hist</span></div>
@@ -138,7 +144,8 @@ async function fetchData() {
 
     $("connectionStatus").classList.add("live");
     $("connectionStatus").classList.remove("error");
-    $("statusText").textContent = `Q3 only · ${data.match_count} games · ${data.bet_signal_count} signals`;
+    const minPct = data.min_definite_pct ?? 70;
+    $("statusText").textContent = `≥${minPct}% definite · ${data.definite_count ?? 0}/${data.match_count ?? 0} games · ${data.bet_signal_count} signals`;
 
     renderBaselines(data);
     renderBetSignals(data.bet_signals);

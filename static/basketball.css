@@ -233,3 +233,45 @@
 
 .bb-vs-hist.above { color: #4ade80; }
 .bb-vs-hist.below { color: #60a5fa; }
+
+.bb-definite-pick {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid;
+  letter-spacing: 0.02em;
+}
+
+.bb-definite-pick.under {
+  color: #60a5fa;
+  border-color: #60a5fa66;
+  background: #60a5fa18;
+}
+
+.bb-definite-pick.over {
+  color: #4ade80;
+  border-color: #4ade8066;
+  background: #4ade8018;
+}
+
+.bb-no-definite {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.bb-pred.definite {
+  border-color: #f9731666;
+  background: #f9731610;
+}
+
+.definite-label {
+  font-family: var(--mono);
+  font-weight: 800;
+}

@@ -170,6 +170,27 @@ def pick_main_line(lines: dict[float, dict[int, float]]) -> Optional[float]:
     return best_line
 
 
+def snapshot_all_lines(lines: dict[float, dict[int, float]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for line in sorted(lines.keys()):
+        sides = lines[line]
+        over = sides.get(9, 0.0)
+        under = sides.get(10, 0.0)
+        over_imp = round(100 / over, 1) if over > 1 else 0.0
+        under_imp = round(100 / under, 1) if under > 1 else 0.0
+        total_imp = over_imp + under_imp
+        rows.append({
+            "line": line,
+            "over_odds": round(over, 3) if over else 0.0,
+            "under_odds": round(under, 3) if under else 0.0,
+            "over_implied_pct": over_imp,
+            "under_implied_pct": under_imp,
+            "under_prob_pct": round(under_imp / total_imp * 100, 1) if total_imp > 0 else 0.0,
+            "over_prob_pct": round(over_imp / total_imp * 100, 1) if total_imp > 0 else 0.0,
+        })
+    return rows
+
+
 def snapshot_odds(lines: dict[float, dict[int, float]], main_line: Optional[float]) -> dict[str, Any]:
     if main_line is None:
         return {}
@@ -272,7 +293,9 @@ class OneXBetBasketballClient:
 
         return {
             "game": snapshot_odds(game_lines, game_line),
+            "game_all_lines": snapshot_all_lines(game_lines),
             "q3_quarter": snapshot_odds(q3_lines, pick_main_line(q3_lines)),
+            "q3_all_lines": snapshot_all_lines(q3_lines),
         }
 
     def match_to_dict(self, match: OneXBetBasketballMatch) -> dict[str, Any]:

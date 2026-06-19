@@ -71,11 +71,17 @@ function renderMatchCard(m) {
       <span class="bb-pred-conf">${Number(p.confidence).toFixed(1)}%</span>
       <span class="rec-badge ${recClass(p.recommendation)}">${p.recommendation}</span>
     </div>
-    <ul class="bb-signals">${(p.signals || []).slice(0, 3).map((s) => `<li>${s}</li>`).join("")}</ul>
+    <ul class="bb-signals">${(p.signals || []).slice(0, 5).map((s) => `<li>${s}</li>`).join("")}</ul>
   `).join("");
 
   const pace = m.pace || {};
   const hist = m.history || {};
+  const qs = m.quarter_stats || {};
+  const vsHist = (v) => {
+    if (v == null || Number.isNaN(v)) return "";
+    const cls = v > 2 ? " above" : v < -2 ? " below" : "";
+    return `<span class="bb-vs-hist${cls}">${v > 0 ? "+" : ""}${v}</span>`;
+  };
 
   return `
     <div class="basketball-card${hasBet ? " bet-pick" : ""}">
@@ -84,18 +90,25 @@ function renderMatchCard(m) {
           <div class="bb-league">${m.league || "Basketball"}</div>
           <div class="bb-teams">${m.home_team} vs ${m.away_team}</div>
         </div>
-        <span class="bb-q3-badge">${m.q3_clock || "Q3"}</span>
+        <span class="bb-q3-badge">${m.q3_clock || "Q3"} · ${qs.game_pct ?? "—"}% played</span>
       </div>
       <div class="bb-score-row">
         <span class="bb-score">${m.score}</span>
-        <span class="bb-total">${m.total_points} pts · proj ${pace.proj_final ?? "—"}</span>
+        <span class="bb-total">${m.total_points} pts · 3Q sum ${qs.three_q_total ?? "—"} · proj ${pace.proj_final ?? "—"}</span>
       </div>
       <div class="bb-quarters">${qChips}</div>
+      <div class="bb-stats-table">
+        <div class="bb-stats-row head"><span>Quarter</span><span>Live</span><span>Hist</span><span>vs Hist</span></div>
+        <div class="bb-stats-row"><span>Q1</span><span>${qs.q1 ?? "—"}</span><span>${hist.hist_q1 ?? "—"}</span><span>${vsHist(qs.q1_vs_hist)}</span></div>
+        <div class="bb-stats-row"><span>Q2</span><span>${qs.q2 ?? "—"}</span><span>${hist.hist_q2 ?? "—"}</span><span>${vsHist(qs.q2_vs_hist)}</span></div>
+        <div class="bb-stats-row active"><span>Q3</span><span>${qs.q3_so_far ?? "—"} → ${qs.q3_pace_to_full ?? "—"}</span><span>${hist.hist_q3 ?? "—"}</span><span>${vsHist(qs.q3_vs_hist)}</span></div>
+        <div class="bb-stats-row sum"><span>3Q total</span><span>${qs.three_q_total ?? "—"}</span><span>${hist.hist_expected_now ?? "—"}</span><span>${vsHist(qs.three_q_vs_hist)}</span></div>
+      </div>
       <div class="bb-pace-grid">
-        <div class="bb-pace-item"><div class="num">${pace.h1_pace ?? "—"}</div><div class="lbl">H1 ppm</div></div>
-        <div class="bb-pace-item"><div class="num">${pace.q3_pace ?? "—"}</div><div class="lbl">Q3 ppm</div></div>
-        <div class="bb-pace-item"><div class="num">${pace.proj_q3 ?? "—"}</div><div class="lbl">Proj Q3</div></div>
-        <div class="bb-pace-item"><div class="num">${hist.hist_game ?? "—"}</div><div class="lbl">Hist avg</div></div>
+        <div class="bb-pace-item"><div class="num">${qs.three_q_ppm ?? "—"}</div><div class="lbl">3Q ppm</div></div>
+        <div class="bb-pace-item"><div class="num">${qs.trajectory ?? "—"}</div><div class="lbl">Trend</div></div>
+        <div class="bb-pace-item"><div class="num">${pace.proj_historical ?? "—"}</div><div class="lbl">Hist proj</div></div>
+        <div class="bb-pace-item"><div class="num">${hist.hist_bias ?? "—"}</div><div class="lbl">Hist lean</div></div>
       </div>
       <div class="bb-predictions">${predsHtml}</div>
     </div>`;

@@ -623,9 +623,15 @@ h1 {
 
 .fusion-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 8px;
+}
+
+@media (max-width: 960px) {
+  .fusion-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 720px) {
@@ -655,6 +661,35 @@ h1 {
   margin-top: 5px;
   font-family: var(--mono, "JetBrains Mono", monospace);
 }
+
+.external-verify {
+  font-size: 0.65rem;
+  color: #a5b4fc;
+  margin-top: 4px;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+}
+
+.market-odds-line {
+  font-size: 0.68rem;
+  color: #fbbf24;
+  margin-top: 5px;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+  font-weight: 600;
+}
+
+.market-odds-line .market-src {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.fusion-col-market {
+  border-left: 1px dashed var(--border);
+  padding-left: 10px;
+}
+
+.market-lean-strong_under { color: var(--green); }
+.market-lean-under { color: #86efac; }
+.market-lean-over { color: #f87171; }
 
 .fusion-breakdown {
   display: flex;

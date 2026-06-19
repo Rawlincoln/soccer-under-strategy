@@ -25,11 +25,25 @@ function confClass(c) {
   return "low";
 }
 
-function renderBaselines(b, meta, pb) {
+function providerLabel(p, countKey, loadingKey) {
+  if (!p) return "—";
+  if (p.loading || p.loading_index) return "Loading…";
+  if (p.error) return "Error";
+  if (p.enabled === false) return "No key";
+  const n = p[countKey];
+  if (n != null) return String(n);
+  return p.loaded ? "OK" : "Pending";
+}
+
+function renderBaselines(b, meta, pb, tsdb, apifb) {
   if (!b) return;
   const pbLabel = pb?.loaded
     ? `${pb.teams_count ?? 0} teams`
     : pb?.loading ? "Loading…" : "Pending";
+  const tsdbLabel = providerLabel(tsdb, "index_events", "loading");
+  const apifbLabel = apifb?.enabled === false
+    ? "Set API key"
+    : providerLabel(apifb, "live_fixtures", "loading");
   $("baselines").innerHTML = `
     <div class="baseline-card"><div class="label">Live football (1xBet)</div><div class="value">${meta?.total_live ?? 0}</div></div>
     <div class="baseline-card"><div class="label">1st half</div><div class="value green">${meta?.first_half ?? 0}</div></div>
@@ -37,6 +51,8 @@ function renderBaselines(b, meta, pb) {
     <div class="baseline-card"><div class="label">Half-time</div><div class="value">${meta?.half_time_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Scored · under alive</div><div class="value green">${meta?.scored_filter ?? 0}</div></div>
     <div class="baseline-card"><div class="label">ProphitBet form DB</div><div class="value">${pbLabel}</div></div>
+    <div class="baseline-card"><div class="label">TheSportsDB verify</div><div class="value">${tsdbLabel}</div></div>
+    <div class="baseline-card"><div class="label">API-Football verify</div><div class="value">${apifbLabel}</div></div>
   `;
 }
 
@@ -145,7 +161,22 @@ function renderFusionAnalysis(m) {
   const form = f.form_summary || {};
   const sp = f.sp_summary || {};
   const fm = f.fotmob_summary || {};
+  const sd = f.sportsdb_summary || m.sportsdb_stats || {};
+  const af = f.apifootball_summary || m.apifootball_stats || {};
+  const mkt = f.market_odds_summary || m.market_odds || {};
   const bd = f.breakdown || {};
+
+  const sdLine = sd.total_shots
+    ? `<div class="external-verify">SportsDB: ${sd.total_shots} shots · ${sd.shots_on_target ?? 0} SoT</div>`
+    : "";
+  const afLine = af.total_shots
+    ? `<div class="external-verify">API-FB: ${af.total_shots} shots · ${af.shots_on_target ?? 0} SoT</div>`
+    : "";
+  const mktLine = mkt.under_15_implied_pct
+    ? `<div class="market-odds-line">Market: ${mkt.under_15_implied_pct}% U1.5 @ ${mkt.under_15_odds ?? "—"} <span class="market-src">(${mkt.source || "1xbet"})</span></div>`
+    : mkt.under_05_implied_pct
+      ? `<div class="market-odds-line">Market: ${mkt.under_05_implied_pct}% U0.5 @ ${mkt.under_05_odds ?? "—"}</div>`
+      : "";
 
   return `
     <div class="fusion-panel ${fusionClass(f.verdict)}">
@@ -186,17 +217,24 @@ function renderFusionAnalysis(m) {
           </div>
           <div class="fusion-profile">${(f.sp_profile || "unknown").replace(/_/g, " ")} trend</div>
         </div>
+        <div class="fusion-col fusion-col-market">
+          <div class="fusion-col-title">External + Market</div>
+          ${sdLine}${afLine}${mktLine || '<div class="fusion-profile">No cross-check data yet</div>'}
+          ${mkt.market_lean && mkt.market_lean !== "neutral" ? `<div class="fusion-profile market-lean-${mkt.market_lean}">${mkt.market_lean.replace(/_/g, " ")} lean</div>` : ""}
+        </div>
       </div>
       <div class="fusion-breakdown">
         <span>Form ${bd.historical ?? 0}</span>
         <span>SP ${bd.soccer_punter ?? 0}</span>
         <span>FM ${bd.fotmob_verify ?? 0}</span>
+        <span>Ext ${bd.external_verify ?? 0}</span>
+        <span>Mkt ${bd.market_odds ?? 0}</span>
         <span>Live ${bd.live_tempo ?? 0}</span>
         <span>Time ${bd.time_context ?? 0}</span>
         <span>Agree ${bd.agreement > 0 ? "+" : ""}${bd.agreement ?? 0}</span>
         <span class="fusion-total">= ${bd.total ?? 0}</span>
       </div>
-      <ul class="signals-list">${(f.fusion_signals || []).slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>
+      <ul class="signals-list">${(f.fusion_signals || []).slice(0, 6).map((s) => `<li>${s}</li>`).join("")}</ul>
     </div>`;
 }
 
@@ -396,13 +434,19 @@ async function fetchData() {
     const pb = data.prophitbet;
     const sp = data.soccerpunter;
     const fm = data.fotmob;
+    const tsdb = data.thesportsdb;
+    const apifb = data.api_football;
     const pbNote = pb?.loaded ? ` · PB ${pb.teams_count} teams` : pb?.loading ? " · PB loading" : "";
     const spNote = sp?.index_pairs ? ` · SP ${sp.index_pairs} pairs` : sp?.loading_index ? " · SP loading" : "";
     const fmNote = fm?.index_matches ? ` · FM ${fm.index_matches}` : fm?.loading ? " · FM loading" : "";
+    const tsdbNote = tsdb?.index_events ? ` · TSDB ${tsdb.index_events}` : tsdb?.loading ? " · TSDB loading" : "";
+    const apifbNote = apifb?.enabled === false
+      ? ""
+      : apifb?.live_fixtures ? ` · API-FB ${apifb.live_fixtures}` : apifb?.loading ? " · API-FB loading" : "";
     const minC = data.min_confidence ?? MIN_CONF;
-    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}${fmNote}`;
+    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}${fmNote}${tsdbNote}${apifbNote}`;
 
-    renderBaselines(data.baselines, data, data.prophitbet);
+    renderBaselines(data.baselines, data, data.prophitbet, data.thesportsdb, data.api_football);
     renderScoredPicks("scoredU15Section", "scoredU15", data.scored_under_15, "Under 1.5 First Half");
     renderScoredPicks("scoredU25Section", "scoredU25", data.scored_under_25, "Under 2.5 First Half");
     renderBetSignals(data.bet_signals);

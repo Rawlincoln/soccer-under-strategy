@@ -98,6 +98,26 @@ def _leg_score(pick: dict, card: dict) -> float:
     fm = card.get("fotmob_stats") or {}
     if fm.get("total_xg", 99) <= 0.5:
         bonus += 2
+    bd = fusion.get("breakdown") or {}
+    if (bd.get("external_verify") or 0) >= 6:
+        bonus += 3
+    elif (bd.get("external_verify") or 0) >= 3:
+        bonus += 1
+    if (bd.get("market_odds") or 0) >= 6:
+        bonus += 3
+    elif (bd.get("market_odds") or 0) >= 3:
+        bonus += 1
+    mkt = card.get("market_odds") or fusion.get("market_odds_summary") or {}
+    if mkt.get("under_15_implied_pct", 0) >= 68:
+        bonus += 2
+    elif mkt.get("under_05_implied_pct", 0) >= 65:
+        bonus += 1
+    if mkt.get("market_lean") == "strong_under":
+        bonus += 2
+    sd = card.get("sportsdb_stats") or {}
+    af = card.get("apifootball_stats") or {}
+    if sd.get("total_shots") and af.get("total_shots"):
+        bonus += 2
     return conf + bonus
 
 

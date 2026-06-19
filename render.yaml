@@ -10,3 +10,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.13.0"
+      - key: API_FOOTBALL_KEY
+        sync: false

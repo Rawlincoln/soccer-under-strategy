@@ -165,6 +165,13 @@ class APIFootballStatsProvider:
             with self._lock:
                 self._loading = False
 
+    def _fixture_by_id(self, fixture_id: int) -> Optional[dict[str, Any]]:
+        with self._lock:
+            for fx in self._live_index.values():
+                if fx.get("fixture", {}).get("id") == fixture_id:
+                    return fx
+        return None
+
     def _resolve_fixture(self, home: str, away: str) -> Optional[dict[str, Any]]:
         key = _pair_key(home, away)
         with self._lock:
@@ -184,7 +191,11 @@ class APIFootballStatsProvider:
                 best = fx
         return best if best_score >= 0.78 else None
 
-    def _fetch_statistics(self, fixture_id: int) -> Optional[APIFootballMatchStats]:
+    def _fetch_statistics(
+        self,
+        fixture_id: int,
+        fixture: Optional[dict[str, Any]] = None,
+    ) -> Optional[APIFootballMatchStats]:
         cache_key = str(fixture_id)
         with self._lock:
             cached = self._stats_cache.get(cache_key)
@@ -203,12 +214,9 @@ class APIFootballStatsProvider:
 
         home_row = response[0].get("statistics") or []
         away_row = response[1].get("statistics") or []
-        fx = self._resolve_fixture(
-            response[0].get("team", {}).get("name", ""),
-            response[1].get("team", {}).get("name", ""),
-        ) or {}
+        fx = fixture or self._fixture_by_id(fixture_id) or {}
 
-        fixture = fx.get("fixture") or {}
+        fixture_meta = fx.get("fixture") or {}
         goals = fx.get("goals") or {}
         league = fx.get("league") or {}
 
@@ -231,8 +239,8 @@ class APIFootballStatsProvider:
             home_team=(response[0].get("team") or {}).get("name", ""),
             away_team=(response[1].get("team") or {}).get("name", ""),
             league=league.get("name", ""),
-            status=(fixture.get("status") or {}).get("short", ""),
-            minute=_safe_int((fixture.get("status") or {}).get("elapsed")),
+            status=(fixture_meta.get("status") or {}).get("short", ""),
+            minute=_safe_int((fixture_meta.get("status") or {}).get("elapsed")),
             total_shots=home_shots + away_shots,
             shots_on_target=home_sot + away_sot,
             corners=home_corners + away_corners,
@@ -261,7 +269,7 @@ class APIFootballStatsProvider:
         if not fid:
             return None
 
-        stats = self._fetch_statistics(int(fid))
+        stats = self._fetch_statistics(int(fid), fixture=fx)
         if not stats:
             return None
         return asdict(stats)

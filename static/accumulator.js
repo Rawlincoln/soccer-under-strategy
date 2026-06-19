@@ -32,7 +32,7 @@ function periodMinute(item) {
   if (pm != null && pm !== "") return Number(pm);
   const m = matchMinute(item);
   if (m == null || Number.isNaN(m)) return null;
-  if ((item?.half ?? half) === "sh") return Math.max(0, m - 45);
+  if (item?.half === "sh") return Math.max(0, m - 45);
   return m;
 }
 

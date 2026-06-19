@@ -34,7 +34,6 @@ class OneXBetMatch:
     period: int
     period_name: str
     minute: int
-    period_minute: int = 0
     home_score: int
     away_score: int
     fh_home: int
@@ -50,6 +49,7 @@ class OneXBetMatch:
     is_first_half: bool = False
     is_second_half: bool = False
     is_half_time: bool = False
+    period_minute: int = 0
     raw: dict = field(default_factory=dict)
 
 

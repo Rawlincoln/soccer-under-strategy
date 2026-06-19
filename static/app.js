@@ -62,9 +62,8 @@ function periodMinute(item) {
   const pm = item?.period_minute ?? item?.live_stats?.period_minute;
   if (pm != null && pm !== "") return Number(pm);
   const m = matchMinute(item);
-  const h = item?.half ?? half;
   if (m == null || Number.isNaN(m)) return null;
-  if (h === "sh") return Math.max(0, m - 45);
+  if (item?.half === "sh") return Math.max(0, m - 45);
   return m;
 }
 

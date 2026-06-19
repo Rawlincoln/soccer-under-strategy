@@ -83,6 +83,7 @@ FINISHED_STATUSES = {"FT", "AET", "PEN"}
 @dataclass
 class LiveStats:
     minute: int
+    period_minute: int = 0
     home_goals: int
     away_goals: int
     total_shots: int = 0
@@ -126,6 +127,7 @@ class MatchCard:
     status: str
     score: str
     minute: int
+    period_minute: int = 0
     live_stats: Optional[dict]
     predictions: list[dict]
     home_badge: str = ""
@@ -524,8 +526,17 @@ def _onexbet_to_live_stats(m: OneXBetMatch, half: str = "fh", period_stats: Opti
         home_goals, away_goals = m.fh_home, m.fh_away
     else:
         home_goals, away_goals = m.sh_home, m.sh_away
+    period_min = m.period_minute if half == ("sh" if m.is_second_half else "fh") else (
+        m.period_minute if half == "sh" else m.period_minute
+    )
+    if half == "fh":
+        period_min = m.period_minute if m.is_first_half or m.is_half_time else min(m.minute, 45)
+    else:
+        period_min = m.period_minute if m.is_second_half else max(0, m.minute - 45)
+
     return LiveStats(
         minute=m.minute,
+        period_minute=period_min,
         home_goals=home_goals,
         away_goals=away_goals,
         total_shots=s.get("total_shots", 0),

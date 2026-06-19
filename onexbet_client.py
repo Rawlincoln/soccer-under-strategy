@@ -34,6 +34,7 @@ class OneXBetMatch:
     period: int
     period_name: str
     minute: int
+    period_minute: int = 0
     home_score: int
     away_score: int
     fh_home: int
@@ -50,6 +51,30 @@ class OneXBetMatch:
     is_second_half: bool = False
     is_half_time: bool = False
     raw: dict = field(default_factory=dict)
+
+
+HALF_TIME_SECONDS = 45 * 60
+
+
+def parse_match_clock(period: int, is_half_time: bool, timer_sec: int) -> tuple[int, int]:
+    """
+    Return (match_minute, period_minute).
+    match_minute: standard match clock (0-45 HT, 46-90+ in 2H).
+    period_minute: minutes elapsed in the current half.
+    """
+    if is_half_time:
+        return 45, 45
+    if period == 1:
+        elapsed = timer_sec // 60
+        return elapsed, elapsed
+    if period == 2:
+        # TS >= 45 min: total match clock. TS < 45 min: seconds elapsed in 2nd half only.
+        if timer_sec >= HALF_TIME_SECONDS:
+            match_min = timer_sec // 60
+        else:
+            match_min = 45 + timer_sec // 60
+        return match_min, max(0, match_min - 45)
+    return 0, 0
 
 
 def detect_half_time(period: int, period_name: str) -> bool:
@@ -173,14 +198,7 @@ class OneXBetClient:
             sh_away = max(away_score - fh_away, 0)
 
         timer_sec = int(sc.get("TS") or 0)
-        if is_half_time:
-            minute = 45
-        elif period == 1:
-            minute = timer_sec // 60
-        elif period == 2:
-            minute = 45 + timer_sec // 60
-        else:
-            minute = 0
+        minute, period_minute = parse_match_clock(period, is_half_time, timer_sec)
 
         stats = self._parse_stats(sc.get("ST"))
         home_poss = float(stats.get("possession_home", 50))
@@ -204,6 +222,7 @@ class OneXBetClient:
             period=period,
             period_name=period_name,
             minute=minute,
+            period_minute=period_minute,
             home_score=home_score,
             away_score=away_score,
             fh_home=fh_home,

@@ -5,11 +5,14 @@ from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
 
+from basketball_engine import REFRESH_SECONDS as BB_REFRESH_SECONDS, BasketballCache
 from engine import REFRESH_SECONDS, DataCache
 
 app = Flask(__name__, static_folder="static")
 cache = DataCache()
+basketball_cache = BasketballCache()
 _cache_started = False
+_bb_cache_started = False
 
 
 def _ensure_cache():
@@ -17,6 +20,13 @@ def _ensure_cache():
     if not _cache_started:
         cache.start()
         _cache_started = True
+
+
+def _ensure_basketball_cache():
+    global _bb_cache_started
+    if not _bb_cache_started:
+        basketball_cache.start()
+        _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
 
@@ -34,6 +44,11 @@ def accumulator_page():
 @app.route("/strategy")
 def strategy_page():
     return send_from_directory(STATIC, "strategy.html")
+
+
+@app.route("/basketball")
+def basketball_page():
+    return send_from_directory(STATIC, "basketball.html")
 
 
 @app.route("/api/accumulators")
@@ -65,6 +80,18 @@ def api_predictions():
 def api_refresh():
     cache.refresh()
     return jsonify({"ok": True, "updated_at": cache.get().get("updated_at")})
+
+
+@app.route("/api/basketball")
+def api_basketball():
+    _ensure_basketball_cache()
+    return jsonify(basketball_cache.get())
+
+
+@app.route("/api/basketball/refresh", methods=["POST"])
+def api_basketball_refresh():
+    basketball_cache.refresh()
+    return jsonify({"ok": True, "updated_at": basketball_cache.get().get("updated_at")})
 
 
 @app.route("/health")

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro Punter · Basketball Q3</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/basketball.css?v=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+</head>
+<body class="basketball-page">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">🏀</span>
+        <div>
+          <h1>Pro Punter · Basketball</h1>
+          <p class="subtitle">1xBet live · 3rd quarter only · arithmetic + historical totals</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/">Soccer Live</a>
+        <a href="/basketball" class="active">Basketball Q3</a>
+        <a href="/accumulator">Accumulators</a>
+        <a href="/strategy">100K Strategy</a>
+      </nav>
+      <div class="status-pill" id="connectionStatus">
+        <span class="pulse"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+      <div class="meta">
+        <span id="lastUpdate">—</span>
+        <span class="sep">·</span>
+        <span id="matchCount">0 Q3 games</span>
+        <span class="sep">·</span>
+        <span id="liveTotal">0 live</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="baselines" id="baselines"></section>
+
+  <section class="bet-signals" id="betSignalsSection" hidden>
+    <h2 class="section-title bet-title">
+      <span class="badge-live">SIGNALS</span>
+      Q3 over/under picks
+    </h2>
+    <div class="signals-grid" id="betSignals"></div>
+  </section>
+
+  <section class="matches-section">
+    <div class="section-header">
+      <h2 class="section-title">Live 3rd quarter · totals predictions</h2>
+      <button class="btn-refresh" id="btnRefresh" title="Force refresh">↻ Refresh</button>
+    </div>
+    <div class="matches-grid" id="matchesGrid">
+      <div class="loading">Loading 1xBet basketball…</div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Data: 1xBet basketball live · 3rd quarter filter · excludes cyber/NBA 2K/IPBL/esports ·
+    refreshes every <span id="refreshInterval">30</span>s
+  </footer>
+
+  <script src="/static/basketball.js?v=1"></script>
+</body>
+</html>

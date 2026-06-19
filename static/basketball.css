@@ -1,0 +1,187 @@
+.basketball-page {
+  --accent: #f97316;
+  --accent-dim: #f9731622;
+}
+
+.basketball-page .logo h1 {
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.basketball-page .nav-links a.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.basketball-page .status-pill.live .pulse {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.basketball-page .baseline-card .value.orange {
+  color: var(--accent);
+}
+
+.basketball-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.basketball-card.bet-pick {
+  border-color: #f9731688;
+  box-shadow: 0 0 0 1px #f9731633;
+}
+
+.bb-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bb-league {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bb-q3-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid #f9731644;
+}
+
+.bb-teams {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.bb-score-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.bb-score {
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.bb-total {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.bb-quarters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+.bb-q-chip {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.bb-q-chip.active {
+  color: var(--accent);
+  border-color: #f9731655;
+  background: var(--accent-dim);
+}
+
+.bb-pace-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .bb-pace-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.bb-pace-item {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+
+.bb-pace-item .num {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.bb-pace-item .lbl {
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.bb-predictions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bb-pred {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 600px) {
+  .bb-pred {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.bb-pred-market {
+  font-weight: 600;
+}
+
+.bb-pred-pick.over { color: #4ade80; font-weight: 700; }
+.bb-pred-pick.under { color: #60a5fa; font-weight: 700; }
+.bb-pred-pick.near { color: var(--muted); }
+
+.bb-pred-conf {
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.bb-signals {
+  list-style: none;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.bb-signals li::before {
+  content: "→ ";
+  color: var(--accent);
+}

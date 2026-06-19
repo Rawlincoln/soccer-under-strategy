@@ -673,15 +673,21 @@ class SoccerPunterStatsProvider:
         parsed: dict[str, Any],
         partial: bool = False,
     ) -> dict[str, Any]:
+        fields = {
+            k: v for k, v in parsed.items()
+            if k in MatchSoccerPunterStats.__dataclass_fields__ and k not in {
+                "home_team", "away_team", "home_id", "away_id", "match_id", "league", "partial",
+            }
+        }
         stats = MatchSoccerPunterStats(
             home_team=home,
             away_team=away,
             home_id=pair["home_id"],
             away_id=pair["away_id"],
             match_id=pair.get("match_id", ""),
-            league=pair.get("league", parsed.get("league", "")),
+            league=pair.get("league") or parsed.get("league", ""),
             partial=partial,
-            **{k: v for k, v in parsed.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
+            **fields,
         )
         return asdict(stats)
 

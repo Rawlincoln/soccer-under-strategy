@@ -52,10 +52,28 @@ function isHalfTime(item) {
   return !!(item?.is_half_time || item?.half === "ht" || item?.status === "HT");
 }
 
+function normalizeMatchMinute(item, raw) {
+  const m = Number(raw);
+  if (Number.isNaN(m)) return null;
+  const half = item?.half ?? item?.status;
+  if (half !== "sh" && half !== "2H") return m;
+
+  const pm = Number(item?.period_minute ?? item?.live_stats?.period_minute);
+  if (!Number.isNaN(pm) && pm >= 0) {
+    const clock = 45 + pm;
+    // Fix legacy double-add bug (45 + total_clock e.g. 45+56=101')
+    if (m === clock + 45) return clock;
+    if (m > 80 && pm < 45 && m - pm >= 85) return m - 45;
+  }
+  if (m > 120) return m - 45;
+  return m;
+}
+
 function matchMinute(item) {
   if (isHalfTime(item)) return 45;
-  const m = item?.minute ?? item?.live_stats?.minute;
-  return m != null && m !== "" ? Number(m) : null;
+  const raw = item?.minute ?? item?.live_stats?.minute;
+  if (raw == null || raw === "") return null;
+  return normalizeMatchMinute(item, raw);
 }
 
 function periodMinute(item) {

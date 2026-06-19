@@ -56,24 +56,42 @@ class OneXBetMatch:
 HALF_TIME_SECONDS = 45 * 60
 
 
-def parse_match_clock(period: int, is_half_time: bool, timer_sec: int) -> tuple[int, int]:
+def parse_match_clock(
+    period: int,
+    is_half_time: bool,
+    timer_sec: int,
+    period_name: str = "",
+) -> tuple[int, int]:
     """
     Return (match_minute, period_minute).
     match_minute: standard match clock (0-45 HT, 46-90+ in 2H).
     period_minute: minutes elapsed in the current half.
+
+    1xBet TS semantics:
+    - 1st half (CP=1): seconds elapsed in the half.
+    - 2nd half (CP=2): usually total match seconds (>= 45 min). Sometimes
+      only 2nd-half elapsed (< 45 min) on short/esoccer feeds.
     """
     if is_half_time:
         return 45, 45
+
+    elapsed_sec = max(int(timer_sec or 0), 0)
+
     if period == 1:
-        elapsed = timer_sec // 60
-        return elapsed, elapsed
+        match_min = elapsed_sec // 60
+        return match_min, match_min
+
     if period == 2:
-        # TS >= 45 min: total match clock. TS < 45 min: seconds elapsed in 2nd half only.
-        if timer_sec >= HALF_TIME_SECONDS:
-            match_min = timer_sec // 60
+        pn = (period_name or "").lower()
+        if elapsed_sec >= HALF_TIME_SECONDS:
+            # Total match clock (e.g. TS=3396 -> 56', not 45+56=101')
+            match_min = elapsed_sec // 60
+        elif "2nd" in pn:
+            match_min = 45 + elapsed_sec // 60
         else:
-            match_min = 45 + timer_sec // 60
+            match_min = elapsed_sec // 60
         return match_min, max(0, match_min - 45)
+
     return 0, 0
 
 
@@ -198,7 +216,9 @@ class OneXBetClient:
             sh_away = max(away_score - fh_away, 0)
 
         timer_sec = int(sc.get("TS") or 0)
-        minute, period_minute = parse_match_clock(period, is_half_time, timer_sec)
+        minute, period_minute = parse_match_clock(
+            period, is_half_time, timer_sec, period_name,
+        )
 
         stats = self._parse_stats(sc.get("ST"))
         home_poss = float(stats.get("possession_home", 50))

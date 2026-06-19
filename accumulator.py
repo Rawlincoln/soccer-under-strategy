@@ -24,12 +24,12 @@ class AccaLeg:
     selection: str
     fh_score: str
     minute: int
-    period_minute: int = 0
     confidence: float
     recommendation: str
     estimated_odds: float
     signals: list[str]
     half: str = "fh"
+    period_minute: int = 0
     period_score: str = "0-0"
     full_score: str = "0-0"
     prophit_under_15_fh_pct: float = 0.0

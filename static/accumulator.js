@@ -21,10 +21,25 @@ function isHalfTime(item) {
   return !!(item?.is_half_time || item?.half === "ht" || item?.status === "HT");
 }
 
+function normalizeMatchMinute(item, raw) {
+  const m = Number(raw);
+  if (Number.isNaN(m)) return null;
+  if (item?.half !== "sh") return m;
+  const pm = Number(item?.period_minute);
+  if (!Number.isNaN(pm) && pm >= 0) {
+    const clock = 45 + pm;
+    if (m === clock + 45) return clock;
+    if (m > 80 && pm < 45 && m - pm >= 85) return m - 45;
+  }
+  if (m > 120) return m - 45;
+  return m;
+}
+
 function matchMinute(item) {
   if (isHalfTime(item)) return 45;
-  const m = item?.minute;
-  return m != null && m !== "" ? Number(m) : null;
+  const raw = item?.minute;
+  if (raw == null || raw === "") return null;
+  return normalizeMatchMinute(item, raw);
 }
 
 function periodMinute(item) {

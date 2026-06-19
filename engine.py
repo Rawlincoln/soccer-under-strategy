@@ -127,7 +127,6 @@ class MatchCard:
     status: str
     score: str
     minute: int
-    period_minute: int = 0
     live_stats: Optional[dict]
     predictions: list[dict]
     home_badge: str = ""
@@ -147,6 +146,7 @@ class MatchCard:
     full_score: str = "0-0"
     is_half_time: bool = False
     period_name: str = ""
+    period_minute: int = 0
 
 
 class DataCache:

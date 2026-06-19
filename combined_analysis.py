@@ -197,6 +197,16 @@ def _sp_profile(sp: Optional[dict[str, Any]], half: str = "fh") -> tuple[float, 
     if not sp:
         return 0.0, "unknown", {}
 
+    has_signal = any(
+        (sp.get(k) or 0) > 0
+        for k in (
+            "combined_goals_avg", "combined_under_225_pct", "combined_fh_under_05_pct",
+            "h2h_avg_total_goals", "h2h_meetings",
+        )
+    )
+    if not has_signal:
+        return 0.0, "unknown", {}
+
     score = 0.0
     combined_avg = sp.get("combined_goals_avg", 0) or 0
     u225 = sp.get("combined_under_225_pct", 0) or 0

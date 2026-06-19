@@ -193,30 +193,112 @@ def _form_profile(prophit: Optional[dict[str, Any]], half: str = "fh") -> tuple[
     }
 
 
-def _agreement_score(live_profile: str, form_profile: str) -> tuple[float, str, list[str]]:
+def _sp_profile(sp: Optional[dict[str, Any]], half: str = "fh") -> tuple[float, str, dict[str, Any]]:
+    if not sp:
+        return 0.0, "unknown", {}
+
+    score = 0.0
+    combined_avg = sp.get("combined_goals_avg", 0) or 0
+    u225 = sp.get("combined_under_225_pct", 0) or 0
+    fh_u05 = sp.get("combined_fh_under_05_pct", 0) or 0
+    h2h_avg = sp.get("h2h_avg_total_goals", 0) or 0
+    h2h_u25 = sp.get("h2h_under_25_pct", 0) or 0
+
+    if combined_avg > 0:
+        if combined_avg <= 1.6:
+            score += 8
+        elif combined_avg <= 2.2:
+            score += 5
+        elif combined_avg >= 3.0:
+            score -= 5
+
+    if u225 >= 65:
+        score += 6
+    elif u225 >= 50:
+        score += 3
+    elif u225 <= 30 and u225 > 0:
+        score -= 3
+
+    if half == "fh":
+        if fh_u05 >= 55:
+            score += 5
+        elif fh_u05 >= 40:
+            score += 2
+        elif fh_u05 <= 25 and fh_u05 > 0:
+            score -= 2
+    elif u225 >= 55:
+        score += 4
+
+    if h2h_avg > 0:
+        if h2h_avg <= 2.0:
+            score += 4
+        elif h2h_avg >= 3.5:
+            score -= 4
+
+    if h2h_u25 >= 70:
+        score += 3
+
+    score = max(0.0, min(score, 20.0))
+
+    if score >= 15:
+        profile = "defensive"
+    elif score >= 10:
+        profile = "low_scoring"
+    elif score >= 5:
+        profile = "balanced"
+    else:
+        profile = "high_scoring"
+
+    return score, profile, {
+        "combined_goals_avg": round(combined_avg, 2),
+        "under_225_pct": round(u225, 1),
+        "fh_under_05_pct": round(fh_u05, 1),
+        "h2h_avg_goals": round(h2h_avg, 2),
+        "h2h_under_25_pct": round(h2h_u25, 1),
+        "h2h_meetings": sp.get("h2h_meetings", 0),
+        "home_gs_avg": round(sp.get("home_goals_scored_avg", 0) or 0, 2),
+        "away_gs_avg": round(sp.get("away_goals_scored_avg", 0) or 0, 2),
+    }
+
+
+def _agreement_score(
+    live_profile: str,
+    form_profile: str,
+    sp_profile: str = "unknown",
+) -> tuple[float, str, list[str]]:
     signals: list[str] = []
     slow_live = live_profile in ("very_slow", "slow")
     fast_live = live_profile == "fast"
     low_form = form_profile in ("defensive", "low_scoring")
     high_form = form_profile == "high_scoring"
+    low_sp = sp_profile in ("defensive", "low_scoring")
+    high_sp = sp_profile == "high_scoring"
+    low_all = low_form or low_sp
+    high_all = high_form or high_sp
 
-    if slow_live and low_form:
-        signals.append("Live tempo confirms low-scoring form — strong fusion")
+    if slow_live and low_form and low_sp:
+        signals.append("1xBet tempo + ProphitBet + SoccerPunter all lean under — triple fusion")
+        return 12.0, "CONFIRMED", signals
+    if slow_live and low_all:
+        signals.append("Live tempo confirms low-scoring historical data — strong fusion")
         return 10.0, "CONFIRMED", signals
-    if slow_live and form_profile == "balanced":
+    if slow_live and form_profile == "balanced" and sp_profile in ("balanced", "low_scoring", "defensive"):
         signals.append("Quiet live match supports moderate under lean")
         return 5.0, "ALIGNED", signals
-    if fast_live and high_form:
+    if fast_live and high_all:
         signals.append("Fast live tempo matches high-scoring form — avoid unders")
         return -10.0, "CONFLICT", signals
-    if fast_live and low_form:
-        signals.append("Live tempo hotter than form suggests — caution on unders")
+    if fast_live and low_all:
+        signals.append("Live tempo hotter than form/H2H suggests — caution on unders")
         return -8.0, "CONFLICT", signals
-    if live_profile == "average" and low_form:
-        signals.append("Average tempo but defensive form — slight under edge")
+    if live_profile == "average" and low_all:
+        signals.append("Average tempo but defensive trends — slight under edge")
         return 3.0, "LEAN_UNDER", signals
-    if form_profile == "unknown":
-        signals.append("No ProphitBet form — relying on live 1xBet stats only")
+    if sp_profile != "unknown" and low_sp and form_profile == "unknown":
+        signals.append("SoccerPunter H2H supports unders — partial fusion (no ProphitBet)")
+        return 2.0, "LEAN_UNDER", signals
+    if form_profile == "unknown" and sp_profile == "unknown":
+        signals.append("No historical form — relying on live 1xBet stats only")
         return 0.0, "LIVE_ONLY", signals
     return 0.0, "NEUTRAL", signals
 
@@ -285,20 +367,23 @@ def build_combined_analysis(
     minute: int,
     league_baseline_under_15: float = 67.0,
     half: str = "fh",
+    soccer_punter_stats: Optional[dict[str, Any]] = None,
 ) -> CombinedAnalysis:
     live_score, live_profile, live_summary = _live_tempo_profile(live_stats, minute, half)
     form_score, form_profile, form_summary = _form_profile(prophit_stats, half)
+    sp_score, sp_prof, sp_summary = _sp_profile(soccer_punter_stats, half)
     time_score, time_signals = _time_context_score(total_goals, minute, half)
-    agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile)
+    agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile, sp_prof)
 
     hist_score = form_score if prophit_stats else league_baseline_under_15 / 100 * 25
 
     breakdown = ScoreBreakdown(
         historical=round(hist_score, 1),
+        soccer_punter=round(sp_score, 1),
         live_tempo=round(live_score, 1),
         time_context=round(time_score, 1),
         agreement=round(agree_score, 1),
-        total=round(hist_score + live_score + time_score + agree_score, 1),
+        total=round(hist_score + sp_score + live_score + time_score + agree_score, 1),
     )
 
     confidence = round(min(max(breakdown.total, 5), 96), 1)
@@ -326,6 +411,12 @@ def build_combined_analysis(
             f"ProphitBet: {form_profile.replace('_', ' ')} "
             f"(U1.5 FH {form_summary.get('under_15_fh_pct', '—')}%)"
         )
+    if sp_prof != "unknown":
+        fusion_signals.append(
+            f"SoccerPunter: {sp_prof.replace('_', ' ')} "
+            f"(H2H avg {sp_summary.get('h2h_avg_goals', '—')} gl, "
+            f"U2.25 {sp_summary.get('under_225_pct', '—')}%)"
+        )
 
     return CombinedAnalysis(
         verdict=_verdict(confidence, agreement, best_rec),
@@ -336,11 +427,13 @@ def build_combined_analysis(
         breakdown=breakdown,
         live_profile=live_profile,
         form_profile=form_profile,
+        sp_profile=sp_prof,
         half=half,
         period_minute=elapsed,
         fusion_signals=fusion_signals,
         live_summary=live_summary,
         form_summary=form_summary,
+        sp_summary=sp_summary,
     )
 
 

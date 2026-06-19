@@ -18,6 +18,7 @@ from combined_analysis import build_combined_analysis, combined_to_dict
 from filters import has_red_cards, is_excluded_match, is_excluded_raw
 from onexbet_client import OneXBetClient, OneXBetMatch
 from prophitbet_stats import PROPHIT_PROVIDER
+from soccerpunter_stats import SOCCERPUNTER_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
 REFRESH_SECONDS = 30
@@ -114,6 +115,7 @@ class Prediction:
     home_team: str = ""
     away_team: str = ""
     prophit_stats: Optional[dict] = None
+    soccerpunter_stats: Optional[dict] = None
     combined_analysis: Optional[dict] = None
 
 
@@ -139,6 +141,7 @@ class MatchCard:
     under_25_alive: bool = False
     scored_filter: bool = False
     prophit_stats: Optional[dict] = None
+    soccerpunter_stats: Optional[dict] = None
     combined_analysis: Optional[dict] = None
     half: str = "fh"
     period_goals: int = 0
@@ -548,6 +551,7 @@ def analyze_onexbet_match(
     m: OneXBetMatch,
     half: str = "fh",
     prophit_stats: Optional[dict] = None,
+    soccerpunter_stats: Optional[dict] = None,
     period_stats: Optional[dict] = None,
 ) -> tuple[list[Prediction], dict]:
     live = _onexbet_to_live_stats(m, half=half, period_stats=period_stats)
@@ -556,6 +560,7 @@ def analyze_onexbet_match(
     period_goals = m.fh_goals if half == "fh" else m.sh_goals
     combined = combined_to_dict(build_combined_analysis(
         live, prophit_stats, period_goals, m.minute, baseline[bl_key], half=half,
+        soccer_punter_stats=soccerpunter_stats,
     ))
     preds = list(score_period_under(
         live, m.home_team, m.away_team, m.league, half=half,
@@ -580,6 +585,7 @@ def _build_match_card(
     m: OneXBetMatch,
     half: str,
     prophit_stats: Optional[dict],
+    soccerpunter_stats: Optional[dict],
     preds: list[Prediction],
     combined: dict,
     live_stats: LiveStats,
@@ -617,6 +623,7 @@ def _build_match_card(
         under_25_alive=under_25_alive,
         scored_filter=scored and (under_15_alive or under_25_alive),
         prophit_stats=prophit_stats,
+        soccerpunter_stats=soccerpunter_stats,
         combined_analysis=combined,
         half=half,
         period_goals=p_goals,
@@ -627,7 +634,11 @@ def _build_match_card(
     )
 
 
-def _build_half_time_card(m: OneXBetMatch, prophit_stats: Optional[dict]) -> MatchCard:
+def _build_half_time_card(
+    m: OneXBetMatch,
+    prophit_stats: Optional[dict],
+    soccerpunter_stats: Optional[dict],
+) -> MatchCard:
     return MatchCard(
         event_id=str(m.game_id),
         home_team=m.home_team,
@@ -647,6 +658,7 @@ def _build_half_time_card(m: OneXBetMatch, prophit_stats: Optional[dict]) -> Mat
         under_25_alive=m.fh_goals <= 2,
         scored_filter=m.fh_goals >= 1,
         prophit_stats=prophit_stats,
+        soccerpunter_stats=soccerpunter_stats,
         combined_analysis=None,
         half="ht",
         period_goals=m.fh_goals,
@@ -664,6 +676,7 @@ def build_dashboard_payload() -> dict[str, Any]:
     scored_under_25: list[dict] = []
 
     PROPHIT_PROVIDER.ensure_loaded(background=True)
+    SOCCERPUNTER_PROVIDER.ensure_loaded(background=True)
 
     raw_live = ONEXBET_CLIENT.fetch_live_football()
     total_live = len(raw_live)
@@ -687,9 +700,10 @@ def build_dashboard_payload() -> dict[str, Any]:
             continue
 
         prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
+        soccerpunter_stats = SOCCERPUNTER_PROVIDER.lookup_match(m.home_team, m.away_team)
 
         if m.is_half_time:
-            cards.append(_build_half_time_card(m, prophit_stats))
+            cards.append(_build_half_time_card(m, prophit_stats, soccerpunter_stats))
             ht_count += 1
             continue
 
@@ -706,13 +720,16 @@ def build_dashboard_payload() -> dict[str, Any]:
             if has_red_cards(period_stats):
                 continue
             preds, combined = analyze_onexbet_match(
-                m, half=half, prophit_stats=prophit_stats, period_stats=period_stats,
+                m, half=half, prophit_stats=prophit_stats,
+                soccerpunter_stats=soccerpunter_stats, period_stats=period_stats,
             )
             if not preds:
                 continue
 
             live_stats = _onexbet_to_live_stats(m, half=half, period_stats=period_stats)
-            card = _build_match_card(m, half, prophit_stats, preds, combined, live_stats)
+            card = _build_match_card(
+                m, half, prophit_stats, soccerpunter_stats, preds, combined, live_stats,
+            )
             if not card.predictions:
                 continue
             cards.append(card)
@@ -781,6 +798,7 @@ def build_dashboard_payload() -> dict[str, Any]:
             "time_decay_20_under_15": 100 - TIME_DECAY_0_0[20]["over_15_fh"],
         },
         "prophitbet": PROPHIT_PROVIDER.status(),
+        "soccerpunter": SOCCERPUNTER_PROVIDER.status(),
         "min_confidence": MIN_CONFIDENCE,
         "error": None,
     }

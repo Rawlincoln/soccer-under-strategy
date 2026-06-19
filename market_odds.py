@@ -1,5 +1,5 @@
 """
-Live betting-market implied probabilities from 1xBet (+ API-Football odds fallback).
+Live betting-market implied probabilities from 1xBet period odds.
 """
 
 from __future__ import annotations
@@ -7,7 +7,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
-from api_football_stats import APIFOOTBALL_PROVIDER
 from onexbet_client import OneXBetClient
 
 
@@ -119,50 +118,13 @@ def extract_onexbet_period_odds(
     )
 
 
-def _apifootball_odds_fallback(fixture_id: int, half: str) -> Optional[MarketOddsSnapshot]:
-    if not APIFOOTBALL_PROVIDER.enabled:
-        return None
-    data = APIFOOTBALL_PROVIDER._request("odds/live", {"fixture": fixture_id})  # noqa: SLF001
-    if not data:
-        return None
-    for block in data.get("response") or []:
-        for bookmaker in block.get("bookmakers") or []:
-            for bet in bookmaker.get("bets") or []:
-                name = (bet.get("name") or "").lower()
-                if "first half" not in name and half == "fh":
-                    continue
-                if "second half" not in name and half == "sh":
-                    continue
-                if "goals" not in name:
-                    continue
-                u15 = 0.0
-                for val in bet.get("values") or []:
-                    v = (val.get("value") or "").lower()
-                    if "under 1.5" in v:
-                        u15 = _safe_float(val.get("odd"))
-                if u15:
-                    imp = implied_probability(u15)
-                    return MarketOddsSnapshot(
-                        source="api-football",
-                        half=half,
-                        under_15_odds=round(u15, 3),
-                        under_15_implied_pct=imp,
-                        market_lean="strong_under" if imp >= 72 else "under" if imp >= 62 else "neutral",
-                        best_under_market=f"Under 1.5 {half.upper()}",
-                    )
-    return None
-
-
 def lookup_market_odds(
     client: OneXBetClient,
     game_id: int,
     half: str = "fh",
-    apifb_fixture_id: Optional[int] = None,
     cached_detail: Optional[dict] = None,
 ) -> Optional[dict[str, Any]]:
     snap = extract_onexbet_period_odds(client, game_id, half, cached_detail=cached_detail)
-    if not snap and apifb_fixture_id:
-        snap = _apifootball_odds_fallback(apifb_fixture_id, half)
     return asdict(snap) if snap else None
 
 

@@ -649,6 +649,13 @@ h1 {
   text-transform: capitalize;
 }
 
+.fotmob-verify {
+  font-size: 0.65rem;
+  color: #7dd3fc;
+  margin-top: 5px;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+}
+
 .fusion-breakdown {
   display: flex;
   gap: 10px;

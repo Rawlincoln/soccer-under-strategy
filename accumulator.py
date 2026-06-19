@@ -93,6 +93,11 @@ def _leg_score(pick: dict, card: dict) -> float:
         bonus += 2
     if (fusion.get("sp_profile") or "") in ("defensive", "low_scoring"):
         bonus += 2
+    if (fusion.get("fotmob_profile") or "") in ("very_slow", "slow"):
+        bonus += 2
+    fm = card.get("fotmob_stats") or {}
+    if fm.get("total_xg", 99) <= 0.5:
+        bonus += 2
     return conf + bonus
 
 

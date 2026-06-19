@@ -144,6 +144,7 @@ function renderFusionAnalysis(m) {
   const live = f.live_summary || {};
   const form = f.form_summary || {};
   const sp = f.sp_summary || {};
+  const fm = f.fotmob_summary || {};
   const bd = f.breakdown || {};
 
   return `
@@ -165,6 +166,7 @@ function renderFusionAnalysis(m) {
             <span>${live.dangerous_attacks ?? 0} danger</span>
           </div>
           <div class="fusion-profile">${(f.live_profile || "").replace(/_/g, " ")} tempo</div>
+          ${fm.total_xg != null ? `<div class="fotmob-verify">FotMob: ${fm.total_xg} xG · ${fm.shots ?? 0} shots · ${(f.fotmob_profile || "").replace(/_/g, " ")}</div>` : ""}
         </div>
         <div class="fusion-col">
           <div class="fusion-col-title">ProphitBet Form</div>
@@ -188,6 +190,7 @@ function renderFusionAnalysis(m) {
       <div class="fusion-breakdown">
         <span>Form ${bd.historical ?? 0}</span>
         <span>SP ${bd.soccer_punter ?? 0}</span>
+        <span>FM ${bd.fotmob_verify ?? 0}</span>
         <span>Live ${bd.live_tempo ?? 0}</span>
         <span>Time ${bd.time_context ?? 0}</span>
         <span>Agree ${bd.agreement > 0 ? "+" : ""}${bd.agreement ?? 0}</span>
@@ -392,10 +395,12 @@ async function fetchData() {
     $("connectionStatus").classList.remove("error");
     const pb = data.prophitbet;
     const sp = data.soccerpunter;
+    const fm = data.fotmob;
     const pbNote = pb?.loaded ? ` · PB ${pb.teams_count} teams` : pb?.loading ? " · PB loading" : "";
     const spNote = sp?.index_pairs ? ` · SP ${sp.index_pairs} pairs` : sp?.loading_index ? " · SP loading" : "";
+    const fmNote = fm?.index_matches ? ` · FM ${fm.index_matches}` : fm?.loading ? " · FM loading" : "";
     const minC = data.min_confidence ?? MIN_CONF;
-    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}`;
+    $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}${fmNote}`;
 
     renderBaselines(data.baselines, data, data.prophitbet);
     renderScoredPicks("scoredU15Section", "scoredU15", data.scored_under_15, "Under 1.5 First Half");

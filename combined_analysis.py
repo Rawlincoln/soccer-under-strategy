@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
+from fotmob_stats import fotmob_live_agreement, fotmob_tempo_profile
+
 HALF_CONFIG = {
     "fh": {
         "label": "FH",
@@ -384,33 +386,42 @@ def build_combined_analysis(
     league_baseline_under_15: float = 67.0,
     half: str = "fh",
     soccer_punter_stats: Optional[dict[str, Any]] = None,
+    fotmob_stats: Optional[dict[str, Any]] = None,
 ) -> CombinedAnalysis:
     live_score, live_profile, live_summary = _live_tempo_profile(live_stats, minute, half)
     form_score, form_profile, form_summary = _form_profile(prophit_stats, half)
     sp_score, sp_prof, sp_summary = _sp_profile(soccer_punter_stats, half)
+    fm_score, fm_prof, fm_summary = fotmob_tempo_profile(fotmob_stats, minute, half)
+    fm_agree, fm_signals = fotmob_live_agreement(live_profile, fm_prof)
     time_score, time_signals = _time_context_score(total_goals, minute, half)
     agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile, sp_prof)
 
     hist_score = form_score if prophit_stats else league_baseline_under_15 / 100 * 25
+    fotmob_total = round(fm_score + fm_agree, 1)
 
     breakdown = ScoreBreakdown(
         historical=round(hist_score, 1),
         soccer_punter=round(sp_score, 1),
+        fotmob_verify=round(fotmob_total, 1),
         live_tempo=round(live_score, 1),
         time_context=round(time_score, 1),
         agreement=round(agree_score, 1),
-        total=round(hist_score + sp_score + live_score + time_score + agree_score, 1),
+        total=round(
+            hist_score + sp_score + fotmob_total + live_score + time_score + agree_score, 1
+        ),
     )
 
     confidence = round(min(max(breakdown.total, 5), 96), 1)
     if agreement == "CONFLICT":
         confidence = round(max(confidence - 12, 20), 1)
+    if fm_agree <= -4:
+        confidence = round(max(confidence - 8, 20), 1)
 
     best_market, best_rec = _pick_best_market(total_goals, confidence, minute, half)
     if agreement == "CONFLICT" and best_rec == "BET":
         best_rec = "WATCH"
 
-    fusion_signals = list(agree_signals) + list(time_signals)
+    fusion_signals = list(agree_signals) + list(fm_signals) + list(time_signals)
     elapsed = _period_elapsed(minute, half)
     if live_profile in ("very_slow", "slow"):
         fusion_signals.append(
@@ -433,6 +444,11 @@ def build_combined_analysis(
             f"(H2H avg {sp_summary.get('h2h_avg_goals', '—')} gl, "
             f"U2.25 {sp_summary.get('under_225_pct', '—')}%)"
         )
+    if fm_prof != "unknown":
+        fusion_signals.append(
+            f"FotMob: {fm_prof.replace('_', ' ')} xG tempo "
+            f"({fm_summary.get('total_xg', '—')} xG, {fm_summary.get('shots', '—')} shots)"
+        )
 
     return CombinedAnalysis(
         verdict=_verdict(confidence, agreement, best_rec),
@@ -444,12 +460,14 @@ def build_combined_analysis(
         live_profile=live_profile,
         form_profile=form_profile,
         sp_profile=sp_prof,
+        fotmob_profile=fm_prof,
         half=half,
         period_minute=elapsed,
         fusion_signals=fusion_signals,
         live_summary=live_summary,
         form_summary=form_summary,
         sp_summary=sp_summary,
+        fotmob_summary=fm_summary,
     )
 
 

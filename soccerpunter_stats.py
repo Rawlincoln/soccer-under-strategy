@@ -27,10 +27,16 @@ TODAY_URL = f"{BASE_URL}/soccer-statistics/matches_today"
 FEED_TTL_SECONDS = 60
 INDEX_TTL_SECONDS = 6 * 3600
 H2H_CACHE_TTL_SECONDS = 12 * 3600
+H2H_MIN_INTERVAL_SECONDS = 2.5
+FEED_FORM_WINDOW = 8
 REQUEST_TIMEOUT = 25
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ProPunter/1.0; +https://github.com/Rawlincoln/soccer-under-strategy)",
-    "Accept": "text/html,application/json",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/json,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 
@@ -109,12 +115,20 @@ class MatchSoccerPunterStats:
     partial: bool = False
 
 
+def _is_registration_wall(html: str) -> bool:
+    if len(html) < 90000:
+        return True
+    if "Member Registration" in html:
+        return True
+    return "h2hSum" not in html and "Head to Head Summary" not in html
+
+
 def _parse_h2h_pie(html: str) -> tuple[int, int, int]:
-    m = re.search(r"data\.addRows\(\[\s*(.*?)\s*\]\)", html, re.S)
+    m = re.search(r"addRows\s*\(\s*\[\s*(.*?)\s*\]\s*\)", html, re.S)
     if not m:
         return 0, 0, 0
     block = m.group(1)
-    rows = re.findall(r"\['([^']+)',\s*(\d+)\]", block)
+    rows = re.findall(r"\[\s*'([^']+)'\s*,\s*(\d+)\s*\]", block)
     home_wins = draws = away_wins = 0
     for label, val in rows:
         n = _safe_int(val)
@@ -160,8 +174,8 @@ def _parse_h2h_sum(html: str) -> dict[str, Any]:
 def _parse_team_comparison(html: str) -> dict[str, int | float]:
     stats: dict[str, int | float] = {}
     pattern = re.compile(
-        r"<tr[^>]*>\s*<td[^>]*>(\d+)</td>\s*<td[^>]*>([^<]+)</td>\s*<td[^>]*>(\d+)</td>",
-        re.I,
+        r"<td[^>]*>\s*(\d+)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*(\d+)\s*</td>",
+        re.I | re.S,
     )
     label_map = {
         "matches under 2.25 goals": ("home_under_225", "away_under_225"),
@@ -272,6 +286,152 @@ def _parse_h2h_page(html: str, home: str, away: str) -> dict[str, Any]:
     }
 
 
+def _team_form_from_results(results: list[dict[str, Any]]) -> dict[str, Any]:
+    if not results:
+        return {}
+    n = len(results)
+    goals_for = sum(r["gf"] for r in results)
+    goals_against = sum(r["ga"] for r in results)
+    under_225 = sum(1 for r in results if r["gf"] + r["ga"] <= 2)
+    fh_under_05 = sum(1 for r in results if r.get("ht_total", 0) <= 0)
+    fh_over_05 = sum(1 for r in results if r.get("ht_total", 0) >= 1)
+    return {
+        "played": n,
+        "goals_scored_avg": round(goals_for / n, 2),
+        "goals_allowed_avg": round(goals_against / n, 2),
+        "under_225": under_225,
+        "over_225": n - under_225,
+        "fh_under_05": fh_under_05,
+        "fh_over_05": fh_over_05,
+        "under_225_pct": round(under_225 / n * 100, 1),
+        "fh_under_05_pct": round(fh_under_05 / n * 100, 1),
+    }
+
+
+def _build_feed_aggregates(matches: list[dict[str, Any]]) -> tuple[dict[str, list], dict[str, list]]:
+    """Rolling finished-match form keyed by team id and normalized name."""
+    by_id: dict[str, list[dict[str, Any]]] = {}
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    finished = [m for m in matches if m.get("status") in ("FT", "AET", "PEN")]
+
+    for m in finished:
+        ht_a = m.get("hts_A")
+        ht_b = m.get("hts_B")
+        ht_a_i = _safe_int(ht_a, -1) if ht_a is not None else -1
+        ht_b_i = _safe_int(ht_b, -1) if ht_b is not None else -1
+
+        for team_id, team_name, gf, ga, ht_gf, ht_ga in (
+            (str(m.get("team_A_id", "")), m.get("ta_name", ""), _safe_int(m.get("score_A")), _safe_int(m.get("score_B")), ht_a_i, ht_b_i),
+            (str(m.get("team_B_id", "")), m.get("tb_name", ""), _safe_int(m.get("score_B")), _safe_int(m.get("score_A")), ht_b_i, ht_a_i),
+        ):
+            if not team_id or not team_name:
+                continue
+            row = {
+                "gf": gf,
+                "ga": ga,
+                "ht_total": ht_gf + ht_ga if ht_gf >= 0 and ht_ga >= 0 else -1,
+                "opponent_id": str(m.get("team_B_id" if team_id == str(m.get("team_A_id")) else "team_A_id", "")),
+            }
+            by_id.setdefault(team_id, []).append(row)
+            by_name.setdefault(_normalize_team(team_name), []).append(row)
+
+    for bucket in (by_id, by_name):
+        for key in bucket:
+            bucket[key] = bucket[key][-FEED_FORM_WINDOW:]
+
+    return by_id, by_name
+
+
+def _pair_h2h_from_feed(matches: list[dict[str, Any]], home_id: str, away_id: str) -> list[tuple[int, int]]:
+    scores: list[tuple[int, int]] = []
+    for m in matches:
+        if m.get("status") not in ("FT", "AET", "PEN"):
+            continue
+        a_id = str(m.get("team_A_id", ""))
+        b_id = str(m.get("team_B_id", ""))
+        if {a_id, b_id} != {home_id, away_id}:
+            continue
+        sa = _safe_int(m.get("score_A"))
+        sb = _safe_int(m.get("score_B"))
+        if a_id == home_id:
+            scores.append((sa, sb))
+        else:
+            scores.append((sb, sa))
+    return scores[-8:]
+
+
+def _compose_feed_fallback(
+    home: str,
+    away: str,
+    home_id: str,
+    away_id: str,
+    league: str,
+    by_id: dict[str, list],
+    by_name: dict[str, list],
+    matches: list[dict[str, Any]],
+) -> dict[str, Any]:
+    home_rows = by_id.get(home_id) or by_name.get(_normalize_team(home), [])
+    away_rows = by_id.get(away_id) or by_name.get(_normalize_team(away), [])
+    home_form = _team_form_from_results(home_rows)
+    away_form = _team_form_from_results(away_rows)
+    h2h_scores = _pair_h2h_from_feed(matches, home_id, away_id)
+
+    totals = [h + a for h, a in h2h_scores]
+    h2h_avg = sum(totals) / len(totals) if totals else 0.0
+    h2h_u25 = sum(1 for t in totals if t <= 2) / max(len(totals), 1) * 100 if totals else 0.0
+
+    hu = home_form.get("under_225", 0)
+    au = away_form.get("under_225", 0)
+    ho = home_form.get("over_225", 0)
+    ao = away_form.get("over_225", 0)
+    uo_total = hu + au + ho + ao
+    under_pct = (hu + au) / max(uo_total, 1) * 100
+
+    hfu = home_form.get("fh_under_05", 0)
+    afu = away_form.get("fh_under_05", 0)
+    hfo = home_form.get("fh_over_05", 0)
+    afo = away_form.get("fh_over_05", 0)
+    fh_total = hfu + afu + hfo + afo
+    fh_under_pct = (hfu + afu) / max(fh_total, 1) * 100
+
+    h_gs = home_form.get("goals_scored_avg", 0.0)
+    a_gs = away_form.get("goals_scored_avg", 0.0)
+    h_ga = home_form.get("goals_allowed_avg", 0.0)
+    a_ga = away_form.get("goals_allowed_avg", 0.0)
+    combined_goals = (h_gs + a_gs + h_ga + a_ga) / 2 if home_form or away_form else 0.0
+
+    return {
+        "h2h_home_wins": 0,
+        "h2h_draws": 0,
+        "h2h_away_wins": 0,
+        "h2h_meetings": len(h2h_scores),
+        "h2h_avg_total_goals": round(h2h_avg, 2),
+        "h2h_under_25_pct": round(h2h_u25, 1),
+        "home_played": home_form.get("played", 0),
+        "away_played": away_form.get("played", 0),
+        "home_goals_scored_avg": h_gs,
+        "away_goals_scored_avg": a_gs,
+        "home_goals_allowed_avg": h_ga,
+        "away_goals_allowed_avg": a_ga,
+        "home_under_225": hu,
+        "away_under_225": au,
+        "home_over_225": ho,
+        "away_over_225": ao,
+        "home_fh_under_05": hfu,
+        "away_fh_under_05": afu,
+        "home_fh_over_05": hfo,
+        "away_fh_over_05": afo,
+        "home_clean_sheets": sum(1 for r in home_rows if r["ga"] == 0),
+        "away_clean_sheets": sum(1 for r in away_rows if r["ga"] == 0),
+        "combined_under_225_pct": round(under_pct, 1),
+        "combined_fh_under_05_pct": round(fh_under_pct, 1),
+        "combined_goals_avg": round(combined_goals, 2),
+        "recent_h2h_results": [f"{home} {h}-{a} {away}" for h, a in h2h_scores[-4:]],
+        "league": league,
+        "source_mode": "feed_form",
+    }
+
+
 class SoccerPunterStatsProvider:
     """Live feed + H2H page stats from soccerpunter.com."""
 
@@ -283,15 +443,20 @@ class SoccerPunterStatsProvider:
         self._session.headers.update(HEADERS)
         self._pair_index: dict[str, dict[str, str]] = {}
         self._feed_index: dict[str, dict[str, Any]] = {}
+        self._feed_raw: list[dict[str, Any]] = []
+        self._team_by_id: dict[str, list] = {}
+        self._team_by_name: dict[str, list] = {}
         self._h2h_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._index_loaded_at: float = 0.0
         self._feed_loaded_at: float = 0.0
+        self._last_h2h_fetch_at: float = 0.0
         self._loading_index = False
         self._loading_feed = False
         self._error: Optional[str] = None
         self._feed_matches = 0
         self._index_pairs = 0
         self._h2h_fetches = 0
+        self._h2h_blocked = 0
 
     @classmethod
     def get(cls) -> "SoccerPunterStatsProvider":
@@ -305,6 +470,7 @@ class SoccerPunterStatsProvider:
             "index_pairs": self._index_pairs,
             "h2h_cache_size": len(self._h2h_cache),
             "h2h_fetches": self._h2h_fetches,
+            "h2h_blocked": self._h2h_blocked,
             "feed_age_seconds": round(time.time() - self._feed_loaded_at, 1) if self._feed_loaded_at else None,
             "index_age_seconds": round(time.time() - self._index_loaded_at, 1) if self._index_loaded_at else None,
             "loading_feed": self._loading_feed,
@@ -333,6 +499,7 @@ class SoccerPunterStatsProvider:
             r.raise_for_status()
             payload = r.json()
             matches = payload.get("matches", {}).get("full", [])
+            by_id, by_name = _build_feed_aggregates(matches)
             index: dict[str, dict[str, Any]] = {}
             for m in matches:
                 home = m.get("ta_name", "")
@@ -352,6 +519,9 @@ class SoccerPunterStatsProvider:
                 index[_pair_key(away, home)] = {**entry, "swapped": True}
             with self._lock:
                 self._feed_index = index
+                self._feed_raw = matches
+                self._team_by_id = by_id
+                self._team_by_name = by_name
                 self._feed_matches = len(matches)
                 self._feed_loaded_at = time.time()
                 self._error = None
@@ -449,13 +619,23 @@ class SoccerPunterStatsProvider:
         return None
 
     def _fetch_h2h_html(self, slug: str, home_id: str, away_id: str) -> Optional[str]:
+        elapsed = time.time() - self._last_h2h_fetch_at
+        if elapsed < H2H_MIN_INTERVAL_SECONDS:
+            time.sleep(H2H_MIN_INTERVAL_SECONDS - elapsed)
+
         url = f"{BASE_URL}/h2h/{slug}/{home_id}/{away_id}/"
         try:
-            r = self._session.get(url, timeout=REQUEST_TIMEOUT)
+            r = self._session.get(url, timeout=REQUEST_TIMEOUT, headers={"Referer": f"{BASE_URL}/"})
             r.raise_for_status()
+            html = r.text
             with self._lock:
                 self._h2h_fetches += 1
-            return r.text
+                self._last_h2h_fetch_at = time.time()
+            if _is_registration_wall(html):
+                with self._lock:
+                    self._h2h_blocked += 1
+                return None
+            return html
         except requests.RequestException:
             return None
 
@@ -476,8 +656,39 @@ class SoccerPunterStatsProvider:
                 for k, _ in oldest:
                     self._h2h_cache.pop(k, None)
 
+    def _feed_fallback(
+        self, home: str, away: str, home_id: str, away_id: str, league: str,
+    ) -> dict[str, Any]:
+        with self._lock:
+            return _compose_feed_fallback(
+                home, away, home_id, away_id, league,
+                self._team_by_id, self._team_by_name, self._feed_raw,
+            )
+
+    def _build_stats_dict(
+        self,
+        home: str,
+        away: str,
+        pair: dict[str, str],
+        parsed: dict[str, Any],
+        partial: bool = False,
+    ) -> dict[str, Any]:
+        stats = MatchSoccerPunterStats(
+            home_team=home,
+            away_team=away,
+            home_id=pair["home_id"],
+            away_id=pair["away_id"],
+            match_id=pair.get("match_id", ""),
+            league=pair.get("league", parsed.get("league", "")),
+            partial=partial,
+            **{k: v for k, v in parsed.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
+        )
+        return asdict(stats)
+
     def lookup_match(self, home: str, away: str) -> Optional[dict[str, Any]]:
         self.ensure_loaded(background=True)
+        if self._feed_loaded_at == 0:
+            self._load_feed()
 
         pair = self._resolve_pair(home, away)
         if not pair:
@@ -486,52 +697,39 @@ class SoccerPunterStatsProvider:
         home_id = pair["home_id"]
         away_id = pair["away_id"]
         slug = pair.get("slug") or f"{_slugify(home)}-vs-{_slugify(away)}"
+        league = pair.get("league", "")
 
         cached = self._get_cached_h2h(home_id, away_id)
-        if cached:
-            stats = MatchSoccerPunterStats(
-                home_team=home,
-                away_team=away,
-                home_id=home_id,
-                away_id=away_id,
-                match_id=pair.get("match_id", ""),
-                league=pair.get("league", cached.get("league", "")),
-                **{k: v for k, v in cached.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
-            )
-            return asdict(stats)
+        if cached and (
+            cached.get("h2h_meetings", 0) > 0 or cached.get("combined_goals_avg", 0) > 0
+        ):
+            return self._build_stats_dict(home, away, pair, cached)
 
         html = self._fetch_h2h_html(slug, home_id, away_id)
-        if not html:
-            with self._lock:
-                stale = self._h2h_cache.get(f"{home_id}:{away_id}")
-            if stale:
-                parsed = stale[1]
-                stats = MatchSoccerPunterStats(
-                    home_team=home,
-                    away_team=away,
-                    home_id=home_id,
-                    away_id=away_id,
-                    match_id=pair.get("match_id", ""),
-                    league=pair.get("league", parsed.get("league", "")),
-                    partial=True,
-                    **{k: v for k, v in parsed.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
-                )
-                return asdict(stats)
-            return None
+        parsed: dict[str, Any]
+        partial = False
 
-        parsed = _parse_h2h_page(html, home, away)
-        parsed["league"] = pair.get("league", "")
+        if html:
+            parsed = _parse_h2h_page(html, home, away)
+            parsed["league"] = league
+            parsed["source_mode"] = "h2h_page"
+            if parsed.get("h2h_meetings", 0) == 0 and parsed.get("combined_goals_avg", 0) == 0:
+                feed_data = self._feed_fallback(home, away, home_id, away_id, league)
+                parsed = {**feed_data, **{k: v for k, v in parsed.items() if v}}
+                partial = True
+            self._store_h2h_cache(home_id, away_id, parsed)
+            return self._build_stats_dict(home, away, pair, parsed, partial=partial)
+
+        with self._lock:
+            stale = self._h2h_cache.get(f"{home_id}:{away_id}")
+        if stale:
+            return self._build_stats_dict(home, away, pair, stale[1], partial=True)
+
+        parsed = self._feed_fallback(home, away, home_id, away_id, league)
+        if parsed.get("home_played", 0) == 0 and parsed.get("away_played", 0) == 0 and parsed.get("h2h_meetings", 0) == 0:
+            parsed["partial"] = True
         self._store_h2h_cache(home_id, away_id, parsed)
-
-        stats = MatchSoccerPunterStats(
-            home_team=home,
-            away_team=away,
-            home_id=home_id,
-            away_id=away_id,
-            match_id=pair.get("match_id", ""),
-            **{k: v for k, v in parsed.items() if k in MatchSoccerPunterStats.__dataclass_fields__},
-        )
-        return asdict(stats)
+        return self._build_stats_dict(home, away, pair, parsed, partial=True)
 
 
 def soccerpunter_scoring_boost(stats: Optional[dict[str, Any]], half: str = "fh") -> tuple[float, list[str]]:

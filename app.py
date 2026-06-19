@@ -49,7 +49,10 @@ def api_accumulators():
 
 @app.route("/static/<path:filename>")
 def static_files(filename):
-    return send_from_directory(STATIC, filename)
+    resp = send_from_directory(STATIC, filename)
+    if filename.endswith((".js", ".html", ".css")):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.route("/api/predictions")

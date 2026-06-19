@@ -25,11 +25,10 @@ function confClass(c) {
   return "low";
 }
 
-function providerLabel(p, countKey, loadingKey) {
+function providerLabel(p, countKey) {
   if (!p) return "—";
   if (p.loading || p.loading_index) return "Loading…";
   if (p.error) return "Error";
-  if (p.enabled === false) return "No key";
   const n = p[countKey];
   if (n != null) return String(n);
   return p.loaded ? "OK" : "Pending";

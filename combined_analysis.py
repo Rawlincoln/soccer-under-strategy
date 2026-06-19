@@ -301,6 +301,9 @@ def _agreement_score(
     if fast_live and low_all:
         signals.append("Live tempo hotter than form/H2H suggests — caution on unders")
         return -8.0, "CONFLICT", signals
+    if high_sp and slow_live:
+        signals.append("SoccerPunter H2H trends higher scoring than live tempo — mixed signals")
+        return -4.0, "CAUTION_MIXED", signals
     if live_profile == "average" and low_all:
         signals.append("Average tempo but defensive trends — slight under edge")
         return 3.0, "LEAN_UNDER", signals

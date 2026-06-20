@@ -6,6 +6,41 @@
   padding: 0 20px 40px;
 }
 
+.strategy-workflow {
+  margin-bottom: 20px;
+}
+
+.wf-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 0.88rem;
+}
+
+.wf-badge {
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--green);
+  background: var(--surface);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.wf-link {
+  margin-left: auto;
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.wf-link:hover { text-decoration: underline; }
+
 .target-hero {
   display: grid;
   grid-template-columns: 1fr 1.2fr;

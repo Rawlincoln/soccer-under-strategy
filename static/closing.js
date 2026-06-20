@@ -26,6 +26,9 @@ function renderBaselines(data) {
 }
 
 function renderMatchCard(m) {
+  const stake = 5000;
+  const slip = typeof BetAssistant !== "undefined" ? BetAssistant.slipFromLock(m, stake) : null;
+  const actions = slip ? BetAssistant.actionButtons(slip, null, true) : "";
   const ls = m.live_stats || {};
   const elapsed = ls.period_minute ?? m.period_minute ?? "—";
   const shotsPm = ls.total_shots && elapsed ? (ls.total_shots / Math.max(elapsed, 1)).toFixed(2) : "—";
@@ -53,6 +56,7 @@ function renderMatchCard(m) {
         <div class="closing-stat"><div class="num">${ls.dangerous_attacks ?? "—"}</div><div class="lbl">Danger</div></div>
       </div>
       <ul class="closing-signals">${(m.signals || []).slice(0, 8).map((s) => `<li>${s}</li>`).join("")}</ul>
+      ${actions}
     </div>`;
 }
 
@@ -72,6 +76,7 @@ function renderMatches(data) {
   }
 
   grid.innerHTML = matches.map(renderMatchCard).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(grid);
 }
 
 function updateMeta(data) {
@@ -122,3 +127,4 @@ $("btnRefresh")?.addEventListener("click", async () => {
 
 fetchData();
 schedulePoll();
+if (typeof BetAssistant !== "undefined") BetAssistant.startAlertPolling(30000);

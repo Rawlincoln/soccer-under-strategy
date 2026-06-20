@@ -469,3 +469,4 @@ function startPolling() {
 }
 
 startPolling();
+if (typeof BetAssistant !== "undefined") BetAssistant.startAlertPolling(30000);

@@ -14,6 +14,7 @@ from typing import Any, Optional
 import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
+from bet_assistant import build_assistant_payload
 from closing_window import (
     MIN_LOCK_PCT,
     build_closing_card,
@@ -184,6 +185,11 @@ class DataCache:
             "matches": [],
             "error": None,
         }
+        self._assistant: dict[str, Any] = {
+            "updated_at": None,
+            "workflow": {},
+            "error": None,
+        }
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -206,13 +212,16 @@ class DataCache:
     def refresh(self):
         try:
             payload, closing_payload = build_all_payloads()
+            assistant_payload = build_assistant_payload(payload, closing_payload)
             with self._lock:
                 self._data = payload
                 self._closing = closing_payload
+                self._assistant = assistant_payload
         except Exception as exc:
             with self._lock:
                 self._data["error"] = str(exc)
                 self._closing["error"] = str(exc)
+                self._assistant["error"] = str(exc)
 
     def get(self) -> dict[str, Any]:
         with self._lock:
@@ -221,6 +230,10 @@ class DataCache:
     def get_closing(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._closing)
+
+    def get_assistant(self) -> dict[str, Any]:
+        with self._lock:
+            return dict(self._assistant)
 
 
 def _parse_kickoff(event: dict) -> Optional[datetime]:

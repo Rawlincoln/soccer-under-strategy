@@ -1,11 +1,20 @@
 """Pro Punter — live under-goals web dashboard."""
 
 import os
+from dataclasses import asdict
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 from basketball_engine import REFRESH_SECONDS as BB_REFRESH_SECONDS, BasketballCache
+from bet_assistant import (
+    STORE,
+    acca_to_slip,
+    lock_to_slip,
+    record_slip_placed,
+    record_slip_result,
+    reset_workflow,
+)
 from engine import REFRESH_SECONDS, DataCache
 
 app = Flask(__name__, static_folder="static")
@@ -54,6 +63,11 @@ def basketball_page():
 @app.route("/closing")
 def closing_page():
     return send_from_directory(STATIC, "closing.html")
+
+
+@app.route("/assistant")
+def assistant_page():
+    return send_from_directory(STATIC, "assistant.html")
 
 
 @app.route("/api/accumulators")
@@ -109,6 +123,89 @@ def api_closing():
 def api_closing_refresh():
     cache.refresh()
     return jsonify({"ok": True, "updated_at": cache.get_closing().get("updated_at")})
+
+
+@app.route("/api/assistant")
+def api_assistant():
+    _ensure_cache()
+    return jsonify(cache.get_assistant())
+
+
+@app.route("/api/assistant/config", methods=["GET", "POST"])
+def api_assistant_config():
+    if request.method == "GET":
+        cfg = STORE.load_config()
+        safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
+        return jsonify(safe)
+    body = request.get_json(silent=True) or {}
+    cfg = STORE.save_config(body)
+    safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
+    return jsonify({"ok": True, "config": safe})
+
+
+@app.route("/api/assistant/workflow/placed", methods=["POST"])
+def api_assistant_placed():
+    body = request.get_json(silent=True) or {}
+    result = record_slip_placed(
+        slip_id=str(body.get("slip_id", "")),
+        slip_type=str(body.get("slip_type", "accumulator")),
+        stake=float(body.get("stake", 5000)),
+        title=str(body.get("title", "Bet slip")),
+    )
+    if result.get("ok"):
+        cache.refresh()
+    return jsonify(result)
+
+
+@app.route("/api/assistant/workflow/result", methods=["POST"])
+def api_assistant_result():
+    body = request.get_json(silent=True) or {}
+    result = record_slip_result(
+        slip_id=str(body.get("slip_id", "")),
+        won=bool(body.get("won")),
+        profit=float(body.get("profit", 0)),
+    )
+    if result.get("ok"):
+        cache.refresh()
+    return jsonify(result)
+
+
+@app.route("/api/assistant/workflow/reset", methods=["POST"])
+def api_assistant_reset():
+    result = reset_workflow()
+    cache.refresh()
+    return jsonify(result)
+
+
+@app.route("/api/assistant/export/acca/<int:acca_id>")
+def api_export_acca(acca_id: int):
+    _ensure_cache()
+    data = cache.get()
+    stake = float(request.args.get("stake", STORE.load_config().get("stake_per_slip", 5000)))
+    accas = (data.get("accumulators") or {}).get("accumulators") or []
+    acca = next((a for a in accas if a.get("id") == acca_id), None)
+    if not acca:
+        return jsonify({"error": "Acca not found"}), 404
+    slip = acca_to_slip(acca, stake)
+    return jsonify(asdict(slip))
+
+
+@app.route("/api/assistant/export/lock")
+def api_export_lock():
+    _ensure_cache()
+    closing = cache.get_closing()
+    event_id = request.args.get("event_id", "")
+    half = request.args.get("half", "fh")
+    stake = float(request.args.get("stake", STORE.load_config().get("stake_per_slip", 5000)))
+    match = next(
+        (m for m in (closing.get("matches") or [])
+         if str(m.get("event_id")) == event_id and m.get("half") == half),
+        None,
+    )
+    if not match:
+        return jsonify({"error": "Lock not found"}), 404
+    slip = lock_to_slip(match, stake)
+    return jsonify(asdict(slip))
 
 
 @app.route("/health")

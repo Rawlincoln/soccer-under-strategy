@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro Punter · Betting Assistant</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/bet-assistant.css?v=1" />
+  <link rel="stylesheet" href="/static/assistant.css?v=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+</head>
+<body class="assistant-page">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">📋</span>
+        <div>
+          <h1>Pro Punter · Betting Assistant</h1>
+          <p class="subtitle">100K workflow · slip export · confirm before you bet · Telegram & browser alerts</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/">Soccer Live</a>
+        <a href="/closing">Goal Lock</a>
+        <a href="/basketball">Basketball Q3</a>
+        <a href="/accumulator">Accumulators</a>
+        <a href="/strategy">100K Strategy</a>
+        <a href="/assistant" class="active">Assistant</a>
+      </nav>
+      <div class="status-pill" id="connectionStatus">
+        <span class="pulse"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+      <div class="meta">
+        <span id="lastUpdate">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="assistant-main">
+    <section class="asst-hero" id="workflowHero">
+      <div class="asst-hero-card">
+        <div class="asst-hero-label">Today's profit</div>
+        <div class="asst-hero-value" id="profitRecorded">0</div>
+        <div class="asst-hero-sub">Target <span id="dailyTarget">100,000</span> · Gap <span id="gapTarget">100,000</span></div>
+      </div>
+      <div class="asst-hero-card">
+        <div class="asst-hero-label">Slips today</div>
+        <div class="asst-hero-value" id="slipsCount">0 / 5</div>
+        <div class="asst-hero-sub">W <span id="winsCount">0</span> · L <span id="lossesCount">0</span></div>
+      </div>
+      <div class="asst-hero-card" id="statusCard">
+        <div class="asst-hero-label">Status</div>
+        <div class="asst-hero-value asst-status-ok" id="workflowStatus">Ready</div>
+        <button class="ba-btn" id="btnResetDay" type="button">Reset day</button>
+      </div>
+    </section>
+
+    <section class="asst-section">
+      <h2 class="section-title">Three-wave plan</h2>
+      <div class="asst-waves" id="wavesGrid"></div>
+    </section>
+
+    <section class="asst-section">
+      <h2 class="section-title">Recommended slips now</h2>
+      <p class="asst-note">Copy or review each slip, then place manually on 1xBet. Mark placed to track your 100K day.</p>
+      <div id="recommendations" class="asst-recs">
+        <div class="loading">Loading recommendations…</div>
+      </div>
+    </section>
+
+    <div class="asst-grid">
+      <section class="asst-section">
+        <h2 class="section-title">Placed slips</h2>
+        <div id="placedSlips" class="asst-placed">
+          <div class="asst-empty">No slips marked placed today</div>
+        </div>
+      </section>
+
+      <section class="asst-section">
+        <h2 class="section-title">Alerts</h2>
+        <div id="alertsList" class="asst-alerts"></div>
+        <div class="asst-settings">
+          <h3>Alert settings</h3>
+          <label class="asst-check">
+            <input type="checkbox" id="browserAlerts" checked />
+            Browser desktop notifications
+          </label>
+          <label class="asst-check">
+            <input type="checkbox" id="telegramEnabled" />
+            Telegram alerts (configure below)
+          </label>
+          <label for="tgToken">Telegram bot token</label>
+          <input type="password" id="tgToken" placeholder="From @BotFather" autocomplete="off" />
+          <label for="tgChat">Telegram chat ID</label>
+          <input type="text" id="tgChat" placeholder="Your chat ID" />
+          <label for="stakeSetting">Stake per slip</label>
+          <input type="number" id="stakeSetting" value="5000" min="100" step="100" />
+          <button class="ba-btn primary" id="btnSaveConfig" type="button">Save settings</button>
+          <p class="asst-hint">Or set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> env vars on Render.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Manual betting only · Pro Punter never places bets on your account
+  </footer>
+
+  <script src="/static/bet-assistant.js?v=1"></script>
+  <script src="/static/assistant.js?v=1"></script>
+</body>
+</html>

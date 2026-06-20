@@ -120,6 +120,8 @@ function renderPicks60(data) {
 }
 
 function renderAcca(acca, stake) {
+  const slip = typeof BetAssistant !== "undefined" ? BetAssistant.slipFromAcca(acca, stake) : null;
+  const actions = slip ? BetAssistant.actionButtons(slip, null, true) : "";
   const legsHtml = acca.legs.map((leg, i) => `
     <div class="acca-leg">
       <div class="leg-num">${i + 1}</div>
@@ -180,6 +182,7 @@ function renderAcca(acca, stake) {
         <span class="total-label">Return on £${stake} stake</span>
         <span class="total-return">£${potential}</span>
       </div>
+      ${actions}
     </div>
   `;
 }
@@ -211,6 +214,7 @@ function renderAccas(data) {
 
   container.innerHTML = `<h2 class="section-title acca-title">Accumulator slips (≥${minConf}% legs)</h2>` +
     accas.map((a) => renderAcca(a, stake)).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(container);
 }
 
 async function fetchData() {
@@ -252,3 +256,4 @@ function startPolling() {
 }
 
 startPolling();
+if (typeof BetAssistant !== "undefined") BetAssistant.startAlertPolling(30000);

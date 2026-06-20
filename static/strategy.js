@@ -74,6 +74,8 @@ function renderCalculator() {
   `;
 }
 
+let workflowState = null;
+
 function renderLiveSlips(accas) {
   const box = $("liveSlips");
   if (!accas?.length) {
@@ -92,6 +94,8 @@ function renderLiveSlips(accas) {
     cumulative += profit;
     const hitsTarget = profit >= DAILY_TARGET;
     const legMins = (a.legs || []).map((l) => `${l.minute ?? "?"}'`).join(", ");
+    const slip = typeof BetAssistant !== "undefined" ? BetAssistant.slipFromAcca(a, STAKE_PER_SLIP) : null;
+    const actions = slip ? BetAssistant.actionButtons(slip, workflowState, true) : "";
     return `
       <div class="slip-plan ${hitsTarget ? "hit-target" : ""}">
         <div class="slip-plan-header">
@@ -105,6 +109,7 @@ function renderLiveSlips(accas) {
         </div>
         <div class="slip-plan-profit">+${fmtMoney(profit)} profit</div>
         <div class="slip-plan-note">${a.risk_level} risk · mins: ${legMins || "—"}</div>
+        ${actions}
       </div>
     `;
   }).join("");
@@ -114,7 +119,33 @@ function renderLiveSlips(accas) {
     : "";
 
   box.innerHTML = comboNote + cards;
+  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(box, workflowState);
   updateProgress(cumulative);
+}
+
+function renderWorkflowBanner(wf) {
+  const banner = $("workflowBanner");
+  if (!banner || !wf) return;
+  if (wf.stop_loss_hit) {
+    banner.hidden = false;
+    $("wfWave").textContent = "STOP-LOSS";
+    $("wfAction").textContent = "2 losses today — do not place more bets. Reset on Assistant if new day.";
+    return;
+  }
+  const active = wf.active_wave;
+  if (active?.status === "ACTIVE") {
+    banner.hidden = false;
+    $("wfWave").textContent = active.label || active.id;
+    $("wfAction").textContent = active.action || "Place slip now @ 5,000";
+    return;
+  }
+  if (wf.recommendations?.length) {
+    banner.hidden = false;
+    $("wfWave").textContent = "READY";
+    $("wfAction").textContent = `${wf.recommendations.length} slip(s) ready — ${wf.slips_remaining} remaining today`;
+    return;
+  }
+  banner.hidden = true;
 }
 
 function updateProgress(potentialProfit) {
@@ -128,13 +159,23 @@ function updateProgress(potentialProfit) {
 
 async function fetchData() {
   try {
-    const res = await fetch("/api/accumulators");
-    const data = await res.json();
+    const [accaRes, asstRes] = await Promise.all([
+      fetch("/api/accumulators"),
+      fetch("/api/assistant"),
+    ]);
+    const data = await accaRes.json();
+    const asst = await asstRes.json();
+    workflowState = asst.workflow || null;
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${new Date(data.updated_at).toLocaleTimeString()}`;
     $("connectionStatus").classList.add("live");
-    $("statusText").textContent = `${data.accumulator_count ?? 0} live accas · ${data.qualified_picks_60_count ?? 0} picks`;
+    const wfNote = workflowState?.stop_loss_hit ? " · STOP-LOSS" : workflowState?.active_wave ? ` · ${workflowState.active_wave.id}` : "";
+    $("statusText").textContent = `${data.accumulator_count ?? 0} accas · ${workflowState?.slips_placed ?? 0}/5 slips${wfNote}`;
     renderLiveSlips(data.accumulators || []);
+    renderWorkflowBanner(workflowState);
+    if (asst.new_alerts?.length && typeof BetAssistant !== "undefined") {
+      BetAssistant.processAlerts(asst.new_alerts);
+    }
   } catch (err) {
     $("connectionStatus").classList.add("error");
     $("statusText").textContent = "Connection error";
@@ -155,3 +196,4 @@ function init() {
 }
 
 init();
+if (typeof BetAssistant !== "undefined") BetAssistant.startAlertPolling(30000);

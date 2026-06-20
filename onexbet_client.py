@@ -135,27 +135,24 @@ def onexbet_android_intent_url(
     site: Optional[str] = None,
     package: Optional[str] = None,
     *,
+    force_package: bool = False,
     browser_fallback: Optional[str] = None,
 ) -> str:
-    """Chrome Android intent URL — opens native app when installed.
+    """Chrome Android intent URL — opens the app that handles 1xbet.co.ke links.
 
-    Default: no browser fallback (avoids opening 1xbet.co.ke in Chrome when intent is slow).
-    Pass browser_fallback='play_store' to offer Play Store if the app is missing.
+    Do NOT set force_package=True on Kenya — Chrome sends users to Play Store when the
+    package cannot handle the exact deep link, even if the app is already installed.
     """
-    pkg = android_package_for_site(site, package)
-    if not pkg:
-        return https_url
     parsed = urlparse(https_url)
     if not parsed.scheme.startswith("http"):
         return https_url
     path = f"{parsed.netloc}{parsed.path or ''}{parsed.query and '?' + parsed.query or ''}"
-    intent = (
-        f"intent://{path}#Intent;scheme=https;package={pkg};"
-        f"action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;"
-    )
-    if browser_fallback == "play_store":
-        intent += f"S.browser_fallback_url={quote(f'market://details?id={pkg}', safe='')};"
-    elif browser_fallback:
+    intent = f"intent://{path}#Intent;scheme=https;"
+    pkg = android_package_for_site(site, package)
+    if force_package and pkg:
+        intent += f"package={pkg};"
+    intent += "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;"
+    if browser_fallback:
         intent += f"S.browser_fallback_url={quote(browser_fallback, safe='')};"
     return f"{intent}end"
 
@@ -195,7 +192,6 @@ def onexbet_open_payload(
         "intent": onexbet_android_intent_url(https_url, site=site, package=pkg),
         "android_app": onexbet_android_app_url(https_url, site=site, package=pkg),
         "package": pkg,
-        "play_store": onexbet_play_store_url(site=site, package=pkg),
     }
 
 

@@ -126,21 +126,14 @@ const BetAssistant = (() => {
     return onexbetAndroidPackage || guessAndroidPackage(siteBase());
   }
 
-  function androidIntentUrl(httpsUrl, browserFallback = false) {
-    const pkg = androidPackage();
-    if (!pkg) return httpsUrl;
+  function androidIntentUrl(httpsUrl) {
     try {
       const u = new URL(httpsUrl);
       const path = `${u.host}${u.pathname}${u.search}`;
-      let intent =
-        `intent://${path}#Intent;scheme=https;package=${pkg};` +
-        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;";
-      if (browserFallback === "play_store") {
-        intent += `S.browser_fallback_url=${encodeURIComponent(`market://details?id=${pkg}`)};`;
-      } else if (browserFallback) {
-        intent += `S.browser_fallback_url=${encodeURIComponent(String(browserFallback))};`;
-      }
-      return `${intent}end`;
+      return (
+        `intent://${path}#Intent;scheme=https;` +
+        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end"
+      );
     } catch {
       return httpsUrl;
     }
@@ -188,7 +181,10 @@ const BetAssistant = (() => {
     const normalized = normalizeHttpsUrl(httpsUrl);
     if (!isMobile()) return normalized;
     if (isInAppBrowser()) return openerPageUrl(normalized);
-    if (isAndroid() && androidPackage()) return androidIntentUrl(normalized);
+    if (isAndroid() && androidPackage()) {
+      const appUri = androidAppUrl(normalized);
+      if (appUri.indexOf("android-app://") === 0) return appUri;
+    }
     return normalized;
   }
 
@@ -236,8 +232,11 @@ const BetAssistant = (() => {
       return;
     }
     if (isAndroid() && androidPackage()) {
-      window.location.href = androidIntentUrl(httpsUrl);
-      return;
+      const appUri = androidAppUrl(httpsUrl);
+      if (appUri.indexOf("android-app://") === 0) {
+        window.location.href = appUri;
+        return;
+      }
     }
     window.location.href = httpsUrl;
   }

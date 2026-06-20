@@ -1,13 +1,11 @@
 /**
- * 1xBet app opener — user tap launches the native app (no auto-redirect to browser).
+ * 1xBet app opener — launches the installed app (never Play Store).
  */
 (function () {
   const data = window.ONEXBET_OPEN || {};
   const httpsUrl = data.https || "";
   const intentUrl = data.intent || "";
   const androidAppUrl = data.android_app || "";
-  const pkg = data.package || "";
-  const playStoreUrl = data.play_store || "";
 
   const ua = navigator.userAgent || "";
   const isAndroid = /Android/i.test(ua);
@@ -57,20 +55,17 @@
       if (httpsUrl) tryNavigate(httpsUrl);
       return;
     }
-    let launched = false;
-    if (intentUrl.indexOf("intent://") === 0) {
-      launched = true;
-      tryIframe(intentUrl);
-      tryNavigate(intentUrl);
-    }
+    // 1) android-app:// — opens installed app directly (no Play Store redirect)
     if (androidAppUrl.indexOf("android-app://") === 0) {
-      setTimeout(() => {
-        if (document.visibilityState !== "hidden") tryNavigate(androidAppUrl);
-      }, 350);
+      tryNavigate(androidAppUrl);
     }
-    if (!launched && playStoreUrl) {
-      tryNavigate(playStoreUrl);
-    }
+    // 2) intent without package — system picks 1xBet if it handles 1xbet.co.ke
+    setTimeout(() => {
+      if (document.visibilityState !== "hidden" && intentUrl.indexOf("intent://") === 0) {
+        tryIframe(intentUrl);
+        tryNavigate(intentUrl);
+      }
+    }, 400);
   }
 
   function init() {
@@ -79,24 +74,20 @@
     const chromeBtn = $("open-chrome");
     const appBtn = $("open-app");
     const webBtn = $("open-web");
-    const installBtn = $("install-app");
 
     show(hint, inAppBrowser && isAndroid);
     show(chromeBtn, inAppBrowser && isAndroid);
-    show(settingsHint, isAndroid && !inAppBrowser);
-    show(installBtn, isAndroid && !!playStoreUrl);
+    show(settingsHint, isAndroid);
 
     if (chromeBtn) chromeBtn.onclick = (e) => { e.preventDefault(); openInChrome(); };
     if (appBtn) appBtn.onclick = (e) => { e.preventDefault(); launchApp(); };
     if (webBtn) webBtn.onclick = (e) => { e.preventDefault(); tryNavigate(httpsUrl); };
-    if (installBtn) installBtn.onclick = (e) => { e.preventDefault(); tryNavigate(playStoreUrl); };
 
     if (isIOS && appBtn) {
       appBtn.textContent = "Open 1xBet in Safari";
     }
 
-    // Android + real browser: try app immediately (no https fallback — that was opening the browser).
-    if (isAndroid && !inAppBrowser && intentUrl.indexOf("intent://") === 0) {
+    if (isAndroid && !inAppBrowser) {
       setTimeout(launchApp, 80);
     }
   }

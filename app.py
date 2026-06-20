@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "19")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "20")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -149,7 +149,6 @@ def open_onexbet_match():
     <button type="button" id="open-app" class="btn btn-primary">Open 1xBet App</button>
     <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
     <a id="open-web" class="btn btn-secondary" href="{https_url}">Open in browser instead</a>
-    <button type="button" id="install-app" class="btn btn-secondary" hidden>Install from Play Store</button>
     <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
   </div>
   <script>window.ONEXBET_OPEN = {json.dumps(payload)};</script>

@@ -419,12 +419,10 @@ function applyConfig(cfg) {
   $("stakeSetting").value = cfg.stake_per_slip || 5000;
   if ($("targetSetting")) $("targetSetting").value = cfg.daily_target || 100000;
   if ($("onexbetSite")) {
-    $("onexbetSite").value = cfg.onexbet_site || "";
-    $("onexbetSite").placeholder = cfg.onexbet_site || "https://1xbet.co.ke";
+    $("onexbetSite").value = cfg.onexbet_site || "https://1xbet.co.ke";
   }
   if ($("onexbetAndroidPkg")) {
-    $("onexbetAndroidPkg").value = cfg.onexbet_android_package || "";
-    $("onexbetAndroidPkg").placeholder = cfg.onexbet_android_package || "org.xbet.client.ke_ps";
+    $("onexbetAndroidPkg").value = cfg.onexbet_android_package || "org.xbet.client.ke_ps";
   }
   if (cfg.telegram_chat_id) $("tgChat").value = cfg.telegram_chat_id;
   const tokenEl = $("tgToken");

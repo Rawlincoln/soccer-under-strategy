@@ -6,8 +6,13 @@ const BetAssistant = (() => {
   let seenAlertIds = new Set(JSON.parse(localStorage.getItem("pp_seen_alerts") || "[]"));
   let notifyEnabled = localStorage.getItem("pp_browser_alerts") !== "false";
   let pollTimer = null;
+  const KENYA_SITE = "https://1xbet.co.ke";
+  const KENYA_ANDROID_PKG = "org.xbet.client.ke_ps";
   let onexbetSite = (localStorage.getItem("pp_onexbet_site") || "").replace(/\/$/, "");
-  let onexbetAndroidPackage = localStorage.getItem("pp_onexbet_android_package") || "";
+  if (!onexbetSite || onexbetSite === "https://1xbet.com" || onexbetSite === "http://1xbet.com") {
+    onexbetSite = KENYA_SITE;
+  }
+  let onexbetAndroidPackage = localStorage.getItem("pp_onexbet_android_package") || KENYA_ANDROID_PKG;
 
   function toast(msg, ms = 2800) {
     const el = document.createElement("div");
@@ -67,8 +72,7 @@ const BetAssistant = (() => {
   }
 
   function siteBase() {
-    if (onexbetSite) return onexbetSite;
-    return "https://1xbet.co.ke";
+    return onexbetSite || KENYA_SITE;
   }
 
   function liveFootballUrl() {
@@ -181,8 +185,8 @@ const BetAssistant = (() => {
 
   function applyOnexbetConfig(cfg) {
     if (!cfg) return;
-    if (cfg.onexbet_site) setOnexbetSite(cfg.onexbet_site);
-    if (cfg.onexbet_android_package) setOnexbetAndroidPackage(cfg.onexbet_android_package);
+    setOnexbetSite(cfg.onexbet_site || KENYA_SITE);
+    setOnexbetAndroidPackage(cfg.onexbet_android_package || KENYA_ANDROID_PKG);
   }
 
   async function loadOnexbetSite() {

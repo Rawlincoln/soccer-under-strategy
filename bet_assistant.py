@@ -140,12 +140,14 @@ class AssistantStore:
             self._write_json(STATE_PATH, asdict(state))
 
     def load_config(self) -> dict[str, Any]:
+        from onexbet_client import DEFAULT_ANDROID_PACKAGE, DEFAULT_ONEXBET_SITE
         cfg = self._read_json(CONFIG_PATH, {
             "stake_per_slip": STAKE_PER_SLIP,
             "daily_target": DAILY_TARGET,
             "browser_alerts": True,
             "telegram_enabled": False,
-            "onexbet_site": "",
+            "onexbet_site": DEFAULT_ONEXBET_SITE,
+            "onexbet_android_package": DEFAULT_ANDROID_PACKAGE,
         })
         token = os.environ.get("TELEGRAM_BOT_TOKEN") or cfg.get("telegram_bot_token", "")
         chat_id = os.environ.get("TELEGRAM_CHAT_ID") or cfg.get("telegram_chat_id", "")

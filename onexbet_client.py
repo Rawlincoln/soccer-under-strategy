@@ -12,14 +12,16 @@ import requests
 
 BASE_URL = "https://1xbet.com/web-api/LiveFeed"
 FOOTBALL_SPORT_ID = 1
+DEFAULT_ONEXBET_SITE = "https://1xbet.co.ke"
+DEFAULT_ANDROID_PACKAGE = "org.xbet.client.ke_ps"
 
 
 def get_onexbet_site(override: Optional[str] = None) -> str:
     """User-facing 1xBet domain (regional site opens the mobile app)."""
-    site = (override or os.environ.get("ONEXBET_SITE") or "https://1xbet.com").strip().rstrip("/")
+    site = (override or os.environ.get("ONEXBET_SITE") or DEFAULT_ONEXBET_SITE).strip().rstrip("/")
     if site and not site.startswith("http"):
         site = f"https://{site}"
-    return site or "https://1xbet.com"
+    return site or DEFAULT_ONEXBET_SITE
 
 
 ONEXBET_SITE = get_onexbet_site()

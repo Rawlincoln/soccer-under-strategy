@@ -137,12 +137,11 @@
           <label for="tgChat">Chat ID</label>
           <input type="text" id="tgChat" placeholder="e.g. 123456789" />
           <div id="tgChatPick" class="tg-chat-pick" hidden></div>
-          <label for="onexbetSite">Your 1xBet site (must match your app region)</label>
-          <input type="url" id="onexbetSite" placeholder="https://1xbet.co.ke" autocomplete="off" />
-          <p class="asst-hint">Kenya: <code>https://1xbet.co.ke</code> · Nigeria: <code>https://1xbet.ng</code> · Zambia: <code>https://1xbet.com.zm</code></p>
-          <label for="onexbetAndroidPkg">Android app package (optional)</label>
-          <input type="text" id="onexbetAndroidPkg" placeholder="org.xbet.client.ke_ps" autocomplete="off" />
-          <p class="asst-hint">Only if links still open the browser — find it on Play Store under App info. Kenya: <code>org.xbet.client.ke_ps</code></p>
+          <label for="onexbetSite">1xBet Kenya site</label>
+          <input type="url" id="onexbetSite" placeholder="https://1xbet.co.ke" value="https://1xbet.co.ke" autocomplete="off" />
+          <label for="onexbetAndroidPkg">Kenya Android app package</label>
+          <input type="text" id="onexbetAndroidPkg" placeholder="org.xbet.client.ke_ps" value="org.xbet.client.ke_ps" autocomplete="off" />
+          <p class="asst-hint">Defaults are set for Kenya. Save once — links on your phone should open the 1xBet app.</p>
           <label for="stakeSetting">Stake per slip</label>
           <input type="number" id="stakeSetting" value="5000" min="100" step="100" />
           <label for="targetSetting">Daily profit target</label>

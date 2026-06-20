@@ -715,6 +715,8 @@ def build_basketball_payload() -> dict[str, Any]:
                     "league": card.league,
                     "score": card.score,
                     "q3_clock": card.q3_clock,
+                    "game_odds": card.game_odds,
+                    "q3_odds": card.q3_odds,
                 })
 
     site = effective_onexbet_site()

@@ -225,6 +225,48 @@ const BetAssistant = (() => {
     window.location.href = httpsUrl;
   }
 
+  function oddsForMarket(item) {
+    if (!item) return null;
+    const pick = String(item.pick || "").toUpperCase();
+    const market = String(item.market || item.selection || item.lock_market || "").toLowerCase();
+    const gameOdds = item.game_odds || {};
+    const q3Odds = item.q3_odds || {};
+    const oddsBlock = (market.includes("quarter") || market.includes("q3")) ? q3Odds : gameOdds;
+    if (pick === "UNDER" && oddsBlock.under_odds > 1) return oddsBlock.under_odds;
+    if (pick === "OVER" && oddsBlock.over_odds > 1) return oddsBlock.over_odds;
+    if (oddsBlock.under_odds > 1) return oddsBlock.under_odds;
+    if (oddsBlock.over_odds > 1) return oddsBlock.over_odds;
+
+    const mkt = item.market_odds || {};
+    if (/under\s*0\.5|u0\.5/.test(market)) return mkt.under_05_odds || null;
+    if (/under\s*1\.5|u1\.5/.test(market)) return mkt.under_15_odds || null;
+    if (/under\s*2\.5|u2\.5/.test(market)) return mkt.under_25_odds || null;
+    const est = Number(item.estimated_odds);
+    if (est > 1) return est;
+    return mkt.under_15_odds || mkt.under_05_odds || mkt.under_25_odds || null;
+  }
+
+  function betLinkHtml(item, opts = {}) {
+    const gid = parseInt(item?.event_id, 10);
+    if (!gid || Number.isNaN(gid)) return "";
+    const sport = opts.sport || "football";
+    const label = opts.label || "BET NOW";
+    const odds = oddsForMarket(item);
+    const text = odds ? `${label} @ ${Number(odds).toFixed(2)}` : label;
+    return matchLinkHtml(gid, item.league_id, text, "rec-badge bet ba-1xbet-link", sport);
+  }
+
+  function recBadgeHtml(item, opts = {}) {
+    const rec = item?.recommendation || opts.rec || "";
+    const sport = opts.sport || "football";
+    if (rec === "BET" || opts.forceBet) {
+      const label = opts.label || (rec === "BET" ? "BET" : "BET NOW");
+      return betLinkHtml(item, { label, sport });
+    }
+    const cls = rec === "WATCH" ? "watch" : rec === "SKIP" ? "skip" : "low";
+    return `<span class="rec-badge ${cls}">${rec || opts.fallback || "—"}</span>`;
+  }
+
   function matchLinkHtml(eventId, leagueId, label = "1xBet ↗", className = "ba-match-link ba-1xbet-link", sport = "football") {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return "";
@@ -392,11 +434,21 @@ const BetAssistant = (() => {
 
   function actionButtons(slip, workflow, compact) {
     const cls = compact ? "ba-actions compact" : "ba-actions";
+    const leg = slip.legs?.[0];
+    const betItem = leg ? {
+      ...leg,
+      event_id: leg.event_id,
+      league_id: leg.league_id,
+      market: leg.selection || leg.market,
+      market_odds: leg.market_odds,
+      estimated_odds: leg.estimated_odds,
+    } : null;
+    const betLink = betItem ? betLinkHtml(betItem, { label: "Bet now" }) : "";
     return `
       <div class="${cls}">
         <button class="ba-btn primary" type="button" data-ba-copy="${slip.id}">Copy slip</button>
         <button class="ba-btn orange" type="button" data-ba-confirm="${slip.id}">Review & place</button>
-        <button class="ba-btn" type="button" data-ba-1xbet="${slip.id}">1xBet ↗</button>
+        ${betLink || `<button class="ba-btn" type="button" data-ba-1xbet="${slip.id}">1xBet ↗</button>`}
       </div>`;
   }
 
@@ -528,6 +580,10 @@ const BetAssistant = (() => {
         home_team: m.home_team,
         away_team: m.away_team,
         selection: m.lock_label,
+        market: m.lock_market,
+        lock_market: m.lock_market,
+        market_odds: m.market_odds,
+        estimated_odds: 1.05,
         confidence: m.lock_pct,
         period_score: m.period_score,
         minute: m.minute,
@@ -566,6 +622,9 @@ const BetAssistant = (() => {
     copyText,
     matchUrl,
     matchLinkHtml,
+    betLinkHtml,
+    recBadgeHtml,
+    oddsForMarket,
     open1xBet,
     setOnexbetSite,
     setOnexbetAndroidPackage,

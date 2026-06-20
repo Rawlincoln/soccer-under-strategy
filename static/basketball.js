@@ -55,7 +55,7 @@ function renderBetSignals(signals) {
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <span class="conf-big definite-label">${s.label || `${s.pick} ${s.line} · ${Number(s.confidence).toFixed(0)}%`}</span>
-        <span class="rec-badge bet">DEFINITE</span>
+        ${BetAssistant.betLinkHtml({ ...s, recommendation: "BET" }, { label: "BET NOW", sport: "basketball" })}
       </div>
       <ul class="bb-signals">${(s.signals || []).map((x) => `<li>${x}</li>`).join("")}</ul>
     </div>
@@ -80,7 +80,9 @@ function renderMatchCard(m) {
       <span class="bb-pred-market">${p.market}</span>
       <span class="bb-pred-pick ${pickClass(p.pick)}">${p.label || `${p.pick} ${p.line}`}</span>
       <span class="bb-pred-conf">${Number(p.confidence).toFixed(0)}%</span>
-      <span class="rec-badge ${p.is_definite ? "bet" : recClass(p.recommendation)}">${p.is_definite ? "DEFINITE" : p.recommendation}</span>
+      ${p.is_definite
+        ? BetAssistant.betLinkHtml({ ...p, event_id: m.event_id, league_id: m.league_id, game_odds: m.game_odds, q3_odds: m.q3_odds, recommendation: "BET" }, { label: "BET NOW", sport: "basketball" })
+        : BetAssistant.recBadgeHtml({ ...p, event_id: m.event_id, league_id: m.league_id, game_odds: m.game_odds, q3_odds: m.q3_odds }, { sport: "basketball" })}
     </div>
     <ul class="bb-signals">${(p.signals || []).slice(0, 5).map((s) => `<li>${s}</li>`).join("")}</ul>
   `).join("");

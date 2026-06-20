@@ -523,6 +523,21 @@ h1 {
   text-align: center;
 }
 
+a.rec-badge {
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+a.rec-badge:hover {
+  filter: brightness(1.1);
+}
+
+a.rec-badge:active {
+  transform: scale(0.98);
+}
+
 .rec-badge.bet { background: var(--green); color: #000; }
 .rec-badge.watch { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
 .rec-badge.skip { background: #2a1a1a; color: var(--red); }

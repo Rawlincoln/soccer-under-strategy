@@ -111,7 +111,13 @@ function renderPicks60(data) {
         ${isHalfTime(item) ? halfTimeBadge() : `<span class="pick-60-half">${halfTag(item.half)}</span>`}
         ${minuteBadge(item, item.half)}
         <span class="pick-60-conf">${fmtConf(item.confidence)}%</span>
-        <span class="rec-badge ${item.recommendation === "BET" ? "bet" : "watch"}">${item.recommendation}</span>
+        ${BetAssistant.recBadgeHtml({
+          recommendation: item.recommendation,
+          event_id: item.event_id,
+          league_id: item.league_id,
+          market: item.market,
+          market_odds: item.pick?.market_odds || item.card?.market_odds,
+        })}
       </div>
       <div class="pick-60-match">${item.match} ${link1x(item)}</div>
       <div class="pick-60-market">${item.market?.replace("First Half Goals", "FH").replace("Second Half Goals", "SH")}</div>
@@ -144,7 +150,13 @@ function renderAcca(acca, stake) {
           <div class="leg-stat"><div class="num">${fmtConf(leg.confidence)}%</div><div class="lbl">Conf</div></div>
         </div>
         <span class="leg-pick">${leg.selection}</span>
-        <span class="rec-badge ${leg.recommendation === "BET" ? "bet" : "watch"}">${leg.recommendation}</span>
+        ${BetAssistant.recBadgeHtml({
+          recommendation: leg.recommendation,
+          event_id: leg.event_id,
+          league_id: leg.league_id,
+          market: leg.market,
+          estimated_odds: leg.estimated_odds,
+        })}
         <div class="leg-meta">${halfTag(leg.half)} ${leg.period_score || leg.fh_score} · FT ${leg.full_score || "—"} · ${fmtMinute(leg, leg.half)}</div>
         ${leg.fusion_verdict ? `<div class="leg-prophit">${leg.fusion_verdict} · ${leg.fusion_agreement}</div>` : ""}
       </div>

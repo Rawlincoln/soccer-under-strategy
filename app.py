@@ -10,10 +10,12 @@ from basketball_engine import REFRESH_SECONDS as BB_REFRESH_SECONDS, BasketballC
 from bet_assistant import (
     STORE,
     acca_to_slip,
+    discover_telegram_chats,
     lock_to_slip,
     record_slip_placed,
     record_slip_result,
     reset_workflow,
+    test_telegram,
 )
 from engine import REFRESH_SECONDS, DataCache
 
@@ -151,11 +153,35 @@ def api_assistant_config():
     if request.method == "GET":
         cfg = STORE.load_config()
         safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
+        safe["telegram_token_set"] = bool(cfg.get("telegram_bot_token"))
         return jsonify(safe)
     body = request.get_json(silent=True) or {}
     cfg = STORE.save_config(body)
     safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
+    safe["telegram_token_set"] = bool(cfg.get("telegram_bot_token"))
     return jsonify({"ok": True, "config": safe})
+
+
+@app.route("/api/assistant/telegram/test", methods=["POST"])
+def api_telegram_test():
+    body = request.get_json(silent=True) or {}
+    cfg = STORE.load_config()
+    if body.get("telegram_bot_token"):
+        cfg = {**cfg, "telegram_bot_token": body["telegram_bot_token"]}
+    if body.get("telegram_chat_id"):
+        cfg = {**cfg, "telegram_chat_id": str(body["telegram_chat_id"])}
+    if body.get("telegram_enabled") is not None:
+        cfg = {**cfg, "telegram_enabled": bool(body["telegram_enabled"])}
+    elif not cfg.get("telegram_enabled"):
+        cfg = {**cfg, "telegram_enabled": True}
+    return jsonify(test_telegram(cfg))
+
+
+@app.route("/api/assistant/telegram/discover", methods=["POST"])
+def api_telegram_discover():
+    body = request.get_json(silent=True) or {}
+    token = body.get("telegram_bot_token") or STORE.load_config().get("telegram_bot_token", "")
+    return jsonify(discover_telegram_chats(token))
 
 
 @app.route("/api/assistant/workflow/placed", methods=["POST"])

@@ -391,6 +391,77 @@
   margin-top: 10px;
 }
 
+.tg-status {
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.tg-status.ok {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.tg-status.warn {
+  border-color: rgba(255, 140, 50, 0.45);
+  color: var(--orange, #ff8c32);
+}
+
+.tg-setup-steps {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.tg-setup-steps ol {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.tg-setup-steps li {
+  margin-bottom: 6px;
+}
+
+.tg-setup-steps a {
+  color: var(--green);
+}
+
+.tg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.tg-chat-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tg-chat-btn {
+  text-align: left;
+  font-size: 0.78rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tg-chat-btn:hover {
+  border-color: var(--green);
+}
+
 .asst-empty {
   color: var(--muted);
   font-size: 0.85rem;

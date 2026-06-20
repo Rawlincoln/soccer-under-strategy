@@ -150,8 +150,11 @@ class AssistantStore:
                 "telegram_enabled", "telegram_bot_token", "telegram_chat_id",
             }
             for key, val in updates.items():
-                if key in allowed:
-                    cfg[key] = val
+                if key not in allowed:
+                    continue
+                if key in ("telegram_bot_token", "telegram_chat_id") and not str(val).strip():
+                    continue
+                cfg[key] = val
             self._write_json(CONFIG_PATH, cfg)
         return self.load_config()
 
@@ -582,23 +585,106 @@ def detect_alerts(
     return new_alerts
 
 
+def _telegram_post(token: str, method: str, payload: dict) -> tuple[bool, str, Optional[dict]]:
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{token}/{method}",
+            json=payload,
+            timeout=15,
+        )
+        data = r.json() if r.content else {}
+        if r.ok and data.get("ok"):
+            return True, "ok", data.get("result")
+        err = data.get("description") or r.text or f"HTTP {r.status_code}"
+        return False, str(err), None
+    except requests.RequestException as exc:
+        return False, str(exc), None
+
+
+def discover_telegram_chats(token: str) -> dict[str, Any]:
+    """Return chat IDs from recent messages to the bot (user must /start bot first)."""
+    token = (token or "").strip()
+    if not token:
+        return {"ok": False, "error": "Bot token required"}
+
+    ok, err, result = _telegram_post(token, "getUpdates", {"limit": 20, "timeout": 0})
+    if not ok:
+        return {"ok": False, "error": err}
+
+    chats: dict[str, dict] = {}
+    for item in result or []:
+        msg = item.get("message") or item.get("channel_post") or {}
+        chat = msg.get("chat") or {}
+        cid = chat.get("id")
+        if cid is None:
+            continue
+        key = str(cid)
+        chats[key] = {
+            "chat_id": key,
+            "type": chat.get("type", ""),
+            "title": chat.get("title") or chat.get("username") or "",
+            "name": " ".join(
+                x for x in [chat.get("first_name"), chat.get("last_name")] if x
+            ).strip() or chat.get("username", ""),
+            "username": chat.get("username", ""),
+        }
+
+    chat_list = list(chats.values())
+    if not chat_list:
+        return {
+            "ok": False,
+            "error": "No messages found. Open your bot in Telegram, tap Start, send any message, then try again.",
+            "chats": [],
+        }
+    return {"ok": True, "chats": chat_list}
+
+
+def send_telegram_message(
+    text: str,
+    *,
+    token: Optional[str] = None,
+    chat_id: Optional[str] = None,
+    config: Optional[dict] = None,
+) -> tuple[bool, str]:
+    config = config or STORE.load_config()
+    token = (token or config.get("telegram_bot_token") or "").strip()
+    chat_id = str(chat_id or config.get("telegram_chat_id") or "").strip()
+    if not token:
+        return False, "Bot token missing — add it below or set TELEGRAM_BOT_TOKEN"
+    if not chat_id:
+        return False, "Chat ID missing — discover it below or set TELEGRAM_CHAT_ID"
+    ok, err, _ = _telegram_post(token, "sendMessage", {
+        "chat_id": chat_id,
+        "text": text,
+        "disable_web_page_preview": True,
+    })
+    return ok, err if not ok else "sent"
+
+
 def send_telegram_alert(text: str, config: Optional[dict] = None) -> bool:
     config = config or STORE.load_config()
     if not config.get("telegram_enabled"):
         return False
-    token = config.get("telegram_bot_token", "")
-    chat_id = config.get("telegram_chat_id", "")
-    if not token or not chat_id:
-        return False
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "disable_web_page_preview": True},
-            timeout=15,
-        )
-        return r.ok
-    except requests.RequestException:
-        return False
+    ok, _ = send_telegram_message(text, config=config)
+    return ok
+
+
+def test_telegram(config: Optional[dict] = None) -> dict[str, Any]:
+    config = config or STORE.load_config()
+    msg = (
+        "✅ Pro Punter Telegram alerts are working!\n\n"
+        "You will receive notifications for:\n"
+        "• Goal Lock picks (95%+)\n"
+        "• Wave 1 / Wave 2 acca signals\n"
+        "• Stop-loss warnings"
+    )
+    ok, detail = send_telegram_message(msg, config=config)
+    return {
+        "ok": ok,
+        "error": None if ok else detail,
+        "telegram_configured": config.get("telegram_configured", False),
+        "telegram_enabled": config.get("telegram_enabled", False),
+    }
 
 
 def dispatch_new_alerts(alerts: list[dict], config: Optional[dict] = None) -> int:

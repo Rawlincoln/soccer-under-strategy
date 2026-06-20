@@ -204,12 +204,34 @@ function renderAlerts(alerts) {
   `).join("");
 }
 
+function updateTgStatus(cfg) {
+  const el = $("tgStatus");
+  if (!el || !cfg) return;
+  if (cfg.telegram_enabled && cfg.telegram_configured) {
+    el.textContent = `Telegram: active · chat ${cfg.telegram_chat_id || "—"}`;
+    el.className = "tg-status ok";
+  } else if (cfg.telegram_configured) {
+    el.textContent = "Telegram: configured — enable checkbox and Save";
+    el.className = "tg-status warn";
+  } else if (cfg.telegram_token_set) {
+    el.textContent = "Telegram: token set — add chat ID";
+    el.className = "tg-status warn";
+  } else {
+    el.textContent = "Telegram: not configured";
+    el.className = "tg-status";
+  }
+  if (cfg.telegram_chat_id && !$("tgChat").value) {
+    $("tgChat").placeholder = `Saved: ${cfg.telegram_chat_id}`;
+  }
+}
+
 function applyConfig(cfg) {
   if (!cfg) return;
   $("browserAlerts").checked = cfg.browser_alerts !== false;
   $("telegramEnabled").checked = !!cfg.telegram_enabled;
   $("stakeSetting").value = cfg.stake_per_slip || 5000;
   BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
+  updateTgStatus(cfg);
 }
 
 async function saveConfig() {
@@ -266,7 +288,80 @@ async function fetchData() {
   }
 }
 
+async function discoverChat() {
+  const token = $("tgToken").value.trim();
+  if (!token) {
+    BetAssistant.toast("Paste your bot token first");
+    return;
+  }
+  $("btnDiscoverChat").disabled = true;
+  try {
+    const res = await fetch("/api/assistant/telegram/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telegram_bot_token: token }),
+    });
+    const data = await res.json();
+    const box = $("tgChatPick");
+    if (!data.ok || !data.chats?.length) {
+      box.hidden = true;
+      BetAssistant.toast(data.error || "No chat found — message your bot first");
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML = data.chats.map((c) => `
+      <button type="button" class="tg-chat-btn" data-chat="${c.chat_id}">
+        ${c.name || c.title || c.username || "Chat"} · ID ${c.chat_id} · ${c.type || "private"}
+      </button>
+    `).join("");
+    box.querySelectorAll(".tg-chat-btn").forEach((btn) => {
+      btn.onclick = () => {
+        $("tgChat").value = btn.dataset.chat;
+        BetAssistant.toast(`Chat ID ${btn.dataset.chat} selected`);
+      };
+    });
+    if (data.chats.length === 1) {
+      $("tgChat").value = data.chats[0].chat_id;
+    }
+    BetAssistant.toast(`Found ${data.chats.length} chat(s)`);
+  } catch {
+    BetAssistant.toast("Could not reach Telegram API");
+  } finally {
+    $("btnDiscoverChat").disabled = false;
+  }
+}
+
+async function testTelegram() {
+  const body = {
+    telegram_bot_token: $("tgToken").value.trim(),
+    telegram_chat_id: $("tgChat").value.trim(),
+    telegram_enabled: true,
+  };
+  $("btnTestTelegram").disabled = true;
+  try {
+    const res = await fetch("/api/assistant/telegram/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      BetAssistant.toast("Test alert sent — check Telegram");
+      $("telegramEnabled").checked = true;
+      await saveConfig();
+    } else {
+      BetAssistant.toast(data.error || "Test failed");
+    }
+  } catch {
+    BetAssistant.toast("Test request failed");
+  } finally {
+    $("btnTestTelegram").disabled = false;
+  }
+}
+
 $("btnSaveConfig").addEventListener("click", saveConfig);
+$("btnDiscoverChat").addEventListener("click", discoverChat);
+$("btnTestTelegram").addEventListener("click", testTelegram);
 $("browserAlerts").addEventListener("change", () => {
   BetAssistant.setBrowserAlerts($("browserAlerts").checked);
   if ($("browserAlerts").checked) BetAssistant.requestNotifyPermission();

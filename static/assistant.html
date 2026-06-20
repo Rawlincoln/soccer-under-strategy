@@ -86,22 +86,38 @@
         <div id="alertsList" class="asst-alerts"></div>
         <div class="asst-settings">
           <h3>Alert settings</h3>
+          <div class="tg-status" id="tgStatus">Telegram: not configured</div>
           <label class="asst-check">
             <input type="checkbox" id="browserAlerts" checked />
             Browser desktop notifications
           </label>
           <label class="asst-check">
             <input type="checkbox" id="telegramEnabled" />
-            Telegram alerts (configure below)
+            Telegram alerts
           </label>
-          <label for="tgToken">Telegram bot token</label>
-          <input type="password" id="tgToken" placeholder="From @BotFather" autocomplete="off" />
-          <label for="tgChat">Telegram chat ID</label>
-          <input type="text" id="tgChat" placeholder="Your chat ID" />
+          <div class="tg-setup-steps">
+            <p><strong>Setup (2 minutes)</strong></p>
+            <ol>
+              <li>Open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> → <code>/newbot</code> → copy the <strong>bot token</strong></li>
+              <li>Open your new bot in Telegram → tap <strong>Start</strong> → send any message</li>
+              <li>Paste token below → <strong>Find chat ID</strong> → Save → <strong>Send test</strong></li>
+            </ol>
+          </div>
+          <label for="tgToken">Bot token</label>
+          <input type="password" id="tgToken" placeholder="123456789:ABCdefGHI..." autocomplete="off" />
+          <div class="tg-actions">
+            <button class="ba-btn" id="btnDiscoverChat" type="button">Find chat ID</button>
+          </div>
+          <label for="tgChat">Chat ID</label>
+          <input type="text" id="tgChat" placeholder="e.g. 123456789" />
+          <div id="tgChatPick" class="tg-chat-pick" hidden></div>
           <label for="stakeSetting">Stake per slip</label>
           <input type="number" id="stakeSetting" value="5000" min="100" step="100" />
-          <button class="ba-btn primary" id="btnSaveConfig" type="button">Save settings</button>
-          <p class="asst-hint">Or set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> env vars on Render.</p>
+          <div class="tg-actions">
+            <button class="ba-btn primary" id="btnSaveConfig" type="button">Save settings</button>
+            <button class="ba-btn orange" id="btnTestTelegram" type="button">Send test alert</button>
+          </div>
+          <p class="asst-hint">Production: set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> on Render (Environment).</p>
         </div>
       </section>
     </div>

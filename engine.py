@@ -179,16 +179,19 @@ class DataCache:
             "matches": [],
             "bet_signals": [],
             "baselines": {},
+            "loading": True,
             "error": None,
         }
         self._closing: dict[str, Any] = {
             "updated_at": None,
             "matches": [],
+            "loading": True,
             "error": None,
         }
         self._assistant: dict[str, Any] = {
             "updated_at": None,
             "workflow": {},
+            "loading": True,
             "error": None,
         }
         self._running = False
@@ -198,7 +201,6 @@ class DataCache:
         if self._running:
             return
         self._running = True
-        self.refresh()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
@@ -207,13 +209,16 @@ class DataCache:
 
     def _loop(self):
         while self._running:
-            time.sleep(REFRESH_SECONDS)
             self.refresh()
+            time.sleep(REFRESH_SECONDS)
 
     def refresh(self):
         try:
             payload, closing_payload = build_all_payloads()
             assistant_payload = build_assistant_payload(payload, closing_payload)
+            payload["loading"] = False
+            closing_payload["loading"] = False
+            assistant_payload["loading"] = False
             with self._lock:
                 self._data = payload
                 self._closing = closing_payload
@@ -221,8 +226,11 @@ class DataCache:
         except Exception as exc:
             with self._lock:
                 self._data["error"] = str(exc)
+                self._data["loading"] = False
                 self._closing["error"] = str(exc)
+                self._closing["loading"] = False
                 self._assistant["error"] = str(exc)
+                self._assistant["loading"] = False
 
     def get(self) -> dict[str, Any]:
         with self._lock:

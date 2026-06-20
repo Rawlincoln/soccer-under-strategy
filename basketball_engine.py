@@ -742,14 +742,13 @@ class BasketballCache:
         if self._running:
             return
         self._running = True
-        self.refresh()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
     def _loop(self):
         while self._running:
-            time.sleep(REFRESH_SECONDS)
             self.refresh()
+            time.sleep(REFRESH_SECONDS)
 
     def refresh(self):
         try:

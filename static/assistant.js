@@ -243,8 +243,13 @@ async function fetchData() {
     $("lastUpdate").textContent = data.updated_at
       ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}`
       : "—";
-    $("statusText").textContent = wf.can_place ? "Ready to assist" : "Stop / max slips";
-    $("connectionStatus").classList.add("live");
+    if (data.loading) {
+      $("statusText").textContent = "Loading live data…";
+      $("connectionStatus").classList.remove("error");
+    } else {
+      $("statusText").textContent = wf.can_place ? "Ready to assist" : "Stop / max slips";
+      $("connectionStatus").classList.add("live");
+    }
 
     renderWorkflow(wf);
     renderWaves(wf.waves);

@@ -230,9 +230,7 @@ async function fetchData() {
   try {
     const res = await fetch("/api/accumulators");
     const data = await res.json();
-    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
-      BetAssistant.setOnexbetSite(data.onexbet_site);
-    }
+    if (typeof BetAssistant !== "undefined") BetAssistant.applyOnexbetConfig(data);
     lastData = data;
 
     $("refreshInterval").textContent = data.refresh_seconds || 30;

@@ -6,7 +6,8 @@ const BetAssistant = (() => {
   let seenAlertIds = new Set(JSON.parse(localStorage.getItem("pp_seen_alerts") || "[]"));
   let notifyEnabled = localStorage.getItem("pp_browser_alerts") !== "false";
   let pollTimer = null;
-  let onexbetSite = (localStorage.getItem("pp_onexbet_site") || "https://1xbet.com").replace(/\/$/, "");
+  let onexbetSite = (localStorage.getItem("pp_onexbet_site") || "").replace(/\/$/, "");
+  let onexbetAndroidPackage = localStorage.getItem("pp_onexbet_android_package") || "";
 
   function toast(msg, ms = 2800) {
     const el = document.createElement("div");
@@ -37,6 +38,16 @@ const BetAssistant = (() => {
     }
   }
 
+  const ANDROID_PACKAGES = {
+    "1xbet.co.ke": "org.xbet.client.ke_ps",
+    "1xbet.ng": "org.xbet.client.ng_ps",
+    "1xbet.com.zm": "org.xbet.client.zm_ps",
+    "1xbet.com.gh": "com.xbet.betafrica.gh",
+    "1xbet.ug": "org.xbet.client.ug_ps",
+    "1xbet.co.tz": "org.xbet.client.tz_ps",
+    "1xbet.co.mz": "org.xbet.client.mz_ps",
+  };
+
   function setOnexbetSite(site) {
     if (!site) return;
     onexbetSite = String(site).trim().replace(/\/$/, "");
@@ -44,59 +55,140 @@ const BetAssistant = (() => {
       onexbetSite = `https://${onexbetSite}`;
     }
     localStorage.setItem("pp_onexbet_site", onexbetSite);
+    if (!onexbetAndroidPackage) {
+      const guessed = guessAndroidPackage(onexbetSite);
+      if (guessed) onexbetAndroidPackage = guessed;
+    }
+  }
+
+  function setOnexbetAndroidPackage(pkg) {
+    onexbetAndroidPackage = String(pkg || "").trim();
+    localStorage.setItem("pp_onexbet_android_package", onexbetAndroidPackage);
+  }
+
+  function siteBase() {
+    if (onexbetSite) return onexbetSite;
+    return "https://1xbet.co.ke";
   }
 
   function liveFootballUrl() {
-    return `${onexbetSite}/en/live/football`;
+    return `${siteBase()}/en/live/football`;
+  }
+
+  function isAndroid() {
+    return /Android/i.test(navigator.userAgent);
+  }
+
+  function isIOS() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
   function isMobile() {
-    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    return isAndroid() || isIOS()
       || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+  }
+
+  function guessAndroidPackage(siteUrl) {
+    try {
+      const host = new URL(siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`).hostname.toLowerCase();
+      if (ANDROID_PACKAGES[host]) return ANDROID_PACKAGES[host];
+      if (host.endsWith(".co.ke")) return "org.xbet.client.ke_ps";
+      if (host.endsWith(".co.tz")) return "org.xbet.client.tz_ps";
+      if (host.endsWith(".co.mz")) return "org.xbet.client.mz_ps";
+      if (host === "1xbet.ng" || host.endsWith(".ng")) return "org.xbet.client.ng_ps";
+      if (host.endsWith(".com.zm")) return "org.xbet.client.zm_ps";
+      if (host.endsWith(".com.gh")) return "com.xbet.betafrica.gh";
+      if (host.endsWith(".ug")) return "org.xbet.client.ug_ps";
+    } catch { /* ignore */ }
+    return "";
+  }
+
+  function normalizeHttpsUrl(url) {
+    const raw = url || liveFootballUrl();
+    try {
+      const u = new URL(raw, siteBase());
+      if (onexbetSite) {
+        const base = new URL(onexbetSite);
+        u.protocol = base.protocol;
+        u.host = base.host;
+      }
+      return u.toString().replace(/\/$/, "");
+    } catch {
+      return raw;
+    }
+  }
+
+  function androidIntentUrl(httpsUrl) {
+    const pkg = onexbetAndroidPackage || guessAndroidPackage(siteBase());
+    if (!pkg) return httpsUrl;
+    try {
+      const u = new URL(httpsUrl);
+      const path = `${u.host}${u.pathname}${u.search}`;
+      const fallback = encodeURIComponent(httpsUrl);
+      return `intent://${path}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${fallback};end`;
+    } catch {
+      return httpsUrl;
+    }
+  }
+
+  function mobileOpenUrl(httpsUrl) {
+    const normalized = normalizeHttpsUrl(httpsUrl);
+    if (isAndroid() && (onexbetAndroidPackage || guessAndroidPackage(siteBase()))) {
+      return androidIntentUrl(normalized);
+    }
+    return normalized;
   }
 
   function matchUrl(eventId, leagueId, sport = "football") {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return liveFootballUrl();
     const lid = parseInt(leagueId, 10);
+    const base = siteBase();
     if (lid && !Number.isNaN(lid)) {
-      return `${onexbetSite}/en/live/${sport}/${lid}/${gid}`;
+      return `${base}/en/live/${sport}/${lid}/${gid}`;
     }
-    return `${onexbetSite}/en/live/${sport}/${gid}`;
+    return `${base}/en/live/${sport}/${gid}`;
   }
 
   function open1xBet(url) {
-    const target = url || liveFootballUrl();
-    if (isMobile()) {
-      window.location.assign(target);
-    } else {
-      window.open(target, "_blank", "noopener");
+    const httpsUrl = normalizeHttpsUrl(url || liveFootballUrl());
+    if (!isMobile()) {
+      window.open(httpsUrl, "_blank", "noopener");
+      return;
     }
+    const openUrl = mobileOpenUrl(httpsUrl);
+    window.location.href = openUrl;
   }
 
   function matchLinkHtml(eventId, leagueId, label = "1xBet ↗", className = "ba-match-link ba-1xbet-link", sport = "football") {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return "";
-    const url = matchUrl(eventId, leagueId, sport);
+    const httpsUrl = matchUrl(eventId, leagueId, sport);
+    const href = isMobile() ? mobileOpenUrl(httpsUrl) : httpsUrl;
     const blank = isMobile() ? "" : ' target="_blank" rel="noopener"';
-    return `<a href="${url}" class="${className}"${blank}>${label}</a>`;
+    return `<a href="${href}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
   }
 
   function bind1xBetLinks(root) {
     (root || document).querySelectorAll("a.ba-1xbet-link").forEach((a) => {
       a.onclick = (e) => {
-        if (!isMobile()) return;
         e.preventDefault();
-        open1xBet(a.href);
+        const httpsUrl = a.dataset.httpsUrl || a.getAttribute("href");
+        open1xBet(httpsUrl);
       };
     });
+  }
+
+  function applyOnexbetConfig(cfg) {
+    if (!cfg) return;
+    if (cfg.onexbet_site) setOnexbetSite(cfg.onexbet_site);
+    if (cfg.onexbet_android_package) setOnexbetAndroidPackage(cfg.onexbet_android_package);
   }
 
   async function loadOnexbetSite() {
     try {
       const res = await fetch("/api/assistant/config");
-      const cfg = await res.json();
-      if (cfg.onexbet_site) setOnexbetSite(cfg.onexbet_site);
+      applyOnexbetConfig(await res.json());
     } catch { /* ignore */ }
   }
 
@@ -149,7 +241,7 @@ const BetAssistant = (() => {
         <span class="ba-modal-leg-meta">${clock} · ${leg.half === "sh" ? "2H" : "1H"} ${leg.period_score || "—"} · FT ${leg.full_score || "—"}</span><br>
         ${leg.selection || leg.market} · ${Number(leg.confidence).toFixed(0)}%${odds}
         ${leg.recommendation ? ` · ${leg.recommendation}` : ""}
-        <br><a href="${url}" ${isMobile() ? "" : 'target="_blank" rel="noopener"'} class="ba-leg-link ba-1xbet-link">Open on 1xBet ↗</a>
+        <br><a href="${mobileOpenUrl(url)}" data-https-url="${url}" ${isMobile() ? "" : 'target="_blank" rel="noopener"'} class="ba-leg-link ba-1xbet-link">Open on 1xBet ↗</a>
       </div>`;
     }).join("");
   }
@@ -412,6 +504,9 @@ const BetAssistant = (() => {
     matchLinkHtml,
     open1xBet,
     setOnexbetSite,
+    setOnexbetAndroidPackage,
+    applyOnexbetConfig,
+    mobileOpenUrl,
     bind1xBetLinks,
     isMobile,
     showConfirm,

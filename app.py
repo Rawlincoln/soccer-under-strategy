@@ -42,7 +42,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "13")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "14")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -98,6 +98,7 @@ def api_accumulators():
         "refresh_seconds": data.get("refresh_seconds", REFRESH_SECONDS),
         "onexbet_site": data.get("onexbet_site"),
         "onexbet_live_url": data.get("onexbet_live_url"),
+        "onexbet_android_package": data.get("onexbet_android_package"),
         **data.get("accumulators", {}),
     })
 

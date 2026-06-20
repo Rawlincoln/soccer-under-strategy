@@ -419,9 +419,7 @@ async function fetchData() {
     if (data.error) throw new Error(data.error);
 
     lastData = data;
-    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
-      BetAssistant.setOnexbetSite(data.onexbet_site);
-    }
+    if (typeof BetAssistant !== "undefined") BetAssistant.applyOnexbetConfig(data);
     refreshSeconds = data.refresh_seconds || 30;
     $("refreshInterval").textContent = refreshSeconds;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;

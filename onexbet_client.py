@@ -6,6 +6,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -48,6 +49,69 @@ def onexbet_basketball_match_url(
     site: Optional[str] = None,
 ) -> str:
     return onexbet_match_url(game_id, league_id, site=site, sport="basketball")
+
+
+# Regional Android app packages (Play Store). Used for intent:// deep links.
+ANDROID_PACKAGES: dict[str, str] = {
+    "1xbet.co.ke": "org.xbet.client.ke_ps",
+    "1xbet.ng": "org.xbet.client.ng_ps",
+    "1xbet.com.zm": "org.xbet.client.zm_ps",
+    "1xbet.com.gh": "com.xbet.betafrica.gh",
+    "1xbet.ug": "org.xbet.client.ug_ps",
+    "1xbet.co.tz": "org.xbet.client.tz_ps",
+    "1xbet.co.mz": "org.xbet.client.mz_ps",
+    "1xbet.com": "org.xbet.client1",
+}
+
+
+def site_hostname(site: Optional[str] = None) -> str:
+    host = urlparse(get_onexbet_site(site)).hostname or ""
+    return host.lower()
+
+
+def android_package_for_site(
+    site: Optional[str] = None,
+    override: Optional[str] = None,
+) -> str:
+    """Guess Play Store package for the regional 1xBet app."""
+    pkg = (override or os.environ.get("ONEXBET_ANDROID_PACKAGE") or "").strip()
+    if pkg:
+        return pkg
+    host = site_hostname(site)
+    if host in ANDROID_PACKAGES:
+        return ANDROID_PACKAGES[host]
+    if host.endswith(".co.ke"):
+        return "org.xbet.client.ke_ps"
+    if host.endswith(".co.tz"):
+        return "org.xbet.client.tz_ps"
+    if host.endswith(".co.mz"):
+        return "org.xbet.client.mz_ps"
+    if host == "1xbet.ng" or host.endswith(".ng"):
+        return "org.xbet.client.ng_ps"
+    if host.endswith(".com.zm"):
+        return "org.xbet.client.zm_ps"
+    if host.endswith(".com.gh"):
+        return "com.xbet.betafrica.gh"
+    if host.endswith(".ug"):
+        return "org.xbet.client.ug_ps"
+    return ""
+
+
+def onexbet_android_intent_url(https_url: str, site: Optional[str] = None, package: Optional[str] = None) -> str:
+    """Chrome Android intent URL — opens native app when installed."""
+    pkg = android_package_for_site(site, package)
+    if not pkg:
+        return https_url
+    parsed = urlparse(https_url)
+    if not parsed.scheme.startswith("http"):
+        return https_url
+    path = f"{parsed.netloc}{parsed.path or ''}{parsed.query and '?' + parsed.query or ''}"
+    fallback = quote(https_url, safe="")
+    return (
+        f"intent://{path}#Intent;scheme=https;package={pkg};"
+        f"S.browser_fallback_url={fallback};end"
+    )
+
 
 STAT_MAP = {
     "attacks": 45,

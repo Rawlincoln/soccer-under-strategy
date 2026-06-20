@@ -14,7 +14,11 @@ from typing import Any, Optional
 import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
-from bet_assistant import build_assistant_payload, effective_onexbet_site
+from bet_assistant import (
+    build_assistant_payload,
+    effective_onexbet_android_package,
+    effective_onexbet_site,
+)
 from closing_window import (
     MIN_LOCK_PCT,
     build_closing_card,
@@ -924,6 +928,7 @@ def build_dashboard_payload() -> dict[str, Any]:
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
     site = effective_onexbet_site()
+    android_pkg = effective_onexbet_android_package()
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -931,6 +936,7 @@ def build_dashboard_payload() -> dict[str, Any]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "first_half_count": counts["fh_count"],
@@ -963,12 +969,14 @@ def build_dashboard_payload() -> dict[str, Any]:
 def build_closing_payload() -> dict[str, Any]:
     _, closing_cards, _, _, _, counts = _scan_live_football()
     site = effective_onexbet_site()
+    android_pkg = effective_onexbet_android_package()
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "closing_window_count": counts["closing_window_count"],
@@ -992,12 +1000,14 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
     accumulators = build_accumulators(match_dicts)
 
     site = effective_onexbet_site()
+    android_pkg = effective_onexbet_android_package()
     main = {
         "updated_at": updated,
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "first_half_count": counts["fh_count"],
@@ -1031,6 +1041,7 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "closing_window_count": counts["closing_window_count"],

@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any, Optional
 import requests
 
-from onexbet_client import get_onexbet_site, onexbet_live_url, onexbet_match_url
+from onexbet_client import (
+    android_package_for_site,
+    get_onexbet_site,
+    onexbet_live_url,
+    onexbet_match_url,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 STATE_PATH = DATA_DIR / "assistant_state.json"
@@ -34,6 +39,12 @@ WAVE_WINDOWS = {
 def effective_onexbet_site(config: Optional[dict] = None) -> str:
     cfg = config or STORE.load_config()
     return get_onexbet_site(cfg.get("onexbet_site") or None)
+
+
+def effective_onexbet_android_package(config: Optional[dict] = None) -> str:
+    cfg = config or STORE.load_config()
+    site = effective_onexbet_site(cfg)
+    return android_package_for_site(site, cfg.get("onexbet_android_package") or None)
 
 
 @dataclass
@@ -149,7 +160,7 @@ class AssistantStore:
             allowed = {
                 "stake_per_slip", "daily_target", "browser_alerts",
                 "telegram_enabled", "telegram_bot_token", "telegram_chat_id",
-                "onexbet_site",
+                "onexbet_site", "onexbet_android_package",
             }
             for key, val in updates.items():
                 if key not in allowed:
@@ -923,4 +934,5 @@ def build_assistant_payload(
         "export_slips": export_slips,
         "onexbet_site": effective_onexbet_site(config),
         "onexbet_live_url": onexbet_live_url(effective_onexbet_site(config)),
+        "onexbet_android_package": effective_onexbet_android_package(config),
     }

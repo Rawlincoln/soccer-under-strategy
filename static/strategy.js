@@ -180,9 +180,7 @@ async function fetchData() {
     ]);
     const data = await accaRes.json();
     const asst = await asstRes.json();
-    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
-      BetAssistant.setOnexbetSite(data.onexbet_site);
-    }
+    if (typeof BetAssistant !== "undefined") BetAssistant.applyOnexbetConfig(data);
     workflowState = asst.workflow || null;
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${new Date(data.updated_at).toLocaleTimeString()}`;

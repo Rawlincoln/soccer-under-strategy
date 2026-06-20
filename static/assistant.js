@@ -297,7 +297,7 @@ function renderLegDetail(leg, idx, slip, settlement) {
           <span class="asst-leg-chip conf">${conf}%</span>
           ${odds ? `<span class="asst-leg-chip">${odds}</span>` : ""}
           ${leg.recommendation ? `<span class="asst-leg-chip rec">${leg.recommendation}</span>` : ""}
-          <a class="asst-leg-chip link ba-1xbet-link" href="${url}" ${BetAssistant.isMobile() ? "" : 'target="_blank" rel="noopener"'}>1xBet ↗</a>
+          <a class="asst-leg-chip link ba-1xbet-link" href="${BetAssistant.mobileOpenUrl(url)}" data-https-url="${url}" ${BetAssistant.isMobile() ? "" : 'target="_blank" rel="noopener"'}>1xBet ↗</a>
         </div>
       </div>
     </div>`;
@@ -422,6 +422,10 @@ function applyConfig(cfg) {
     $("onexbetSite").value = cfg.onexbet_site || "";
     $("onexbetSite").placeholder = cfg.onexbet_site || "https://1xbet.co.ke";
   }
+  if ($("onexbetAndroidPkg")) {
+    $("onexbetAndroidPkg").value = cfg.onexbet_android_package || "";
+    $("onexbetAndroidPkg").placeholder = cfg.onexbet_android_package || "org.xbet.client.ke_ps";
+  }
   if (cfg.telegram_chat_id) $("tgChat").value = cfg.telegram_chat_id;
   const tokenEl = $("tgToken");
   if (cfg.telegram_token_set) {
@@ -430,7 +434,7 @@ function applyConfig(cfg) {
   } else {
     tokenEl.placeholder = "123456789:ABCdefGHI...";
   }
-  if (cfg.onexbet_site) BetAssistant.setOnexbetSite(cfg.onexbet_site);
+  BetAssistant.applyOnexbetConfig(cfg);
   BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
   updateTgStatus(cfg);
 }
@@ -442,6 +446,7 @@ async function saveConfig() {
     stake_per_slip: parseFloat($("stakeSetting").value) || 5000,
     daily_target: parseFloat($("targetSetting")?.value) || 100000,
     onexbet_site: $("onexbetSite").value.trim(),
+    onexbet_android_package: $("onexbetAndroidPkg")?.value.trim() || "",
   };
   const token = $("tgToken").value.trim();
   const chatId = $("tgChat").value.trim();
@@ -456,7 +461,7 @@ async function saveConfig() {
   if (data.ok) {
     BetAssistant.toast("Settings saved");
     BetAssistant.setBrowserAlerts(body.browser_alerts);
-    if (body.onexbet_site) BetAssistant.setOnexbetSite(body.onexbet_site);
+    BetAssistant.applyOnexbetConfig(body);
     if (body.browser_alerts) BetAssistant.requestNotifyPermission();
     if (data.config) applyConfig(data.config);
     fetchData();
@@ -487,7 +492,7 @@ async function fetchData() {
     renderRecommendations(wf.recommendations, wf);
     renderAlerts(data.alerts);
     applyConfig(data.config);
-    if (data.onexbet_site) BetAssistant.setOnexbetSite(data.onexbet_site);
+    BetAssistant.applyOnexbetConfig(data);
     if (data.new_alerts?.length) BetAssistant.processAlerts(data.new_alerts);
   } catch (err) {
     $("connectionStatus").classList.add("error");

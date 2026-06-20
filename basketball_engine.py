@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from basketball_filters import is_excluded_basketball_raw
-from bet_assistant import effective_onexbet_site
+from bet_assistant import effective_onexbet_android_package, effective_onexbet_site
 from onexbet_basketball import OneXBetBasketballClient, OneXBetBasketballMatch
 
 REFRESH_SECONDS = 30
@@ -723,6 +723,7 @@ def build_basketball_payload() -> dict[str, Any]:
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
         "onexbet_site": site,
+        "onexbet_android_package": effective_onexbet_android_package(),
         "sport": "basketball",
         "filter": f"3rd quarter · definite picks ≥{MIN_DEFINITE_PCT:.0f}%",
         "min_definite_pct": MIN_DEFINITE_PCT,

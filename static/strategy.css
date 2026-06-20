@@ -290,6 +290,22 @@
   margin-top: 6px;
 }
 
+.slip-legs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  font-size: 0.78rem;
+}
+
+.slip-leg-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .strategy-card label {
   display: block;
   font-size: 0.75rem;

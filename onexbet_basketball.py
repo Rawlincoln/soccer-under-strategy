@@ -42,6 +42,7 @@ class OneXBetBasketballMatch:
     game_elapsed_min: float = 0.0
     is_third_quarter: bool = False
     is_q3_break: bool = False
+    league_id: int = 0
     raw: dict = field(default_factory=dict)
 
     @property
@@ -272,6 +273,7 @@ class OneXBetBasketballClient:
             game_elapsed_min=round(game_elapsed, 1),
             is_third_quarter=is_active_third_quarter(period, period_name, quarters),
             is_q3_break=period == 3 and "break" in pn_lower,
+            league_id=int(raw.get("LI") or (detail or {}).get("LI") or 0),
             raw=raw,
         )
 

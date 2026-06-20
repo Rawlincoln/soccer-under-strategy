@@ -5,6 +5,11 @@ let lastData = null;
 
 const $ = (id) => document.getElementById(id);
 
+function link1x(item, label = "1xBet ↗") {
+  if (typeof BetAssistant === "undefined") return "";
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "basketball");
+}
+
 function fmtTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -44,7 +49,7 @@ function renderBetSignals(signals) {
   grid.innerHTML = signals.map((s) => `
     <div class="signal-card">
       <div style="font-size:0.75rem;color:var(--muted)">${s.league}</div>
-      <div style="font-weight:700">${s.match}</div>
+      <div style="font-weight:700">${s.match} ${link1x(s)}</div>
       <div style="font-size:0.8rem;color:var(--muted);margin:6px 0">
         ${s.score} · ${s.q3_clock} · ${s.market}
       </div>
@@ -55,6 +60,7 @@ function renderBetSignals(signals) {
       <ul class="bb-signals">${(s.signals || []).map((x) => `<li>${x}</li>`).join("")}</ul>
     </div>
   `).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 function renderMatchCard(m) {
@@ -93,7 +99,7 @@ function renderMatchCard(m) {
       <div class="bb-header">
         <div>
           <div class="bb-league">${m.league || "Basketball"}</div>
-          <div class="bb-teams">${m.home_team} vs ${m.away_team}</div>
+          <div class="bb-teams">${m.home_team} vs ${m.away_team} ${link1x(m)}</div>
         </div>
         <span class="bb-q3-badge">${m.q3_clock || "Q3"} · ${qs.game_pct ?? "—"}% played</span>
       </div>
@@ -127,6 +133,7 @@ function renderMatches(matches) {
     return;
   }
   grid.innerHTML = matches.map(renderMatchCard).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 async function fetchData() {
@@ -136,6 +143,9 @@ async function fetchData() {
     if (data.error) throw new Error(data.error);
 
     lastData = data;
+    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
+      BetAssistant.setOnexbetSite(data.onexbet_site);
+    }
     refreshSeconds = data.refresh_seconds || 30;
     $("refreshInterval").textContent = refreshSeconds;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;

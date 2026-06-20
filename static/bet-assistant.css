@@ -144,6 +144,20 @@
   font-family: var(--mono);
 }
 
+.ba-match-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--orange, #ff8c32);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ba-match-link:hover {
+  text-decoration: underline;
+}
+
 .ba-leg-link {
   font-size: 0.75rem;
   color: var(--orange, #ff8c32);

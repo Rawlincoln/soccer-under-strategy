@@ -32,13 +32,22 @@ def onexbet_match_url(
     game_id: int | str,
     league_id: Optional[int] = None,
     site: Optional[str] = None,
+    sport: str = "football",
 ) -> str:
-    """Deep link to a live football match on 1xBet."""
+    """Deep link to a live match on 1xBet."""
     base = get_onexbet_site(site)
     gid = int(game_id)
     if league_id:
-        return f"{base}/en/live/football/{int(league_id)}/{gid}"
-    return f"{base}/en/live/football/{gid}"
+        return f"{base}/en/live/{sport}/{int(league_id)}/{gid}"
+    return f"{base}/en/live/{sport}/{gid}"
+
+
+def onexbet_basketball_match_url(
+    game_id: int | str,
+    league_id: Optional[int] = None,
+    site: Optional[str] = None,
+) -> str:
+    return onexbet_match_url(game_id, league_id, site=site, sport="basketball")
 
 STAT_MAP = {
     "attacks": 45,

@@ -5,6 +5,11 @@ let lastData = null;
 
 const $ = (id) => document.getElementById(id);
 
+function link1x(item, label = "1xBet ↗") {
+  if (typeof BetAssistant === "undefined") return "";
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+}
+
 function fmtTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -39,7 +44,7 @@ function renderMatchCard(m) {
       <div class="closing-header">
         <div>
           <div class="closing-league">${m.league || "Football"}</div>
-          <div class="closing-teams">${m.home_team} vs ${m.away_team}</div>
+          <div class="closing-teams">${m.home_team} vs ${m.away_team} ${link1x(m)}</div>
         </div>
         <span class="closing-clock">${halfLabel(m.half)} ${m.minute}′ · ${m.minutes_left}′ to ${m.closing_target}</span>
       </div>
@@ -76,7 +81,10 @@ function renderMatches(data) {
   }
 
   grid.innerHTML = matches.map(renderMatchCard).join("");
-  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(grid);
+  if (typeof BetAssistant !== "undefined") {
+    BetAssistant.bindActions(grid);
+    BetAssistant.bind1xBetLinks(grid);
+  }
 }
 
 function updateMeta(data) {

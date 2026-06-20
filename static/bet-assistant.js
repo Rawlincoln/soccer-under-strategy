@@ -55,14 +55,14 @@ const BetAssistant = (() => {
       || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
   }
 
-  function matchUrl(eventId, leagueId) {
+  function matchUrl(eventId, leagueId, sport = "football") {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return liveFootballUrl();
     const lid = parseInt(leagueId, 10);
     if (lid && !Number.isNaN(lid)) {
-      return `${onexbetSite}/en/live/football/${lid}/${gid}`;
+      return `${onexbetSite}/en/live/${sport}/${lid}/${gid}`;
     }
-    return `${onexbetSite}/en/live/football/${gid}`;
+    return `${onexbetSite}/en/live/${sport}/${gid}`;
   }
 
   function open1xBet(url) {
@@ -72,6 +72,14 @@ const BetAssistant = (() => {
     } else {
       window.open(target, "_blank", "noopener");
     }
+  }
+
+  function matchLinkHtml(eventId, leagueId, label = "1xBet ↗", className = "ba-match-link ba-1xbet-link", sport = "football") {
+    const gid = parseInt(eventId, 10);
+    if (!gid || Number.isNaN(gid)) return "";
+    const url = matchUrl(eventId, leagueId, sport);
+    const blank = isMobile() ? "" : ' target="_blank" rel="noopener"';
+    return `<a href="${url}" class="${className}"${blank}>${label}</a>`;
   }
 
   function bind1xBetLinks(root) {
@@ -401,6 +409,7 @@ const BetAssistant = (() => {
   return {
     copyText,
     matchUrl,
+    matchLinkHtml,
     open1xBet,
     setOnexbetSite,
     bind1xBetLinks,

@@ -378,6 +378,11 @@ h1 {
   margin-bottom: 10px;
 }
 
+.match-1xbet-row {
+  text-align: center;
+  margin-top: 8px;
+}
+
 .teams-row {
   display: flex;
   align-items: center;

@@ -4,6 +4,11 @@ const POLL_MS = 15000;
 
 const $ = (id) => document.getElementById(id);
 
+function link1x(item, label = "1xBet ↗") {
+  if (typeof BetAssistant === "undefined") return "";
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+}
+
 function fmtMoney(n) {
   return Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
@@ -92,7 +97,12 @@ function renderLiveSlips(accas) {
     const profit = profitFromStake(STAKE_PER_SLIP, a.combined_odds);
     cumulative += profit;
     const hitsTarget = profit >= DAILY_TARGET;
-    const legMins = (a.legs || []).map((l) => `${l.minute ?? "?"}'`).join(", ");
+    const legsHtml = (a.legs || []).map((leg, j) => `
+      <div class="slip-leg-line">
+        <span>${j + 1}. ${leg.home_team} vs ${leg.away_team}</span>
+        ${link1x(leg)}
+      </div>
+    `).join("");
     const slip = typeof BetAssistant !== "undefined" ? BetAssistant.slipFromAcca(a, STAKE_PER_SLIP) : null;
     const actions = slip ? BetAssistant.actionButtons(slip, workflowState, true) : "";
     return `
@@ -106,8 +116,9 @@ function renderLiveSlips(accas) {
           <div class="slip-plan-stat"><div class="num">${fmtMoney(STAKE_PER_SLIP)}</div><div class="lbl">Stake</div></div>
           <div class="slip-plan-stat"><div class="num">${a.avg_confidence}%</div><div class="lbl">Avg conf</div></div>
         </div>
+        <div class="slip-legs-list">${legsHtml}</div>
         <div class="slip-plan-profit">+${fmtMoney(profit)} profit</div>
-        <div class="slip-plan-note">${a.risk_level} risk · mins: ${legMins || "—"}</div>
+        <div class="slip-plan-note">${a.risk_level} risk</div>
         ${actions}
       </div>
     `;
@@ -118,7 +129,10 @@ function renderLiveSlips(accas) {
     : "";
 
   box.innerHTML = comboNote + cards;
-  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(box, workflowState);
+  if (typeof BetAssistant !== "undefined") {
+    BetAssistant.bindActions(box, workflowState);
+    BetAssistant.bind1xBetLinks(box);
+  }
   updateProgress(cumulative);
 }
 
@@ -166,6 +180,9 @@ async function fetchData() {
     ]);
     const data = await accaRes.json();
     const asst = await asstRes.json();
+    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
+      BetAssistant.setOnexbetSite(data.onexbet_site);
+    }
     workflowState = asst.workflow || null;
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${new Date(data.updated_at).toLocaleTimeString()}`;

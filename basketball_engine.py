@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from basketball_filters import is_excluded_basketball_raw
+from bet_assistant import effective_onexbet_site
 from onexbet_basketball import OneXBetBasketballClient, OneXBetBasketballMatch
 
 REFRESH_SECONDS = 30
@@ -116,6 +117,7 @@ class BasketballCard:
     best_confidence: float = 0.0
     definite_pick: Optional[dict[str, Any]] = None
     definite_picks: list[dict[str, Any]] = field(default_factory=list)
+    league_id: int = 0
 
 
 def _interp_cumulative_share(game_pct: float, shares: list[float]) -> float:
@@ -671,6 +673,7 @@ def build_basketball_payload() -> dict[str, Any]:
             home_team=match.home_team,
             away_team=match.away_team,
             league=match.league,
+            league_id=match.league_id,
             score=f"{match.home_score} - {match.away_score}",
             total_points=match.total_points,
             period_name=match.period_name,
@@ -700,6 +703,8 @@ def build_basketball_payload() -> dict[str, Any]:
             if p.get("is_definite") and p["confidence"] >= MIN_DEFINITE_PCT:
                 bet_signals.append({
                     "match": f"{card.home_team} vs {card.away_team}",
+                    "event_id": card.event_id,
+                    "league_id": card.league_id,
                     "market": p["market"],
                     "pick": p["pick"],
                     "line": p["line"],
@@ -712,10 +717,12 @@ def build_basketball_payload() -> dict[str, Any]:
                     "q3_clock": card.q3_clock,
                 })
 
+    site = effective_onexbet_site()
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
+        "onexbet_site": site,
         "sport": "basketball",
         "filter": f"3rd quarter · definite picks ≥{MIN_DEFINITE_PCT:.0f}%",
         "min_definite_pct": MIN_DEFINITE_PCT,

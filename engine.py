@@ -880,6 +880,11 @@ def _scan_live_football() -> tuple[
                 pd["full_score"] = card.full_score
                 pd["is_half_time"] = card.is_half_time
                 pd["period_minute"] = card.period_minute
+                pd["event_id"] = card.event_id
+                pd["league_id"] = card.league_id
+                pd["match"] = f"{card.home_team} vs {card.away_team}"
+                pd["home_team"] = card.home_team
+                pd["away_team"] = card.away_team
                 if p.recommendation in ("BET", "WATCH"):
                     bet_signals.append(pd)
 

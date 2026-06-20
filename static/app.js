@@ -7,6 +7,11 @@ let lastData = null;
 
 const $ = (id) => document.getElementById(id);
 
+function link1x(item, label = "1xBet ↗") {
+  if (typeof BetAssistant === "undefined") return "";
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+}
+
 function fmtTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -259,7 +264,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
     return `
       <div class="signal-card scored-card">
         <div class="scored-meta">${item.league}</div>
-        <div style="font-weight:700;font-size:1.05rem">${item.home_team} vs ${item.away_team}</div>
+        <div style="font-weight:700;font-size:1.05rem">${item.home_team} vs ${item.away_team} ${link1x(item)}</div>
         <div class="scored-line">
           ${isHalfTime(item) ? halfTimeBadge() : ""}
           <span class="fh-score">${isHalfTime(item) ? "HT" : halfLabel(item.half)}: ${item.period_score || item.fh_score}</span>
@@ -281,6 +286,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
         <ul class="signals-list">${(p.signals || []).slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>
       </div>`;
   }).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 function renderBetSignals(signals) {
@@ -294,7 +300,7 @@ function renderBetSignals(signals) {
   grid.innerHTML = signals.map((p) => `
     <div class="signal-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
-        <div style="font-weight:700">${p.match}</div>
+        <div style="font-weight:700">${p.match} ${link1x(p)}</div>
         <div style="display:flex;gap:6px;align-items:center">${isHalfTime(p) ? halfTimeBadge() : ""}${minuteBadge(p, p.half)}</div>
       </div>
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
@@ -307,6 +313,7 @@ function renderBetSignals(signals) {
       <ul class="signals-list">${(p.signals || []).slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>
     </div>
   `).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 function renderMatchCard(m) {
@@ -371,6 +378,7 @@ function renderMatchCard(m) {
           </div>
           <div class="team away"><span>${m.away_team}</span></div>
         </div>
+        <div class="match-1xbet-row">${link1x(m)}</div>
       </div>
       ${statsHtml}
       ${atHt ? '<div class="ht-note">Break between halves — 2nd half picks open at 60′. FH score locked.</div>' : renderFusionAnalysis(m)}
@@ -401,6 +409,7 @@ function renderMatches(matches) {
     return;
   }
   grid.innerHTML = filtered.map(renderMatchCard).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 async function fetchData() {
@@ -410,6 +419,9 @@ async function fetchData() {
     if (data.error) throw new Error(data.error);
 
     lastData = data;
+    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
+      BetAssistant.setOnexbetSite(data.onexbet_site);
+    }
     refreshSeconds = data.refresh_seconds || 30;
     $("refreshInterval").textContent = refreshSeconds;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;

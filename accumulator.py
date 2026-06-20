@@ -185,6 +185,8 @@ def _all_qualified_picks(matches: list[dict]) -> list[dict]:
                 "recommendation": rec,
                 "market": market,
                 "match": f"{card['home_team']} vs {card['away_team']}",
+                "event_id": card.get("event_id", ""),
+                "league_id": int(card.get("league_id") or 0),
                 "half": card.get("half", "fh"),
                 "minute": card.get("minute", 0),
                 "period_minute": card.get("period_minute", 0),

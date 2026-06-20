@@ -4,6 +4,11 @@ let lastData = null;
 
 const $ = (id) => document.getElementById(id);
 
+function link1x(item, label = "1xBet ↗") {
+  if (typeof BetAssistant === "undefined") return "";
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+}
+
 function fmtTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -108,7 +113,7 @@ function renderPicks60(data) {
         <span class="pick-60-conf">${fmtConf(item.confidence)}%</span>
         <span class="rec-badge ${item.recommendation === "BET" ? "bet" : "watch"}">${item.recommendation}</span>
       </div>
-      <div class="pick-60-match">${item.match}</div>
+      <div class="pick-60-match">${item.match} ${link1x(item)}</div>
       <div class="pick-60-market">${item.market?.replace("First Half Goals", "FH").replace("Second Half Goals", "SH")}</div>
       <div class="pick-60-stats">
         <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : item.half === "sh" ? `2H +${periodMinute(item) ?? 0}'` : `${halfTag(item.half)} Min`}</div></div>
@@ -117,6 +122,7 @@ function renderPicks60(data) {
       <div class="pick-60-meta">${item.fusion_verdict ? item.fusion_verdict : "Live pick"}</div>
     </div>
   `).join("");
+  if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
 }
 
 function renderAcca(acca, stake) {
@@ -127,7 +133,7 @@ function renderAcca(acca, stake) {
       <div class="leg-num">${i + 1}</div>
       <div>
         <div class="leg-match-row">
-          <div class="leg-match">${leg.home_team} vs ${leg.away_team}</div>
+          <div class="leg-match">${leg.home_team} vs ${leg.away_team} ${link1x(leg)}</div>
           <div style="display:flex;gap:6px;align-items:center">${leg.is_half_time ? halfTimeBadge() : ""}${minuteBadge(leg, leg.half)}</div>
         </div>
         <div class="leg-league">${leg.league} · ${halfTag(leg.half)}</div>
@@ -214,7 +220,10 @@ function renderAccas(data) {
 
   container.innerHTML = `<h2 class="section-title acca-title">Accumulator slips (≥${minConf}% legs)</h2>` +
     accas.map((a) => renderAcca(a, stake)).join("");
-  if (typeof BetAssistant !== "undefined") BetAssistant.bindActions(container);
+  if (typeof BetAssistant !== "undefined") {
+    BetAssistant.bindActions(container);
+    BetAssistant.bind1xBetLinks(container);
+  }
 }
 
 async function fetchData() {

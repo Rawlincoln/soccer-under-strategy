@@ -130,8 +130,18 @@ def onexbet_telegram_open_url(
     return f"{base}/open/1xbet"
 
 
-def onexbet_android_intent_url(https_url: str, site: Optional[str] = None, package: Optional[str] = None) -> str:
-    """Chrome Android intent URL — opens native app when installed."""
+def onexbet_android_intent_url(
+    https_url: str,
+    site: Optional[str] = None,
+    package: Optional[str] = None,
+    *,
+    browser_fallback: Optional[str] = None,
+) -> str:
+    """Chrome Android intent URL — opens native app when installed.
+
+    Default: no browser fallback (avoids opening 1xbet.co.ke in Chrome when intent is slow).
+    Pass browser_fallback='play_store' to offer Play Store if the app is missing.
+    """
     pkg = android_package_for_site(site, package)
     if not pkg:
         return https_url
@@ -139,12 +149,15 @@ def onexbet_android_intent_url(https_url: str, site: Optional[str] = None, packa
     if not parsed.scheme.startswith("http"):
         return https_url
     path = f"{parsed.netloc}{parsed.path or ''}{parsed.query and '?' + parsed.query or ''}"
-    fallback = quote(https_url, safe="")
-    return (
+    intent = (
         f"intent://{path}#Intent;scheme=https;package={pkg};"
         f"action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;"
-        f"S.browser_fallback_url={fallback};end"
     )
+    if browser_fallback == "play_store":
+        intent += f"S.browser_fallback_url={quote(f'market://details?id={pkg}', safe='')};"
+    elif browser_fallback:
+        intent += f"S.browser_fallback_url={quote(browser_fallback, safe='')};"
+    return f"{intent}end"
 
 
 def onexbet_android_app_url(

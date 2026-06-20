@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "18")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "19")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -141,9 +141,14 @@ def open_onexbet_match():
       <strong>Using Telegram?</strong> Tap <strong>⋮</strong> (top right) → <strong>Open in Chrome</strong>,
       then tap the green button below.
     </div>
+    <div id="settings-hint" class="hint" hidden>
+      <strong>App not opening?</strong> On your phone go to
+      <strong>Settings → Apps → 1xBet → Open by default</strong> and turn on
+      <strong>Open supported links</strong> for <strong>1xbet.co.ke</strong>.
+    </div>
     <button type="button" id="open-app" class="btn btn-primary">Open 1xBet App</button>
     <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
-    <a id="open-web" class="btn btn-secondary" href="{https_url}">Open on 1xbet.co.ke</a>
+    <a id="open-web" class="btn btn-secondary" href="{https_url}">Open in browser instead</a>
     <button type="button" id="install-app" class="btn btn-secondary" hidden>Install from Play Store</button>
     <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
   </div>

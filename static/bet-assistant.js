@@ -122,18 +122,25 @@ const BetAssistant = (() => {
     }
   }
 
-  function androidIntentUrl(httpsUrl) {
-    const pkg = onexbetAndroidPackage || guessAndroidPackage(siteBase());
+  function androidPackage() {
+    return onexbetAndroidPackage || guessAndroidPackage(siteBase());
+  }
+
+  function androidIntentUrl(httpsUrl, browserFallback = false) {
+    const pkg = androidPackage();
     if (!pkg) return httpsUrl;
     try {
       const u = new URL(httpsUrl);
       const path = `${u.host}${u.pathname}${u.search}`;
-      const fallback = encodeURIComponent(httpsUrl);
-      return (
+      let intent =
         `intent://${path}#Intent;scheme=https;package=${pkg};` +
-        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;" +
-        `S.browser_fallback_url=${fallback};end`
-      );
+        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;";
+      if (browserFallback === "play_store") {
+        intent += `S.browser_fallback_url=${encodeURIComponent(`market://details?id=${pkg}`)};`;
+      } else if (browserFallback) {
+        intent += `S.browser_fallback_url=${encodeURIComponent(String(browserFallback))};`;
+      }
+      return `${intent}end`;
     } catch {
       return httpsUrl;
     }
@@ -168,15 +175,25 @@ const BetAssistant = (() => {
     if (appUri.indexOf("android-app://") === 0) {
       setTimeout(() => {
         if (document.visibilityState !== "hidden") window.location.href = appUri;
-      }, 400);
+      }, 350);
     }
     setTimeout(() => {
-      if (document.visibilityState !== "hidden") window.location.href = httpsUrl;
-    }, 1800);
+      if (document.visibilityState !== "hidden") {
+        toast("If the app did not open: Settings → Apps → 1xBet → Open by default → enable links");
+      }
+    }, 2200);
+  }
+
+  function matchLinkHref(httpsUrl) {
+    const normalized = normalizeHttpsUrl(httpsUrl);
+    if (!isMobile()) return normalized;
+    if (isInAppBrowser()) return openerPageUrl(normalized);
+    if (isAndroid() && androidPackage()) return androidIntentUrl(normalized);
+    return normalized;
   }
 
   function mobileOpenUrl(httpsUrl) {
-    return normalizeHttpsUrl(httpsUrl);
+    return matchLinkHref(httpsUrl);
   }
 
   function matchUrl(eventId, leagueId, sport = "football") {
@@ -214,12 +231,12 @@ const BetAssistant = (() => {
       window.open(httpsUrl, "_blank", "noopener");
       return;
     }
-    if (isInAppBrowser() && isAndroid()) {
+    if (isInAppBrowser()) {
       window.location.href = openerPageUrl(httpsUrl);
       return;
     }
-    if (isAndroid() && (onexbetAndroidPackage || guessAndroidPackage(siteBase()))) {
-      tryOpenApp(httpsUrl);
+    if (isAndroid() && androidPackage()) {
+      window.location.href = androidIntentUrl(httpsUrl);
       return;
     }
     window.location.href = httpsUrl;
@@ -271,16 +288,23 @@ const BetAssistant = (() => {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return "";
     const httpsUrl = matchUrl(eventId, leagueId, sport);
+    const href = matchLinkHref(httpsUrl);
     const blank = isMobile() ? "" : ' target="_blank" rel="noopener"';
-    return `<a href="${httpsUrl}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
+    return `<a href="${href}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
   }
 
   function bind1xBetLinks(root) {
     (root || document).querySelectorAll("a.ba-1xbet-link").forEach((a) => {
+      if (a.dataset.baBound === "1") return;
+      a.dataset.baBound = "1";
+      const httpsUrl = a.dataset.httpsUrl || a.getAttribute("href");
+      if (httpsUrl && !a.dataset.httpsUrl) a.dataset.httpsUrl = httpsUrl;
+      if (isMobile() && httpsUrl && !/^intent:/i.test(a.getAttribute("href") || "")) {
+        a.setAttribute("href", matchLinkHref(httpsUrl));
+      }
       a.onclick = (e) => {
         e.preventDefault();
-        const httpsUrl = a.dataset.httpsUrl || a.getAttribute("href");
-        open1xBet(httpsUrl);
+        open1xBet(a.dataset.httpsUrl || httpsUrl);
       };
     });
   }

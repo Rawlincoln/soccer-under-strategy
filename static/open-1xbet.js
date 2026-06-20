@@ -1,5 +1,5 @@
 /**
- * 1xBet app opener — requires a user tap (Telegram/in-app browsers block auto intent redirects).
+ * 1xBet app opener — user tap launches the native app (no auto-redirect to browser).
  */
 (function () {
   const data = window.ONEXBET_OPEN || {};
@@ -41,42 +41,41 @@
     try {
       const u = new URL(httpsUrl);
       const path = `${u.host}${u.pathname}${u.search}`;
-      const fallback = encodeURIComponent(httpsUrl);
+      const fallback = encodeURIComponent(window.location.href);
       tryNavigate(
         `intent://${path}#Intent;scheme=https;package=com.android.chrome;` +
           `action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;` +
           `S.browser_fallback_url=${fallback};end`
       );
     } catch {
-      tryNavigate(httpsUrl);
+      tryNavigate(window.location.href);
     }
   }
 
-  function openApp() {
+  function launchApp() {
     if (!isAndroid) {
-      tryNavigate(httpsUrl);
+      if (httpsUrl) tryNavigate(httpsUrl);
       return;
     }
+    let launched = false;
     if (intentUrl.indexOf("intent://") === 0) {
+      launched = true;
       tryIframe(intentUrl);
       tryNavigate(intentUrl);
     }
     if (androidAppUrl.indexOf("android-app://") === 0) {
       setTimeout(() => {
-        if (document.visibilityState !== "hidden") {
-          tryNavigate(androidAppUrl);
-        }
-      }, 400);
+        if (document.visibilityState !== "hidden") tryNavigate(androidAppUrl);
+      }, 350);
     }
-    setTimeout(() => {
-      if (document.visibilityState !== "hidden") {
-        tryNavigate(httpsUrl);
-      }
-    }, 1800);
+    if (!launched && playStoreUrl) {
+      tryNavigate(playStoreUrl);
+    }
   }
 
   function init() {
     const hint = $("inapp-hint");
+    const settingsHint = $("settings-hint");
     const chromeBtn = $("open-chrome");
     const appBtn = $("open-app");
     const webBtn = $("open-web");
@@ -84,22 +83,21 @@
 
     show(hint, inAppBrowser && isAndroid);
     show(chromeBtn, inAppBrowser && isAndroid);
+    show(settingsHint, isAndroid && !inAppBrowser);
     show(installBtn, isAndroid && !!playStoreUrl);
 
     if (chromeBtn) chromeBtn.onclick = (e) => { e.preventDefault(); openInChrome(); };
-    if (appBtn) appBtn.onclick = (e) => { e.preventDefault(); openApp(); };
+    if (appBtn) appBtn.onclick = (e) => { e.preventDefault(); launchApp(); };
     if (webBtn) webBtn.onclick = (e) => { e.preventDefault(); tryNavigate(httpsUrl); };
     if (installBtn) installBtn.onclick = (e) => { e.preventDefault(); tryNavigate(playStoreUrl); };
 
-    if (isIOS) {
-      if (appBtn) appBtn.textContent = "Open 1xBet in Safari";
+    if (isIOS && appBtn) {
+      appBtn.textContent = "Open 1xBet in Safari";
     }
 
-    // Auto-open only outside in-app browsers (Chrome mobile supports intent on user-less nav sometimes).
+    // Android + real browser: try app immediately (no https fallback — that was opening the browser).
     if (isAndroid && !inAppBrowser && intentUrl.indexOf("intent://") === 0) {
-      setTimeout(openApp, 120);
-    } else if (!isAndroid && httpsUrl) {
-      setTimeout(() => tryNavigate(httpsUrl), 120);
+      setTimeout(launchApp, 80);
     }
   }
 

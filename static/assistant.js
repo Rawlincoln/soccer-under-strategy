@@ -384,11 +384,16 @@ function renderAlerts(alerts) {
     return;
   }
   box.innerHTML = alerts.slice(0, 10).map((a) => {
-    const links = (a.onexbet_urls || []).map((item) =>
-      `<a class="asst-alert-link" href="${item.url}">⚽ ${item.match}</a>`
-    ).join("");
+    const links = (a.onexbet_urls || []).map((item) => {
+      const direct = item.direct_url || "";
+      const href = direct && BetAssistant.isMobile() && /Android/i.test(navigator.userAgent)
+        ? BetAssistant.mobileOpenUrl(direct)
+        : (item.url || direct);
+      const httpsUrl = direct || item.url || "";
+      return `<a class="asst-alert-link ba-1xbet-link" href="${href}" data-https-url="${httpsUrl}">⚽ ${item.match}</a>`;
+    }).join("");
     const fallback = !links && a.onexbet_url
-      ? `<a class="asst-alert-link" href="${a.onexbet_url}">⚽ 1xBet</a>`
+      ? `<a class="asst-alert-link ba-1xbet-link" href="${a.onexbet_url}" data-https-url="${a.onexbet_url}">⚽ 1xBet</a>`
       : "";
     return `
     <div class="asst-alert-item">
@@ -397,6 +402,7 @@ function renderAlerts(alerts) {
       ${links || fallback ? `<div class="asst-alert-links">${links || fallback}</div>` : ""}
     </div>`;
   }).join("");
+  BetAssistant.bind1xBetLinks(box);
 }
 
 function updateTgStatus(cfg) {

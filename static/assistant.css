@@ -109,15 +109,46 @@
 .asst-tracker-status.ok { color: var(--green); font-weight: 600; }
 .asst-tracker-status.stop { color: #ff6666; font-weight: 600; }
 
+.asst-wl-bar-wrap {
+  margin-top: 14px;
+}
+
+.asst-wl-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.asst-wl-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.asst-wl-bar-win {
+  background: var(--green);
+  transition: width 0.4s ease;
+}
+
+.asst-wl-bar-loss {
+  background: #ff6666;
+  transition: width 0.4s ease;
+}
+
 .asst-tracker-stats {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-top: 16px;
 }
 
 @media (max-width: 800px) {
-  .asst-tracker-stats { grid-template-columns: repeat(3, 1fr); }
+  .asst-tracker-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 .asst-stat {
@@ -402,6 +433,129 @@
   align-items: flex-start;
   gap: 10px;
   margin-bottom: 8px;
+}
+
+.asst-leg-head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.asst-leg-wl {
+  display: flex;
+  gap: 4px;
+}
+
+.asst-wl-btn {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  width: 30px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+}
+
+.asst-wl-btn.win:hover,
+.asst-wl-btn.win.active {
+  border-color: var(--green);
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.asst-wl-btn.loss:hover,
+.asst-wl-btn.loss.active {
+  border-color: #ff6666;
+  background: rgba(255, 100, 100, 0.12);
+  color: #ff6666;
+}
+
+.asst-leg-badge {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  width: 30px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.asst-leg-badge.won {
+  background: var(--green-dim);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+
+.asst-leg-badge.lost {
+  background: rgba(255, 100, 100, 0.12);
+  color: #ff6666;
+  border: 1px solid rgba(255, 100, 100, 0.45);
+}
+
+.asst-rec-settle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.asst-rec-settle.settled {
+  justify-content: space-between;
+}
+
+.asst-rec-settle.settled.won {
+  border-color: rgba(80, 220, 120, 0.35);
+}
+
+.asst-rec-settle.settled.lost {
+  border-color: rgba(255, 100, 100, 0.35);
+}
+
+.asst-rec-settle-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  flex: 1 1 100%;
+}
+
+.asst-settled-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.asst-settled-pnl {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.asst-rec-settle.settled.won .asst-settled-label,
+.asst-rec-settle.settled.won .asst-settled-pnl {
+  color: var(--green);
+}
+
+.asst-rec-settle.settled.lost .asst-settled-label,
+.asst-rec-settle.settled.lost .asst-settled-pnl {
+  color: #ff6666;
+}
+
+.asst-rec-card.settled-won {
+  border-color: rgba(80, 220, 120, 0.35);
+}
+
+.asst-rec-card.settled-lost {
+  border-color: rgba(255, 100, 100, 0.35);
+  opacity: 0.92;
 }
 
 .asst-leg-clock {

@@ -459,6 +459,31 @@ def build_workflow(
 
     total_staked = sum(float(s.get("stake") or 0) for s in state.placed_slips)
     settled = [s for s in state.placed_slips if s.get("result") is not None]
+    total_decided = state.wins + state.losses
+    win_rate = round(state.wins / total_decided * 100, 1) if total_decided else 0.0
+    net_pnl = round(sum(float(s.get("profit") or 0) for s in settled), 2)
+    total_lost = round(
+        sum(abs(float(s.get("profit") or 0)) for s in settled if s.get("result") == "lost"),
+        2,
+    )
+    total_won = round(
+        sum(float(s.get("profit") or 0) for s in settled if s.get("result") == "won"),
+        2,
+    )
+
+    by_id = {s["id"]: s for s in state.placed_slips}
+    for rec in recommendations:
+        slip = rec.get("slip") or {}
+        entry = by_id.get(slip.get("id", ""))
+        if entry:
+            rec["settlement"] = {
+                "result": entry.get("result"),
+                "profit": entry.get("profit"),
+                "leg_results": dict(entry.get("leg_results") or {}),
+                "pending": entry.get("result") is None,
+            }
+        else:
+            rec["settlement"] = None
 
     return {
         "date": state.date,
@@ -480,6 +505,10 @@ def build_workflow(
         "settled_count": len(settled),
         "pending_count": len(state.placed_slips) - len(settled),
         "total_staked": round(total_staked, 2),
+        "win_rate_pct": win_rate,
+        "net_pnl": net_pnl,
+        "total_won": total_won,
+        "total_lost": total_lost,
     }
 
 
@@ -525,6 +554,55 @@ def _apply_settlement(
     return {"ok": True, "state": asdict(state)}
 
 
+def _slip_entry_meta(
+    slip_id: str,
+    slip_type: str,
+    stake: float,
+    title: str,
+    *,
+    wave: str = "",
+    potential_profit: float = 0.0,
+    combined_odds: float = 0.0,
+    leg_event_ids: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    return {
+        "id": slip_id,
+        "type": slip_type,
+        "stake": stake,
+        "title": title,
+        "wave": wave,
+        "potential_profit": round(potential_profit, 2),
+        "combined_odds": round(combined_odds, 2),
+        "placed_at": datetime.now(timezone.utc).isoformat(),
+        "result": None,
+        "profit": None,
+        "leg_results": {},
+        "leg_event_ids": list(leg_event_ids or []),
+    }
+
+
+def _ensure_placed(state: WorkflowState, slip_id: str, meta: dict[str, Any]) -> dict[str, Any]:
+    entry = next((s for s in state.placed_slips if s["id"] == slip_id), None)
+    if entry:
+        if meta.get("leg_event_ids") and not entry.get("leg_event_ids"):
+            entry["leg_event_ids"] = meta["leg_event_ids"]
+        entry.setdefault("leg_results", {})
+        return entry
+    state.slips_placed += 1
+    entry = _slip_entry_meta(
+        slip_id,
+        str(meta.get("slip_type") or meta.get("type") or "accumulator"),
+        float(meta.get("stake") or STAKE_PER_SLIP),
+        str(meta.get("title") or "Bet slip"),
+        wave=str(meta.get("wave") or ""),
+        potential_profit=float(meta.get("potential_profit") or 0),
+        combined_odds=float(meta.get("combined_odds") or 0),
+        leg_event_ids=meta.get("leg_event_ids"),
+    )
+    state.placed_slips.append(entry)
+    return entry
+
+
 def record_slip_placed(
     slip_id: str,
     slip_type: str,
@@ -536,33 +614,60 @@ def record_slip_placed(
     combined_odds: float = 0.0,
 ) -> dict[str, Any]:
     state = STORE.load_state()
-    state.slips_placed += 1
-    state.placed_slips.append({
-        "id": slip_id,
-        "type": slip_type,
+    _ensure_placed(state, slip_id, {
+        "slip_type": slip_type,
         "stake": stake,
         "title": title,
         "wave": wave,
-        "potential_profit": round(potential_profit, 2),
-        "combined_odds": round(combined_odds, 2),
-        "placed_at": datetime.now(timezone.utc).isoformat(),
-        "result": None,
-        "profit": None,
+        "potential_profit": potential_profit,
+        "combined_odds": combined_odds,
     })
     STORE.save_state(state)
     return {"ok": True, "state": asdict(state)}
 
 
-def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str, Any]:
+def record_slip_outcome(
+    slip_id: str,
+    won: bool,
+    profit: float = 0.0,
+    *,
+    leg_event_id: str = "",
+    slip_meta: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     state = STORE.load_state()
     config = STORE.load_config()
     target = float(config.get("daily_target", DAILY_TARGET))
-    entry = next((s for s in state.placed_slips if s["id"] == slip_id and s.get("result") is None), None)
-    if not entry:
-        return {"ok": False, "error": "Slip not found or already settled"}
+    meta = dict(slip_meta or {})
+    entry = _ensure_placed(state, slip_id, meta)
+    if entry.get("result") is not None:
+        return {"ok": False, "error": "Already settled"}
+
+    leg_results = entry.setdefault("leg_results", {})
+    leg_key = str(leg_event_id).strip()
+
+    if leg_key:
+        leg_results[leg_key] = "won" if won else "lost"
+        if not won:
+            return _apply_settlement(state, entry, False, 0, target)
+
+        leg_ids = list(entry.get("leg_event_ids") or meta.get("leg_event_ids") or [])
+        if not leg_ids:
+            leg_ids = [leg_key]
+        if leg_ids and all(leg_results.get(lid) == "won" for lid in leg_ids):
+            if profit <= 0:
+                profit = float(entry.get("potential_profit") or entry.get("stake") or 0)
+            return _apply_settlement(state, entry, True, profit, target)
+
+        STORE.save_state(state)
+        return {"ok": True, "state": asdict(state), "leg_recorded": True}
+
     if won and profit <= 0:
         profit = float(entry.get("potential_profit") or entry.get("stake") or 0)
     return _apply_settlement(state, entry, won, profit, target)
+
+
+def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str, Any]:
+    return record_slip_outcome(slip_id, won, profit)
 
 
 def log_bet_result(

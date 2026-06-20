@@ -59,16 +59,34 @@
         </div>
       </div>
       <div class="asst-progress-header">
-        <span>Progress to target</span>
+        <span>Profit progress to target</span>
         <span id="progressPct">0%</span>
       </div>
       <div class="asst-progress-bar"><div class="asst-progress-fill" id="progressFill"></div></div>
+      <div class="asst-wl-bar-wrap">
+        <div class="asst-wl-bar-label">
+          <span>Win / loss record</span>
+          <span id="wlBarLabel">0 W · 0 L</span>
+        </div>
+        <div class="asst-wl-bar">
+          <div class="asst-wl-bar-win" id="wlBarWin"></div>
+          <div class="asst-wl-bar-loss" id="wlBarLoss"></div>
+        </div>
+      </div>
       <div class="asst-tracker-stats" id="trackerStats"></div>
     </section>
 
     <section class="asst-section">
+      <h2 class="section-title">Qualifying slips now</h2>
+      <p class="asst-note">Tap <strong>W</strong> or <strong>L</strong> on each match after the result — acca marks one lost leg as a full slip loss; all legs W settles the slip as a win.</p>
+      <div id="recommendations" class="asst-recs">
+        <div class="loading">Loading…</div>
+      </div>
+    </section>
+
+    <section class="asst-section">
       <h2 class="section-title">Your bets today</h2>
-      <p class="asst-note">Mark slips placed from recommendations, then record win or loss. Profit updates toward your target.</p>
+      <p class="asst-note">History of every slip you marked today, including manual entries.</p>
       <div id="betJournal" class="asst-journal">
         <div class="asst-empty">No bets logged yet</div>
       </div>
@@ -84,14 +102,6 @@
           </div>
         </div>
       </form>
-    </section>
-
-    <section class="asst-section">
-      <h2 class="section-title">Qualifying slips now</h2>
-      <p class="asst-note">Only picks that pass the 3-wave windows and 60%+ filters appear here.</p>
-      <div id="recommendations" class="asst-recs">
-        <div class="loading">Loading…</div>
-      </div>
     </section>
 
     <div class="asst-grid">

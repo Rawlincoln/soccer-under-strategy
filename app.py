@@ -13,6 +13,7 @@ from bet_assistant import (
     discover_telegram_chats,
     lock_to_slip,
     log_bet_result,
+    record_slip_outcome,
     record_slip_placed,
     record_slip_result,
     reset_workflow,
@@ -41,7 +42,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "12")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "13")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -207,11 +208,29 @@ def api_assistant_placed():
 @app.route("/api/assistant/workflow/result", methods=["POST"])
 def api_assistant_result():
     body = request.get_json(silent=True) or {}
-    result = record_slip_result(
-        slip_id=str(body.get("slip_id", "")),
-        won=bool(body.get("won")),
-        profit=float(body.get("profit", 0)),
-    )
+    slip_meta = body.get("slip_meta") or {}
+    leg_event_id = str(body.get("leg_event_id") or "")
+    if slip_meta and not leg_event_id:
+        result = record_slip_outcome(
+            slip_id=str(body.get("slip_id", "")),
+            won=bool(body.get("won")),
+            profit=float(body.get("profit", 0)),
+            slip_meta=slip_meta,
+        )
+    elif leg_event_id:
+        result = record_slip_outcome(
+            slip_id=str(body.get("slip_id", "")),
+            won=bool(body.get("won")),
+            profit=float(body.get("profit", 0)),
+            leg_event_id=leg_event_id,
+            slip_meta=slip_meta,
+        )
+    else:
+        result = record_slip_result(
+            slip_id=str(body.get("slip_id", "")),
+            won=bool(body.get("won")),
+            profit=float(body.get("profit", 0)),
+        )
     if result.get("ok"):
         cache.refresh()
     return jsonify(result)

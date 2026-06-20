@@ -14,18 +14,48 @@ function waveShort(w) {
   return "W3";
 }
 
+function slipMeta(slip) {
+  const legs = slip?.legs || [];
+  return {
+    slip_type: slip?.slip_type || "accumulator",
+    stake: slip?.stake || 5000,
+    title: slip?.title || "Bet slip",
+    wave: slip?.wave || "",
+    potential_profit: slip?.potential_profit || 0,
+    combined_odds: slip?.combined_odds || 0,
+    leg_event_ids: legs.map((l) => String(l.event_id)).filter(Boolean),
+  };
+}
+
 function renderTracker(wf) {
   if (!wf) return;
   const target = wf.daily_target || 100000;
   const profit = wf.profit_recorded || 0;
   const gap = wf.gap_to_target ?? Math.max(0, target - profit);
   const pct = Math.min(100, Math.round((profit / target) * 100));
+  const wins = wf.wins || 0;
+  const losses = wf.losses || 0;
+  const decided = wins + losses;
+  const wlTotal = Math.max(decided, 1);
+  const winPct = decided ? Math.round((wins / decided) * 100) : 50;
+  const lossPct = decided ? 100 - winPct : 50;
 
   $("profitRecorded").textContent = fmtMoney(profit);
   $("dailyTarget").textContent = fmtMoney(target);
   $("gapTarget").textContent = fmtMoney(gap);
   $("progressFill").style.width = `${pct}%`;
   $("progressPct").textContent = `${pct}%`;
+
+  const wlWin = $("wlBarWin");
+  const wlLoss = $("wlBarLoss");
+  const wlLabel = $("wlBarLabel");
+  if (wlWin) wlWin.style.width = `${winPct}%`;
+  if (wlLoss) wlLoss.style.width = `${lossPct}%`;
+  if (wlLabel) {
+    wlLabel.textContent = decided
+      ? `${wins} W · ${losses} L · ${wf.win_rate_pct ?? 0}% win rate`
+      : "No results yet";
+  }
 
   const streak = wf.loss_streak || 0;
   const maxStreak = wf.max_loss_streak || 5;
@@ -53,14 +83,18 @@ function renderTracker(wf) {
     }).join("");
   }
 
+  const netPnl = wf.net_pnl || 0;
+  const netCls = netPnl >= 0 ? "win" : "loss";
   const stats = $("trackerStats");
   if (stats) {
     stats.innerHTML = `
-      <div class="asst-stat"><span class="num">${wf.slips_placed || 0}</span><span class="lbl">Bets</span></div>
       <div class="asst-stat"><span class="num win">${wf.wins || 0}</span><span class="lbl">Wins</span></div>
       <div class="asst-stat"><span class="num loss">${wf.losses || 0}</span><span class="lbl">Losses</span></div>
-      <div class="asst-stat"><span class="num">${streak}</span><span class="lbl">Streak</span></div>
-      <div class="asst-stat"><span class="num">${fmtMoney(wf.total_staked || 0)}</span><span class="lbl">Staked</span></div>
+      <div class="asst-stat"><span class="num">${wf.win_rate_pct ?? 0}%</span><span class="lbl">Win rate</span></div>
+      <div class="asst-stat"><span class="num ${netCls}">${netPnl >= 0 ? "+" : ""}${fmtMoney(netPnl)}</span><span class="lbl">Net P/L</span></div>
+      <div class="asst-stat"><span class="num win">+${fmtMoney(wf.total_won || 0)}</span><span class="lbl">Won</span></div>
+      <div class="asst-stat"><span class="num loss">-${fmtMoney(wf.total_lost || 0)}</span><span class="lbl">Lost</span></div>
+      <div class="asst-stat"><span class="num">${streak}</span><span class="lbl">Loss streak</span></div>
       <div class="asst-stat"><span class="num">${wf.pending_count || 0}</span><span class="lbl">Pending</span></div>
     `;
   }
@@ -70,11 +104,14 @@ function renderTracker(wf) {
   }
 }
 
-async function settleSlip(slipId, won, profit = 0) {
+async function recordOutcome(slipId, won, { profit = 0, legEventId = "", slip = null } = {}) {
+  const body = { slip_id: slipId, won, profit };
+  if (legEventId) body.leg_event_id = legEventId;
+  if (slip) body.slip_meta = slipMeta(slip);
   const res = await fetch("/api/assistant/workflow/result", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ slip_id: slipId, won, profit }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!data.ok) {
@@ -86,10 +123,16 @@ async function settleSlip(slipId, won, profit = 0) {
       ? "Target reached — day reset"
       : "5-loss streak — day reset";
     BetAssistant.toast(msg, 4200);
+  } else if (data.leg_recorded) {
+    BetAssistant.toast(won ? "Leg marked W" : "Leg marked L");
   } else {
     BetAssistant.toast(won ? "Win recorded" : "Loss recorded");
   }
   fetchData();
+}
+
+async function settleSlip(slipId, won, profit = 0, slip = null) {
+  await recordOutcome(slipId, won, { profit, slip });
 }
 
 function renderBetJournal(wf) {
@@ -169,7 +212,54 @@ function leg1xBetUrl(leg) {
   return leg.onexbet_url || BetAssistant.matchUrl(leg.event_id, leg.league_id);
 }
 
-function renderLegDetail(leg, idx, slip) {
+function renderLegWl(leg, slip, settlement) {
+  const eid = String(leg.event_id || "");
+  const slipSettled = settlement?.result != null;
+  const legResult = settlement?.leg_results?.[eid];
+  if (slipSettled) {
+    const won = settlement.result === "won";
+    return `<span class="asst-leg-badge ${won ? "won" : "lost"}">${won ? "W" : "L"}</span>`;
+  }
+  if (legResult) {
+    return `<span class="asst-leg-badge ${legResult === "won" ? "won" : "lost"}">${legResult === "won" ? "W" : "L"}</span>`;
+  }
+  if (!eid) return "";
+  return `
+    <div class="asst-leg-wl" data-slip-id="${slip.id}">
+      <button type="button" class="asst-wl-btn win" data-leg-win="${eid}" data-slip="${slip.id}" title="Mark win">W</button>
+      <button type="button" class="asst-wl-btn loss" data-leg-loss="${eid}" data-slip="${slip.id}" title="Mark loss">L</button>
+    </div>`;
+}
+
+function renderSlipSettleBar(slip, settlement) {
+  if (settlement?.result != null) {
+    const won = settlement.result === "won";
+    const pnl = Number(settlement.profit);
+    const pnlText = won ? `+${fmtMoney(pnl)}` : fmtMoney(pnl);
+    return `
+      <div class="asst-rec-settle settled ${won ? "won" : "lost"}">
+        <span class="asst-settled-label">${won ? "Slip won" : "Slip lost"}</span>
+        <span class="asst-settled-pnl">${pnlText}</span>
+      </div>`;
+  }
+  const defaultProfit = slip.potential_profit || slip.stake || 5000;
+  const legs = slip.legs || [];
+  const legCount = legs.length;
+  const marked = settlement?.leg_results ? Object.keys(settlement.leg_results).length : 0;
+  const hint = legCount > 1 && marked
+    ? `${marked}/${legCount} legs marked — or settle whole slip below`
+    : "Or settle the whole slip:";
+  return `
+    <div class="asst-rec-settle">
+      <span class="asst-rec-settle-hint">${hint}</span>
+      <label class="asst-profit-label">Profit if won</label>
+      <input type="number" class="asst-profit-input" data-slip-profit="${slip.id}" value="${defaultProfit}" min="0" step="100" />
+      <button type="button" class="ba-btn primary asst-wl-slip" data-slip-win="${slip.id}">Win slip</button>
+      <button type="button" class="ba-btn asst-wl-slip loss" data-slip-loss="${slip.id}">Loss slip</button>
+    </div>`;
+}
+
+function renderLegDetail(leg, idx, slip, settlement) {
   const league = leg.league || "Football";
   const clock = fmtLegMinute(leg);
   const timeBadge = leg.minutes_left
@@ -182,6 +272,7 @@ function renderLegDetail(leg, idx, slip) {
   const odds = leg.estimated_odds ? `@ ${Number(leg.estimated_odds).toFixed(2)}` : "";
   const url = leg1xBetUrl(leg);
   const isLock = slip?.slip_type === "goal_lock";
+  const wlHtml = renderLegWl(leg, slip, settlement);
   return `
     <div class="asst-leg-row${isLock ? " lock" : ""}">
       <div class="asst-leg-num">${idx}</div>
@@ -191,7 +282,10 @@ function renderLegDetail(leg, idx, slip) {
             <div class="asst-leg-league">${league}</div>
             <div class="asst-leg-match">${leg.match || `${leg.home_team} vs ${leg.away_team}`}</div>
           </div>
-          <span class="asst-leg-clock">${timeBadge}</span>
+          <div class="asst-leg-head-right">
+            ${wlHtml}
+            <span class="asst-leg-clock">${timeBadge}</span>
+          </div>
         </div>
         <div class="asst-leg-score-row">
           <span class="asst-leg-period-score">${period}</span>
@@ -219,13 +313,16 @@ function renderRecommendations(recs, wf) {
     box.innerHTML = `<div class="asst-empty">${hint}</div>`;
     return;
   }
+  const slipCache = new Map();
   box.innerHTML = recs.map((r) => {
     const slip = r.slip;
+    const settlement = r.settlement;
     BetAssistant.registerSlip(slip);
-    const legsHtml = (slip.legs || []).map((l, i) => renderLegDetail(l, i + 1, slip)).join("");
+    slipCache.set(slip.id, slip);
+    const legsHtml = (slip.legs || []).map((l, i) => renderLegDetail(l, i + 1, slip, settlement)).join("");
     const legCount = slip.legs?.length || 0;
     return `
-      <div class="asst-rec-card ${r.priority}">
+      <div class="asst-rec-card ${r.priority}${settlement?.result ? ` settled-${settlement.result}` : ""}">
         <div class="asst-rec-top">
           <div style="flex:1;min-width:0">
             <div class="asst-rec-reason">${r.reason}</div>
@@ -238,6 +335,7 @@ function renderRecommendations(recs, wf) {
               · ${legCount} leg${legCount !== 1 ? "s" : ""}
             </div>
             <div class="asst-leg-list">${legsHtml}</div>
+            ${renderSlipSettleBar(slip, settlement)}
           </div>
         </div>
         ${BetAssistant.actionButtons(slip, wf)}
@@ -245,6 +343,38 @@ function renderRecommendations(recs, wf) {
   }).join("");
   BetAssistant.bindActions(box, wf);
   BetAssistant.bind1xBetLinks(box);
+  bindRecommendationOutcomes(box, slipCache);
+}
+
+function bindRecommendationOutcomes(box, slipCache) {
+  box.querySelectorAll("[data-leg-win]").forEach((btn) => {
+    btn.onclick = () => {
+      const slip = slipCache.get(btn.dataset.slip);
+      const input = box.querySelector(`[data-slip-profit="${btn.dataset.slip}"]`);
+      const profit = parseFloat(input?.value) || slip?.potential_profit || 0;
+      recordOutcome(btn.dataset.slip, true, { legEventId: btn.dataset.legWin, profit, slip });
+    };
+  });
+  box.querySelectorAll("[data-leg-loss]").forEach((btn) => {
+    btn.onclick = () => {
+      const slip = slipCache.get(btn.dataset.slip);
+      recordOutcome(btn.dataset.slip, false, { legEventId: btn.dataset.legLoss, slip });
+    };
+  });
+  box.querySelectorAll("[data-slip-win]").forEach((btn) => {
+    btn.onclick = () => {
+      const slip = slipCache.get(btn.dataset.slipWin);
+      const input = box.querySelector(`[data-slip-profit="${btn.dataset.slipWin}"]`);
+      const profit = parseFloat(input?.value) || slip?.potential_profit || 0;
+      recordOutcome(btn.dataset.slipWin, true, { profit, slip });
+    };
+  });
+  box.querySelectorAll("[data-slip-loss]").forEach((btn) => {
+    btn.onclick = () => {
+      const slip = slipCache.get(btn.dataset.slipLoss);
+      recordOutcome(btn.dataset.slipLoss, false, { slip });
+    };
+  });
 }
 
 function renderAlerts(alerts) {

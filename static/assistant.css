@@ -156,6 +156,81 @@
 .asst-rec-meta {
   font-size: 0.8rem;
   color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.asst-leg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.asst-leg-row {
+  display: flex;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.asst-leg-num {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 18px;
+}
+
+.asst-leg-match {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.asst-leg-league {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 2px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.asst-leg-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.asst-leg-chip {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.asst-leg-chip.clock {
+  color: var(--orange, #ff8c32);
+  border-color: rgba(255, 140, 50, 0.35);
+  background: rgba(255, 140, 50, 0.1);
+}
+
+.asst-leg-chip.pick {
+  color: var(--green);
+  border-color: var(--green-dim);
+}
+
+.asst-leg-chip.conf {
+  font-weight: 600;
+}
+
+.asst-leg-chip.rec {
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.65rem;
 }
 
 .asst-grid {

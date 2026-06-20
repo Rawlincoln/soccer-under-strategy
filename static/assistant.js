@@ -51,6 +51,48 @@ function renderWaves(waves) {
   }).join("");
 }
 
+function halfTag(h) {
+  return h === "sh" ? "2H" : "1H";
+}
+
+function fmtLegMinute(leg) {
+  const m = Number(leg.minute);
+  const pm = Number(leg.period_minute);
+  if (leg.half === "sh") {
+    const elapsed = !Number.isNaN(pm) && pm > 0 ? pm : Math.max(0, m - 45);
+    return !Number.isNaN(m) ? `${m}' · 2H ${elapsed}'` : "—";
+  }
+  if (!Number.isNaN(m)) return `1H ${m}'`;
+  return "—";
+}
+
+function renderLegDetail(leg, idx) {
+  const league = leg.league || "Football";
+  const clock = fmtLegMinute(leg);
+  const extra = leg.minutes_left
+    ? ` · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`
+    : "";
+  const pick = leg.selection || leg.market || "";
+  const conf = Number(leg.confidence).toFixed(0);
+  const period = leg.period_score || "—";
+  const full = leg.full_score ? ` · FT ${leg.full_score}` : "";
+  return `
+    <div class="asst-leg-row">
+      <div class="asst-leg-num">${idx}</div>
+      <div class="asst-leg-body">
+        <div class="asst-leg-match">${leg.match || `${leg.home_team} vs ${leg.away_team}`}</div>
+        <div class="asst-leg-league">${league}</div>
+        <div class="asst-leg-stats">
+          <span class="asst-leg-chip clock">${clock}${extra}</span>
+          <span class="asst-leg-chip">${halfTag(leg.half)} ${period}${full}</span>
+          <span class="asst-leg-chip pick">${pick}</span>
+          <span class="asst-leg-chip conf">${conf}%</span>
+          ${leg.recommendation ? `<span class="asst-leg-chip rec">${leg.recommendation}</span>` : ""}
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderRecommendations(recs, wf) {
   const box = $("recommendations");
   if (!recs?.length) {
@@ -60,19 +102,22 @@ function renderRecommendations(recs, wf) {
   box.innerHTML = recs.map((r) => {
     const slip = r.slip;
     BetAssistant.registerSlip(slip);
-    const legs = (slip.legs || []).map((l) => l.match).join(", ");
+    const legsHtml = (slip.legs || []).map((l, i) => renderLegDetail(l, i + 1)).join("");
+    const legCount = slip.legs?.length || 0;
     return `
       <div class="asst-rec-card ${r.priority}">
         <div class="asst-rec-top">
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="asst-rec-reason">${r.reason}</div>
             <div class="asst-rec-title">${slip.title}</div>
             <div class="asst-rec-meta">
               Stake ${fmtMoney(slip.stake)} · @ ${Number(slip.combined_odds).toFixed(2)} ·
               +${fmtMoney(slip.potential_profit)} profit
               ${slip.lock_pct ? ` · Lock ${slip.lock_pct}%` : ""}
+              ${slip.risk_level ? ` · ${slip.risk_level} risk` : ""}
+              · ${legCount} leg${legCount !== 1 ? "s" : ""}
             </div>
-            <div class="asst-rec-meta">${legs}</div>
+            <div class="asst-leg-list">${legsHtml}</div>
           </div>
         </div>
         ${BetAssistant.actionButtons(slip, wf)}

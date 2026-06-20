@@ -49,6 +49,9 @@ class SlipLeg:
     confidence: float
     estimated_odds: float
     half: str = "fh"
+    period_minute: int = 0
+    minutes_left: int = 0
+    closing_target: str = ""
     event_id: str = ""
     league_id: int = 0
     onexbet_url: str = ""
@@ -247,6 +250,7 @@ def acca_to_slip(acca: dict, stake: float, wave: str = "") -> BetSlip:
             confidence=float(leg.get("confidence", 0)),
             estimated_odds=float(leg.get("estimated_odds", 1.5)),
             half=leg.get("half", "fh"),
+            period_minute=int(leg.get("period_minute") or 0),
             event_id=eid,
             league_id=lid,
             onexbet_url=_leg_match_url(eid, lid),
@@ -290,6 +294,9 @@ def lock_to_slip(match: dict, stake: float) -> BetSlip:
         confidence=float(match.get("lock_pct", 0)),
         estimated_odds=1.05,
         half=match.get("half", "fh"),
+        period_minute=int(match.get("period_minute") or 0),
+        minutes_left=int(match.get("minutes_left") or 0),
+        closing_target=match.get("closing_target", ""),
         event_id=eid,
         league_id=lid,
         onexbet_url=match_url,

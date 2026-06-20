@@ -60,9 +60,37 @@
       </div>
     </section>
 
-    <section class="asst-section">
-      <h2 class="section-title">Three-wave plan</h2>
-      <div class="asst-waves" id="wavesGrid"></div>
+    <section class="asst-wave-banner" id="waveBanner" hidden>
+      <span class="asst-wave-banner-badge" id="waveBannerLabel">Wave</span>
+      <span class="asst-wave-banner-text" id="waveBannerAction">—</span>
+    </section>
+
+    <section class="asst-plan-section">
+      <div class="asst-plan-grid">
+        <article class="asst-plan-card">
+          <h2 class="section-title">Daily rules</h2>
+          <ol class="asst-rules-list" id="dailyRules"></ol>
+        </article>
+        <article class="asst-plan-card asst-plan-progress">
+          <h2 class="section-title">Today's path</h2>
+          <p class="asst-plan-note">Progress toward your profit target this session.</p>
+          <div class="asst-progress-header">
+            <span>Recorded profit</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="asst-progress-bar"><div class="asst-progress-fill" id="progressFill"></div></div>
+          <div class="asst-progress-foot">
+            <span>Profit: <strong id="progressProfit">0</strong></span>
+            <span>Gap: <strong id="progressGap">100,000</strong></span>
+          </div>
+        </article>
+      </div>
+
+      <article class="asst-plan-card asst-plan-wide">
+        <h2 class="section-title">Three-wave execution plan</h2>
+        <p class="asst-plan-note">Follow the framework below — live status updates when entry windows open.</p>
+        <div class="asst-waves-detail" id="wavesGrid"></div>
+      </article>
     </section>
 
     <section class="asst-section">

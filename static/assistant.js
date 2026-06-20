@@ -35,20 +35,107 @@ function renderWorkflow(wf) {
   }
 }
 
-function renderWaves(waves) {
-  const grid = $("wavesGrid");
-  if (!waves?.length) {
-    grid.innerHTML = "";
+const WAVE_PLAN = {
+  wave1: {
+    time: "Wave 1 · 15′–20′ (1H)",
+    title: "Anchor slip",
+    body: (stake) =>
+      `Place <strong>1× ${fmtMoney(stake)}</strong> on the best 4–6 leg acca (highest fusion + 65%+ avg confidence). Prefer scored-but-under-alive games.`,
+  },
+  wave2: {
+    time: "Wave 2 · 60′–65′ (2H)",
+    title: "Booster slip",
+    body: (stake) =>
+      `Place <strong>1–2× ${fmtMoney(stake)}</strong> on 2H under accas. Only when entry window + BET signal align. Use second slip if Wave 1 lost.`,
+  },
+  wave3: {
+    time: "Wave 3 · Late window",
+    title: "Closer slip(s)",
+    body: (stake) =>
+      `Keep placing <strong>${fmtMoney(stake)}</strong> on 60%+ accas or goal locks until profit target, a 5-loss streak, or midnight resets the day.`,
+  },
+};
+
+function renderDailyRules(wf) {
+  const stake = fmtMoney(wf?.stake_per_slip || 5000);
+  const target = fmtMoney(wf?.daily_target || 100000);
+  const box = $("dailyRules");
+  if (!box) return;
+  box.innerHTML = `
+    <li><strong>Only 60%+ picks</strong> from Pro Punter — never force a bet when the app has no qualifier.</li>
+    <li><strong>No slip cap</strong> — keep placing ${stake} stakes until profit target or a 5-loss streak ends the day.</li>
+    <li><strong>1st half:</strong> enter between <strong>15′–20′</strong> on 1H under markets when fusion says BET / STRONG BET.</li>
+    <li><strong>2nd half:</strong> enter between <strong>60′–65′</strong> on 2H under markets with the same filter.</li>
+    <li><strong>Skip</strong> red-card games, virtual/esoccer, and student leagues (auto-excluded in app).</li>
+    <li><strong>Day resets</strong> at <strong>midnight</strong>, when <strong>${target} profit</strong> is reached, or after <strong>5 losses in a row</strong>.</li>
+    <li><strong>Split the target:</strong> aim for 2–4 winning accas, not one miracle longshot.</li>
+  `;
+}
+
+function renderProgress(wf) {
+  const target = wf?.daily_target || 100000;
+  const profit = wf?.profit_recorded || 0;
+  const gap = wf?.gap_to_target ?? Math.max(0, target - profit);
+  const pct = Math.min(100, Math.round((profit / target) * 100));
+  if ($("progressFill")) $("progressFill").style.width = `${pct}%`;
+  if ($("progressPct")) $("progressPct").textContent = `${pct}%`;
+  if ($("progressProfit")) $("progressProfit").textContent = fmtMoney(profit);
+  if ($("progressGap")) $("progressGap").textContent = fmtMoney(gap);
+}
+
+function renderWaveBanner(wf) {
+  const banner = $("waveBanner");
+  if (!banner || !wf) return;
+  const active = wf.active_wave;
+  const streak = wf.loss_streak || 0;
+  const maxStreak = wf.max_loss_streak || 5;
+  if (streak >= maxStreak - 1 && streak > 0) {
+    banner.hidden = false;
+    $("waveBannerLabel").textContent = `${streak}L STREAK`;
+    $("waveBannerAction").textContent =
+      `${streak} losses in a row — session resets after ${maxStreak} consecutive losses.`;
     return;
   }
-  grid.innerHTML = waves.map((w) => {
+  if (active?.status === "ACTIVE") {
+    banner.hidden = false;
+    $("waveBannerLabel").textContent = active.label?.split("·")[0]?.trim() || active.id;
+    $("waveBannerAction").textContent = active.action || "Place slip now";
+    return;
+  }
+  if (wf.recommendations?.length) {
+    banner.hidden = false;
+    $("waveBannerLabel").textContent = "READY";
+    $("waveBannerAction").textContent = `${wf.recommendations.length} slip(s) ready — follow daily rules below`;
+    return;
+  }
+  banner.hidden = true;
+}
+
+function renderWaves(waves, wf) {
+  const grid = $("wavesGrid");
+  if (!grid) return;
+  const stake = wf?.stake_per_slip || 5000;
+  const waveTarget = Math.round((wf?.daily_target || 100000) / 3);
+  const fallback = [
+    { id: "wave1", status: "WAITING", action: "Wait for 1H matches to hit 15′–20′ entry window", label: "Wave 1 · 1H anchor", start: 15, end: 20 },
+    { id: "wave2", status: "WAITING", action: "Wait for 2H matches to hit 60′–65′ entry window", label: "Wave 2 · 2H booster", start: 60, end: 65 },
+    { id: "wave3", status: "STANDBY", action: "Use late accas or goal locks if short of target", label: "Wave 3 · Closer / Goal Lock", start: 0, end: 999 },
+  ];
+  const list = waves?.length ? waves : fallback;
+  grid.innerHTML = list.map((w) => {
+    const plan = WAVE_PLAN[w.id] || WAVE_PLAN.wave3;
     const badgeCls = w.status === "ACTIVE" ? "active" : w.status === "STANDBY" ? "standby" : "waiting";
+    const windowLabel = w.end === 999 ? "Late / Goal Lock" : `${w.start}′–${w.end}′`;
     return `
-      <div class="asst-wave ${w.status === "ACTIVE" ? "active" : ""}">
-        <div class="asst-wave-time">${w.label || w.id}</div>
-        <h3>${w.start}′–${w.end === 999 ? "late" : w.end + "′"}</h3>
-        <p>${w.action || ""}</p>
-        <span class="asst-wave-badge ${badgeCls}">${w.status}</span>
+      <div class="asst-wave-card ${w.status === "ACTIVE" ? "active" : ""}">
+        <div class="asst-wave-card-top">
+          <div class="asst-wave-time">${plan.time}</div>
+          <span class="asst-wave-badge ${badgeCls}">${w.status}</span>
+        </div>
+        <h3>${plan.title} · ${windowLabel}</h3>
+        <p class="asst-wave-body">${plan.body(stake)}</p>
+        <div class="asst-wave-live">${w.action || ""}</div>
+        <div class="asst-wave-target">Target profit: ~${fmtMoney(waveTarget)}</div>
       </div>`;
   }).join("");
 }
@@ -303,7 +390,10 @@ async function fetchData() {
     }
 
     renderWorkflow(wf);
-    renderWaves(wf.waves);
+    renderDailyRules(wf);
+    renderProgress(wf);
+    renderWaveBanner(wf);
+    renderWaves(wf.waves, wf);
     renderRecommendations(wf.recommendations, wf);
     renderPlaced(wf);
     renderAlerts(data.alerts);
@@ -402,13 +492,19 @@ $("btnResetDay").addEventListener("click", async () => {
 });
 
 async function loadSavedConfig() {
+  const defaults = { stake_per_slip: 5000, daily_target: 100000 };
   try {
     const res = await fetch("/api/assistant/config");
     const cfg = await res.json();
     applyConfig(cfg);
+    defaults.stake_per_slip = cfg.stake_per_slip || 5000;
+    defaults.daily_target = cfg.daily_target || 100000;
   } catch {
     /* ignore — fetchData will retry via workflow config */
   }
+  renderDailyRules(defaults);
+  renderProgress({ ...defaults, profit_recorded: 0, gap_to_target: defaults.daily_target });
+  renderWaves(null, defaults);
 }
 
 loadSavedConfig();

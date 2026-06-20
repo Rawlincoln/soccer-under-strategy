@@ -383,12 +383,20 @@ function renderAlerts(alerts) {
     box.innerHTML = `<div class="asst-empty">No alerts yet</div>`;
     return;
   }
-  box.innerHTML = alerts.slice(0, 10).map((a) => `
+  box.innerHTML = alerts.slice(0, 10).map((a) => {
+    const links = (a.onexbet_urls || []).map((item) =>
+      `<a class="asst-alert-link" href="${item.url}">⚽ ${item.match}</a>`
+    ).join("");
+    const fallback = !links && a.onexbet_url
+      ? `<a class="asst-alert-link" href="${a.onexbet_url}">⚽ 1xBet</a>`
+      : "";
+    return `
     <div class="asst-alert-item">
       <div class="atitle">${a.title}</div>
       <div class="amsg">${a.message}</div>
-    </div>
-  `).join("");
+      ${links || fallback ? `<div class="asst-alert-links">${links || fallback}</div>` : ""}
+    </div>`;
+  }).join("");
 }
 
 function updateTgStatus(cfg) {

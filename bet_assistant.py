@@ -16,9 +16,12 @@ import requests
 
 from onexbet_client import (
     android_package_for_site,
+    app_base_url,
     get_onexbet_site,
+    onexbet_android_intent_url,
     onexbet_live_url,
     onexbet_match_url,
+    onexbet_telegram_open_url,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -207,6 +210,56 @@ def _leg_match_url(
     if event_id and str(event_id).isdigit():
         return onexbet_match_url(event_id, league_id or None, site=site)
     return onexbet_live_url(site)
+
+
+def _telegram_match_link(
+    event_id: str,
+    league_id: int = 0,
+    *,
+    sport: str = "football",
+    config: Optional[dict] = None,
+) -> str:
+    """App-opening link suitable for Telegram (via Pro Punter redirect)."""
+    site = effective_onexbet_site(config)
+    return onexbet_telegram_open_url(
+        event_id,
+        league_id or None,
+        site=site,
+        sport=sport,
+        base_url=app_base_url(),
+    )
+
+
+def _match_label(home: str, away: str, fallback: str = "") -> str:
+    if home and away:
+        return f"{home} vs {away}"
+    return fallback or "Open on 1xBet"
+
+
+def _alert_onexbet_entries(alert: dict, config: Optional[dict] = None) -> list[dict[str, str]]:
+    entries = alert.get("onexbet_urls") or []
+    if entries:
+        return entries
+    url = alert.get("onexbet_url") or ""
+    if url:
+        return [{"match": "Open on 1xBet", "url": url}]
+    return []
+
+
+def _format_telegram_alert(alert: dict, config: Optional[dict] = None) -> str:
+    lines = [f"🔔 {alert.get('title', 'Alert')}", alert.get("message", "")]
+    entries = _alert_onexbet_entries(alert, config)
+    if entries:
+        lines.append("")
+        for item in entries:
+            label = item.get("match") or "Open on 1xBet"
+            link = item.get("url") or ""
+            if link:
+                lines.append(f"⚽ {label}\n{link}")
+    elif alert.get("type") == "loss_streak":
+        lines.append(f"\n⚽ Live football\n{_telegram_match_link('', 0, config=config)}")
+    lines.append("\nPro Punter → Betting Assistant")
+    return "\n".join(lines)
 
 
 def _default_checklist(stake: float) -> list[str]:
@@ -736,15 +789,23 @@ def detect_alerts(
         aid = _alert_id("lock", f"{m.get('event_id')}-{m.get('half')}")
         if aid in seen:
             continue
+        match_label = _match_label(m.get("home_team", ""), m.get("away_team", ""))
+        tg_link = _telegram_match_link(
+            str(m.get("event_id", "")),
+            int(m.get("league_id") or 0),
+        )
         new_alerts.append({
             "id": aid,
             "type": "goal_lock",
             "priority": "high",
             "title": f"Goal Lock {m.get('lock_pct', 0):.0f}%",
-            "message": f"{m['home_team']} vs {m['away_team']} — {m.get('lock_label')} — {m.get('minute')}'",
+            "message": f"{match_label} — {m.get('lock_label')} — {m.get('minute')}'",
             "created_at": now,
             "slip_hint": "goal_lock",
             "event_id": m.get("event_id"),
+            "league_id": m.get("league_id"),
+            "onexbet_url": tg_link,
+            "onexbet_urls": [{"match": match_label, "url": tg_link}],
         })
         seen.add(aid)
 
@@ -757,6 +818,18 @@ def detect_alerts(
             aid = _alert_id("wave", f"{active['id']}-acca-{acca.get('id')}")
             if aid in seen:
                 continue
+            leg_links: list[dict[str, str]] = []
+            for leg in acca.get("legs") or []:
+                eid = str(leg.get("event_id", ""))
+                if not eid.isdigit():
+                    continue
+                label = leg.get("match") or _match_label(
+                    leg.get("home_team", ""), leg.get("away_team", ""),
+                )
+                leg_links.append({
+                    "match": label,
+                    "url": _telegram_match_link(eid, int(leg.get("league_id") or 0)),
+                })
             new_alerts.append({
                 "id": aid,
                 "type": "wave_acca",
@@ -766,6 +839,8 @@ def detect_alerts(
                 "created_at": now,
                 "slip_hint": "accumulator",
                 "acca_id": acca.get("id"),
+                "onexbet_url": leg_links[0]["url"] if leg_links else _telegram_match_link("", 0),
+                "onexbet_urls": leg_links,
             })
             seen.add(aid)
 
@@ -880,12 +955,14 @@ def send_telegram_alert(text: str, config: Optional[dict] = None) -> bool:
 
 def test_telegram(config: Optional[dict] = None) -> dict[str, Any]:
     config = config or STORE.load_config()
+    sample_link = _telegram_match_link("", 0, config=config)
     msg = (
         "✅ Pro Punter Telegram alerts are working!\n\n"
         "You will receive notifications for:\n"
-        "• Goal Lock picks (95%+)\n"
-        "• Wave 1 / Wave 2 acca signals\n"
-        "• Stop-loss warnings"
+        "• Goal Lock picks (95%+) — with 1xBet match links\n"
+        "• Wave 1 / Wave 2 acca signals — link per leg\n"
+        "• Stop-loss warnings\n\n"
+        f"⚽ Test link (opens 1xBet Kenya app):\n{sample_link}"
     )
     ok, detail = send_telegram_message(msg, config=config)
     return {
@@ -900,7 +977,7 @@ def dispatch_new_alerts(alerts: list[dict], config: Optional[dict] = None) -> in
     config = config or STORE.load_config()
     sent = 0
     for alert in alerts:
-        body = f"🔔 {alert['title']}\n{alert['message']}\n\nOpen Pro Punter → Betting Assistant"
+        body = _format_telegram_alert(alert, config)
         if send_telegram_alert(body, config):
             sent += 1
     return sent

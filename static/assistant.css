@@ -716,6 +716,24 @@
   font-size: 0.78rem;
 }
 
+.asst-alert-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.asst-alert-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--orange, #ff8c32);
+  text-decoration: none;
+}
+
+.asst-alert-link:hover {
+  text-decoration: underline;
+}
+
 .asst-settings {
   margin-top: 20px;
   padding-top: 16px;

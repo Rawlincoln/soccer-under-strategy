@@ -1,5 +1,6 @@
 """Pro Punter — live under-goals web dashboard."""
 
+import json
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -11,6 +12,8 @@ from bet_assistant import (
     STORE,
     acca_to_slip,
     discover_telegram_chats,
+    effective_onexbet_android_package,
+    effective_onexbet_site,
     lock_to_slip,
     log_bet_result,
     record_slip_outcome,
@@ -18,6 +21,11 @@ from bet_assistant import (
     record_slip_result,
     reset_workflow,
     test_telegram,
+)
+from onexbet_client import (
+    onexbet_android_intent_url,
+    onexbet_live_url,
+    onexbet_match_url,
 )
 from engine import REFRESH_SECONDS, DataCache
 
@@ -42,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "15")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "16")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -87,6 +95,54 @@ def closing_page():
 @app.route("/assistant")
 def assistant_page():
     return _serve_html("assistant.html")
+
+
+@app.route("/open/1xbet")
+def open_onexbet_match():
+    """Mobile redirect: Telegram/external link → 1xBet Kenya app (Android intent) or site."""
+    game_id = request.args.get("game_id", "").strip()
+    league_id = request.args.get("league_id", "").strip()
+    sport = request.args.get("sport", "football").strip() or "football"
+    config = STORE.load_config()
+    site = effective_onexbet_site(config)
+    pkg = effective_onexbet_android_package(config)
+    if game_id.isdigit():
+        lid = int(league_id) if league_id.isdigit() else None
+        https_url = onexbet_match_url(game_id, lid, site=site, sport=sport)
+    else:
+        https_url = onexbet_live_url(site)
+    intent_url = onexbet_android_intent_url(https_url, site=site, package=pkg)
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open 1xBet</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }}
+    .box {{ text-align: center; max-width: 320px; }}
+    a {{ color: #3fb950; font-weight: 700; }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <p>Opening 1xBet…</p>
+    <p><a id="fallback" href="{https_url}">Tap here if the app does not open</a></p>
+  </div>
+  <script>
+    const httpsUrl = {json.dumps(https_url)};
+    const intentUrl = {json.dumps(intent_url)};
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid && intentUrl.indexOf("intent://") === 0) {{
+      window.location.replace(intentUrl);
+    }} else {{
+      window.location.replace(httpsUrl);
+    }}
+  </script>
+</body>
+</html>"""
+    return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))
 
 
 @app.route("/api/accumulators")

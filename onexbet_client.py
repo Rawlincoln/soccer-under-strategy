@@ -99,6 +99,37 @@ def android_package_for_site(
     return ""
 
 
+def app_base_url() -> str:
+    """Public URL of this Pro Punter deployment (for Telegram deep-link redirects)."""
+    base = (
+        os.environ.get("APP_BASE_URL")
+        or os.environ.get("RENDER_EXTERNAL_URL")
+        or "https://soccer-under-strategy.onrender.com"
+    )
+    return str(base).strip().rstrip("/")
+
+
+def onexbet_telegram_open_url(
+    game_id: int | str = "",
+    league_id: Optional[int] = None,
+    *,
+    site: Optional[str] = None,
+    sport: str = "football",
+    base_url: Optional[str] = None,
+) -> str:
+    """Link for Telegram/messaging apps → /open/1xbet redirect → native app."""
+    base = (base_url or app_base_url()).rstrip("/")
+    gid = str(game_id).strip()
+    if gid and gid.isdigit():
+        params = f"game_id={int(gid)}"
+        if league_id:
+            params += f"&league_id={int(league_id)}"
+        if sport and sport != "football":
+            params += f"&sport={sport}"
+        return f"{base}/open/1xbet?{params}"
+    return f"{base}/open/1xbet"
+
+
 def onexbet_android_intent_url(https_url: str, site: Optional[str] = None, package: Optional[str] = None) -> str:
     """Chrome Android intent URL — opens native app when installed."""
     pkg = android_package_for_site(site, package)

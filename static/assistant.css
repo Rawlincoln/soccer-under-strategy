@@ -172,7 +172,58 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px;
+}
+
+.asst-leg-row.lock {
+  border-color: rgba(255, 140, 50, 0.4);
+  background: rgba(255, 140, 50, 0.06);
+}
+
+.asst-leg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.asst-leg-clock {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--orange, #ff8c32);
+  background: rgba(255, 140, 50, 0.12);
+  border: 1px solid rgba(255, 140, 50, 0.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.asst-leg-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.asst-leg-period-score {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.asst-leg-period-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.asst-leg-lock {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--orange, #ff8c32);
+  margin-bottom: 8px;
 }
 
 .asst-leg-num {
@@ -185,15 +236,15 @@
 
 .asst-leg-match {
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
+  margin-top: 2px;
 }
 
 .asst-leg-league {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--muted);
-  margin: 2px 0 6px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .asst-leg-stats {
@@ -231,6 +282,17 @@
   text-transform: uppercase;
   font-weight: 700;
   font-size: 0.65rem;
+}
+
+.asst-leg-chip.link {
+  color: var(--orange, #ff8c32);
+  border-color: rgba(255, 140, 50, 0.35);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.asst-leg-chip.link:hover {
+  background: rgba(255, 140, 50, 0.15);
 }
 
 .asst-grid {

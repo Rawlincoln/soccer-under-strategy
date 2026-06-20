@@ -126,8 +126,22 @@
 }
 
 .ba-modal-leg {
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.ba-modal-leg-league {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.ba-modal-leg-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
 }
 
 .ba-leg-link {

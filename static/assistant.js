@@ -66,28 +66,45 @@ function fmtLegMinute(leg) {
   return "—";
 }
 
-function renderLegDetail(leg, idx) {
+function leg1xBetUrl(leg) {
+  return leg.onexbet_url || BetAssistant.matchUrl(leg.event_id, leg.league_id);
+}
+
+function renderLegDetail(leg, idx, slip) {
   const league = leg.league || "Football";
   const clock = fmtLegMinute(leg);
-  const extra = leg.minutes_left
-    ? ` · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`
-    : "";
+  const timeBadge = leg.minutes_left
+    ? `${halfTag(leg.half)} ${leg.minute}' · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`
+    : clock;
   const pick = leg.selection || leg.market || "";
   const conf = Number(leg.confidence).toFixed(0);
   const period = leg.period_score || "—";
-  const full = leg.full_score ? ` · FT ${leg.full_score}` : "";
+  const full = leg.full_score || "—";
+  const odds = leg.estimated_odds ? `@ ${Number(leg.estimated_odds).toFixed(2)}` : "";
+  const url = leg1xBetUrl(leg);
+  const isLock = slip?.slip_type === "goal_lock";
   return `
-    <div class="asst-leg-row">
+    <div class="asst-leg-row${isLock ? " lock" : ""}">
       <div class="asst-leg-num">${idx}</div>
       <div class="asst-leg-body">
-        <div class="asst-leg-match">${leg.match || `${leg.home_team} vs ${leg.away_team}`}</div>
-        <div class="asst-leg-league">${league}</div>
+        <div class="asst-leg-head">
+          <div>
+            <div class="asst-leg-league">${league}</div>
+            <div class="asst-leg-match">${leg.match || `${leg.home_team} vs ${leg.away_team}`}</div>
+          </div>
+          <span class="asst-leg-clock">${timeBadge}</span>
+        </div>
+        <div class="asst-leg-score-row">
+          <span class="asst-leg-period-score">${period}</span>
+          <span class="asst-leg-period-label">${halfTag(leg.half)} period · FT ${full}</span>
+        </div>
+        ${isLock ? `<div class="asst-leg-lock">${pick}</div>` : ""}
         <div class="asst-leg-stats">
-          <span class="asst-leg-chip clock">${clock}${extra}</span>
-          <span class="asst-leg-chip">${halfTag(leg.half)} ${period}${full}</span>
-          <span class="asst-leg-chip pick">${pick}</span>
+          ${!isLock ? `<span class="asst-leg-chip pick">${pick}</span>` : ""}
           <span class="asst-leg-chip conf">${conf}%</span>
+          ${odds ? `<span class="asst-leg-chip">${odds}</span>` : ""}
           ${leg.recommendation ? `<span class="asst-leg-chip rec">${leg.recommendation}</span>` : ""}
+          <a class="asst-leg-chip link" href="${url}" target="_blank" rel="noopener">1xBet ↗</a>
         </div>
       </div>
     </div>`;
@@ -102,7 +119,7 @@ function renderRecommendations(recs, wf) {
   box.innerHTML = recs.map((r) => {
     const slip = r.slip;
     BetAssistant.registerSlip(slip);
-    const legsHtml = (slip.legs || []).map((l, i) => renderLegDetail(l, i + 1)).join("");
+    const legsHtml = (slip.legs || []).map((l, i) => renderLegDetail(l, i + 1, slip)).join("");
     const legCount = slip.legs?.length || 0;
     return `
       <div class="asst-rec-card ${r.priority}">

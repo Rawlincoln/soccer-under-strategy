@@ -74,13 +74,31 @@ const BetAssistant = (() => {
     localStorage.setItem("pp_browser_alerts", enabled ? "true" : "false");
   }
 
+  function fmtModalMinute(leg) {
+    const m = Number(leg.minute);
+    const pm = Number(leg.period_minute);
+    if (leg.half === "sh") {
+      const elapsed = !Number.isNaN(pm) && pm > 0 ? pm : Math.max(0, m - 45);
+      return !Number.isNaN(m) ? `${m}' · 2H ${elapsed}'` : "—";
+    }
+    return !Number.isNaN(m) ? `1H ${m}'` : "—";
+  }
+
   function renderLegs(slip) {
     return (slip.legs || []).map((leg, i) => {
       const url = leg.onexbet_url || matchUrl(leg.event_id, leg.league_id);
+      const league = leg.league || "Football";
+      const clock = leg.minutes_left
+        ? `${leg.minute}' · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`
+        : fmtModalMinute(leg);
+      const odds = leg.estimated_odds ? ` · @ ${Number(leg.estimated_odds).toFixed(2)}` : "";
       return `
       <div class="ba-modal-leg">
+        <div class="ba-modal-leg-league">${league}</div>
         <strong>${i + 1}. ${leg.match}</strong><br>
-        ${leg.selection} · ${Number(leg.confidence).toFixed(0)}% · ${leg.period_score}
+        <span class="ba-modal-leg-meta">${clock} · ${leg.half === "sh" ? "2H" : "1H"} ${leg.period_score || "—"} · FT ${leg.full_score || "—"}</span><br>
+        ${leg.selection || leg.market} · ${Number(leg.confidence).toFixed(0)}%${odds}
+        ${leg.recommendation ? ` · ${leg.recommendation}` : ""}
         <br><a href="${url}" target="_blank" rel="noopener" class="ba-leg-link">Open on 1xBet ↗</a>
       </div>`;
     }).join("");

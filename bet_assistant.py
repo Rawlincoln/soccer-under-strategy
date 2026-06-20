@@ -216,9 +216,16 @@ def _format_export(slip: BetSlip) -> str:
         lines.append("LEGS:")
         for i, leg in enumerate(slip.legs, 1):
             half = "2H" if leg.half == "sh" else "1H"
+            league = leg.league or "Football"
+            pm = leg.period_minute
+            clock = (
+                f"{leg.minute}' · {leg.minutes_left}' to {leg.closing_target}"
+                if leg.minutes_left
+                else (f"{half} {leg.minute}'" if leg.half == "fh" else f"{leg.minute}' · 2H {pm or max(0, leg.minute - 45)}'")
+            )
             lines.append(
-                f"{i}. {leg.match} — {leg.selection} — {leg.confidence:.0f}% "
-                f"— {half} {leg.minute}' — {leg.period_score}"
+                f"{i}. {leg.match} ({league}) — {leg.selection} — {leg.confidence:.0f}% "
+                f"— {clock} — {half} {leg.period_score} · FT {leg.full_score}"
             )
             if leg.onexbet_url:
                 lines.append(f"   1xBet: {leg.onexbet_url}")

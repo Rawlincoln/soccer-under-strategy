@@ -141,7 +141,6 @@ class AssistantStore:
         cfg["telegram_bot_token"] = token
         cfg["telegram_chat_id"] = chat_id
         cfg["telegram_configured"] = bool(token and chat_id)
-        cfg["telegram_enabled"] = bool(cfg.get("telegram_enabled") and token and chat_id)
         return cfg
 
     def save_config(self, updates: dict[str, Any]) -> dict[str, Any]:
@@ -738,6 +737,7 @@ def build_assistant_payload(
     all_alerts = STORE.load_alerts()
     safe_config = {k: v for k, v in config.items() if k != "telegram_bot_token"}
     safe_config["telegram_configured"] = config.get("telegram_configured", False)
+    safe_config["telegram_token_set"] = bool(config.get("telegram_bot_token"))
 
     accas = (main_payload.get("accumulators") or {}).get("accumulators") or []
     stake = float(config.get("stake_per_slip", STAKE_PER_SLIP))

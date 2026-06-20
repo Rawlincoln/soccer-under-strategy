@@ -219,18 +219,18 @@ function updateTgStatus(cfg) {
   if (cfg.telegram_enabled && cfg.telegram_configured) {
     el.textContent = `Telegram: active · chat ${cfg.telegram_chat_id || "—"}`;
     el.className = "tg-status ok";
+  } else if (cfg.telegram_enabled && cfg.telegram_token_set) {
+    el.textContent = "Telegram: enabled — add chat ID and Save";
+    el.className = "tg-status warn";
   } else if (cfg.telegram_configured) {
     el.textContent = "Telegram: configured — enable checkbox and Save";
     el.className = "tg-status warn";
   } else if (cfg.telegram_token_set) {
-    el.textContent = "Telegram: token set — add chat ID";
+    el.textContent = "Telegram: token saved — add chat ID";
     el.className = "tg-status warn";
   } else {
     el.textContent = "Telegram: not configured";
     el.className = "tg-status";
-  }
-  if (cfg.telegram_chat_id && !$("tgChat").value) {
-    $("tgChat").placeholder = `Saved: ${cfg.telegram_chat_id}`;
   }
 }
 
@@ -243,6 +243,16 @@ function applyConfig(cfg) {
     $("onexbetSite").value = cfg.onexbet_site || "";
     $("onexbetSite").placeholder = cfg.onexbet_site || "https://1xbet.co.ke";
   }
+  if (cfg.telegram_chat_id) {
+    $("tgChat").value = cfg.telegram_chat_id;
+  }
+  const tokenEl = $("tgToken");
+  if (cfg.telegram_token_set) {
+    tokenEl.placeholder = "Token saved on server (leave blank to keep)";
+    tokenEl.value = "";
+  } else {
+    tokenEl.placeholder = "123456789:ABCdefGHI...";
+  }
   if (cfg.onexbet_site) BetAssistant.setOnexbetSite(cfg.onexbet_site);
   BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
   updateTgStatus(cfg);
@@ -252,11 +262,13 @@ async function saveConfig() {
   const body = {
     browser_alerts: $("browserAlerts").checked,
     telegram_enabled: $("telegramEnabled").checked,
-    telegram_bot_token: $("tgToken").value.trim(),
-    telegram_chat_id: $("tgChat").value.trim(),
     stake_per_slip: parseFloat($("stakeSetting").value) || 5000,
     onexbet_site: $("onexbetSite").value.trim(),
   };
+  const token = $("tgToken").value.trim();
+  const chatId = $("tgChat").value.trim();
+  if (token) body.telegram_bot_token = token;
+  if (chatId) body.telegram_chat_id = chatId;
   const res = await fetch("/api/assistant/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -308,22 +320,19 @@ async function fetchData() {
 
 async function discoverChat() {
   const token = $("tgToken").value.trim();
-  if (!token) {
-    BetAssistant.toast("Paste your bot token first");
-    return;
-  }
   $("btnDiscoverChat").disabled = true;
   try {
     const res = await fetch("/api/assistant/telegram/discover", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegram_bot_token: token }),
+      body: JSON.stringify(token ? { telegram_bot_token: token } : {}),
     });
     const data = await res.json();
     const box = $("tgChatPick");
     if (!data.ok || !data.chats?.length) {
       box.hidden = true;
-      BetAssistant.toast(data.error || "No chat found — message your bot first");
+      const err = data.error || "No chat found — message your bot first";
+      BetAssistant.toast(token ? err : `${err} (or paste your bot token if not saved yet)`);
       return;
     }
     box.hidden = false;
@@ -350,11 +359,11 @@ async function discoverChat() {
 }
 
 async function testTelegram() {
-  const body = {
-    telegram_bot_token: $("tgToken").value.trim(),
-    telegram_chat_id: $("tgChat").value.trim(),
-    telegram_enabled: true,
-  };
+  const body = { telegram_enabled: true };
+  const token = $("tgToken").value.trim();
+  const chatId = $("tgChat").value.trim();
+  if (token) body.telegram_bot_token = token;
+  if (chatId) body.telegram_chat_id = chatId;
   $("btnTestTelegram").disabled = true;
   try {
     const res = await fetch("/api/assistant/telegram/test", {
@@ -392,6 +401,17 @@ $("btnResetDay").addEventListener("click", async () => {
   BetAssistant.toast("Day reset");
 });
 
+async function loadSavedConfig() {
+  try {
+    const res = await fetch("/api/assistant/config");
+    const cfg = await res.json();
+    applyConfig(cfg);
+  } catch {
+    /* ignore — fetchData will retry via workflow config */
+  }
+}
+
+loadSavedConfig();
 fetchData();
 setInterval(fetchData, POLL_MS);
 BetAssistant.startAlertPolling(30000);

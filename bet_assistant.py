@@ -18,9 +18,10 @@ from onexbet_client import (
     android_package_for_site,
     app_base_url,
     get_onexbet_site,
-    onexbet_android_intent_url,
+    onexbet_app_open_url,
     onexbet_live_url,
     onexbet_match_url,
+    onexbet_mobile_url,
     onexbet_telegram_open_url,
 )
 
@@ -212,6 +213,11 @@ def _leg_match_url(
     return onexbet_live_url(site)
 
 
+def _app_open_url(config: Optional[dict] = None) -> str:
+    """Phone link that opens the installed 1xBet app (Kenya /en/mobile page)."""
+    return onexbet_app_open_url(effective_onexbet_site(config))
+
+
 def _telegram_match_link(
     event_id: str,
     league_id: int = 0,
@@ -263,7 +269,7 @@ def _format_telegram_alert(alert: dict, config: Optional[dict] = None) -> str:
     elif alert.get("type") == "loss_streak":
         lines.append(f"\n⚽ Live football")
         lines.append(f"📱 Tap to open app:\n{_telegram_match_link('', 0, config=config)}")
-        lines.append(f"🌐 Or on website:\n{_leg_match_url('', 0, config)}")
+        lines.append(f"🌐 Open app page:\n{_app_open_url(config)}")
     if entries or alert.get("type") == "loss_streak":
         lines.append("\n💡 In Telegram: tap ⋮ → Open in Chrome, then tap the app link.")
     lines.append("\nPro Punter → Betting Assistant")
@@ -801,7 +807,7 @@ def detect_alerts(
         eid = str(m.get("event_id", ""))
         lid = int(m.get("league_id") or 0)
         tg_link = _telegram_match_link(eid, lid)
-        direct_link = _leg_match_url(eid, lid)
+        direct_link = _app_open_url()
         new_alerts.append({
             "id": aid,
             "type": "goal_lock",
@@ -838,7 +844,7 @@ def detect_alerts(
                 leg_links.append({
                     "match": label,
                     "url": _telegram_match_link(eid, leg_lid),
-                    "direct_url": _leg_match_url(eid, leg_lid),
+                    "direct_url": _app_open_url(),
                 })
             new_alerts.append({
                 "id": aid,
@@ -1023,5 +1029,7 @@ def build_assistant_payload(
         "export_slips": export_slips,
         "onexbet_site": effective_onexbet_site(config),
         "onexbet_live_url": onexbet_live_url(effective_onexbet_site(config)),
+        "onexbet_mobile_url": onexbet_mobile_url(effective_onexbet_site(config)),
+        "onexbet_app_open_url": onexbet_app_open_url(effective_onexbet_site(config)),
         "onexbet_android_package": effective_onexbet_android_package(config),
     }

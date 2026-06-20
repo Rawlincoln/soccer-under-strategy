@@ -27,7 +27,13 @@ from closing_window import (
 )
 from combined_analysis import build_combined_analysis, combined_to_dict
 from filters import has_red_cards, is_excluded_match, is_excluded_raw
-from onexbet_client import OneXBetClient, OneXBetMatch, onexbet_live_url
+from onexbet_client import (
+    OneXBetClient,
+    OneXBetMatch,
+    onexbet_app_open_url,
+    onexbet_live_url,
+    onexbet_mobile_url,
+)
 from prophitbet_stats import PROPHIT_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
 from market_odds import lookup_market_odds
@@ -936,6 +942,8 @@ def build_dashboard_payload() -> dict[str, Any]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_mobile_url": onexbet_mobile_url(site),
+        "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
@@ -976,6 +984,8 @@ def build_closing_payload() -> dict[str, Any]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_mobile_url": onexbet_mobile_url(site),
+        "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
@@ -1007,6 +1017,8 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_mobile_url": onexbet_mobile_url(site),
+        "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
@@ -1041,6 +1053,8 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "source": "1xbet",
         "onexbet_site": site,
         "onexbet_live_url": onexbet_live_url(site),
+        "onexbet_mobile_url": onexbet_mobile_url(site),
+        "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": android_pkg,
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],

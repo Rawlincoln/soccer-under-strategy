@@ -31,6 +31,16 @@ def onexbet_live_url(site: Optional[str] = None) -> str:
     return f"{get_onexbet_site(site)}/en/live/football"
 
 
+def onexbet_mobile_url(site: Optional[str] = None) -> str:
+    """Official mobile / app page — opens installed 1xBet app on Android phones."""
+    return f"{get_onexbet_site(site)}/en/mobile?v=1"
+
+
+def onexbet_app_open_url(site: Optional[str] = None) -> str:
+    """Best URL for launching the native 1xBet Kenya app from a phone browser."""
+    return onexbet_mobile_url(site)
+
+
 def onexbet_match_url(
     game_id: int | str,
     league_id: Optional[int] = None,

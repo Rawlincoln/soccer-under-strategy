@@ -13,6 +13,7 @@ const BetAssistant = (() => {
     onexbetSite = KENYA_SITE;
   }
   let onexbetAndroidPackage = localStorage.getItem("pp_onexbet_android_package") || KENYA_ANDROID_PKG;
+  let onexbetAppOpenUrl = "";
 
   function toast(msg, ms = 2800) {
     const el = document.createElement("div");
@@ -79,6 +80,11 @@ const BetAssistant = (() => {
     return `${siteBase()}/en/live/football`;
   }
 
+  function appOpenUrl() {
+    if (onexbetAppOpenUrl) return onexbetAppOpenUrl;
+    return `${siteBase()}/en/mobile?v=1`;
+  }
+
   function isAndroid() {
     return /Android/i.test(navigator.userAgent);
   }
@@ -143,7 +149,7 @@ const BetAssistant = (() => {
     const normalized = normalizeHttpsUrl(httpsUrl);
     if (!isMobile()) return normalized;
     if (isInAppBrowser()) return openerPageUrl(normalized);
-    return normalized;
+    return appOpenUrl();
   }
 
   function mobileOpenUrl(httpsUrl) {
@@ -190,7 +196,7 @@ const BetAssistant = (() => {
       return;
     }
     showAppLinkHint();
-    window.location.href = httpsUrl;
+    window.location.href = appOpenUrl();
   }
 
   function oddsForMarket(item) {
@@ -264,6 +270,9 @@ const BetAssistant = (() => {
     if (!cfg) return;
     setOnexbetSite(cfg.onexbet_site || KENYA_SITE);
     setOnexbetAndroidPackage(cfg.onexbet_android_package || KENYA_ANDROID_PKG);
+    onexbetAppOpenUrl = String(
+      cfg.onexbet_app_open_url || cfg.onexbet_mobile_url || "",
+    ).trim().replace(/\/$/, "");
   }
 
   async function loadOnexbetSite() {
@@ -601,6 +610,8 @@ const BetAssistant = (() => {
     recBadgeHtml,
     oddsForMarket,
     open1xBet,
+    appOpenUrl,
+    matchLinkHref,
     setOnexbetSite,
     setOnexbetAndroidPackage,
     applyOnexbetConfig,

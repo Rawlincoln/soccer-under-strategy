@@ -720,11 +720,15 @@ def build_basketball_payload() -> dict[str, Any]:
                 })
 
     site = effective_onexbet_site()
+    from onexbet_client import onexbet_app_open_url, onexbet_mobile_url
+
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
         "onexbet_site": site,
+        "onexbet_mobile_url": onexbet_mobile_url(site),
+        "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": effective_onexbet_android_package(),
         "sport": "basketball",
         "filter": f"3rd quarter · definite picks ≥{MIN_DEFINITE_PCT:.0f}%",

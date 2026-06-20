@@ -23,9 +23,9 @@ from bet_assistant import (
     test_telegram,
 )
 from onexbet_client import (
+    onexbet_app_open_url,
     onexbet_live_url,
     onexbet_match_url,
-    onexbet_open_payload,
 )
 from engine import REFRESH_SECONDS, DataCache
 
@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "21")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "22")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -108,10 +108,11 @@ def open_onexbet_match():
     pkg = effective_onexbet_android_package(config)
     if game_id.isdigit():
         lid = int(league_id) if league_id.isdigit() else None
-        https_url = onexbet_match_url(game_id, lid, site=site, sport=sport)
+        match_url = onexbet_match_url(game_id, lid, site=site, sport=sport)
     else:
-        https_url = onexbet_live_url(site)
-    payload = onexbet_open_payload(https_url, site=site, package=pkg)
+        match_url = onexbet_live_url(site)
+    https_url = onexbet_app_open_url(site)
+    payload = {"https": https_url, "match": match_url, "package": pkg}
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -136,7 +137,8 @@ def open_onexbet_match():
 <body>
   <div class="box">
     <h1>Open in 1xBet app</h1>
-    <p>Tap the green button — opens the match on <strong>1xbet.co.ke</strong> in your installed 1xBet app.</p>
+    <p>Tap the green button — opens the <strong>1xBet app</strong> via <strong>1xbet.co.ke/en/mobile</strong>.</p>
+    <p style="font-size:0.8rem;color:#8b949e;margin-top:-8px">Match link (in app → Live Football): <a href="{match_url}" style="color:#3fb950">{match_url}</a></p>
     <div id="inapp-hint" class="hint" hidden>
       <strong>Using Telegram?</strong> Tap <strong>⋮</strong> (top right) → <strong>Open in Chrome</strong>,
       then tap the green button below.
@@ -148,9 +150,9 @@ def open_onexbet_match():
       3. Add / enable <strong>1xbet.co.ke</strong><br>
       Then links open the app instead of Play Store or browser.
     </div>
-    <button type="button" id="open-app" class="btn btn-primary">Open match in 1xBet app</button>
+    <button type="button" id="open-app" class="btn btn-primary">Open 1xBet app</button>
     <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
-    <a id="open-web" class="btn btn-secondary" href="{https_url}">Open in browser instead</a>
+    <a id="open-web" class="btn btn-secondary" href="{match_url}">Open match in browser</a>
     <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
   </div>
   <script>window.ONEXBET_OPEN = {json.dumps(payload)};</script>

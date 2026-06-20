@@ -31,6 +31,7 @@ def closing_target(half: str) -> str:
 @dataclass
 class ClosingCard:
     event_id: str
+    league_id: int = 0
     home_team: str
     away_team: str
     league: str
@@ -230,6 +231,7 @@ def qualifies_lock(lock_pct: float) -> bool:
 def build_closing_card(
     *,
     event_id: str,
+    league_id: int,
     home_team: str,
     away_team: str,
     league: str,
@@ -268,6 +270,7 @@ def build_closing_card(
 
     return ClosingCard(
         event_id=event_id,
+        league_id=league_id,
         home_team=home_team,
         away_team=away_team,
         league=league,

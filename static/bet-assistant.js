@@ -36,6 +36,16 @@ const BetAssistant = (() => {
     }
   }
 
+  function matchUrl(eventId, leagueId) {
+    const gid = parseInt(eventId, 10);
+    if (!gid || Number.isNaN(gid)) return "https://1xbet.com/en/live/football";
+    const lid = parseInt(leagueId, 10);
+    if (lid && !Number.isNaN(lid)) {
+      return `https://1xbet.com/en/live/football/${lid}/${gid}`;
+    }
+    return `https://1xbet.com/en/live/football/${gid}`;
+  }
+
   function open1xBet(url) {
     window.open(url || "https://1xbet.com/en/live/football", "_blank", "noopener");
   }
@@ -65,12 +75,15 @@ const BetAssistant = (() => {
   }
 
   function renderLegs(slip) {
-    return (slip.legs || []).map((leg, i) => `
+    return (slip.legs || []).map((leg, i) => {
+      const url = leg.onexbet_url || matchUrl(leg.event_id, leg.league_id);
+      return `
       <div class="ba-modal-leg">
         <strong>${i + 1}. ${leg.match}</strong><br>
         ${leg.selection} · ${Number(leg.confidence).toFixed(0)}% · ${leg.period_score}
-      </div>
-    `).join("");
+        <br><a href="${url}" target="_blank" rel="noopener" class="ba-leg-link">Open on 1xBet ↗</a>
+      </div>`;
+    }).join("");
   }
 
   function closeModal() {
@@ -112,7 +125,15 @@ const BetAssistant = (() => {
     });
 
     overlay.querySelector('[data-act="copy"]').onclick = () => copyText(slip.export_text || "");
-    overlay.querySelector('[data-act="1xbet"]').onclick = () => open1xBet(slip.onexbet_url);
+    overlay.querySelector('[data-act="1xbet"]').onclick = () => {
+      const legs = slip.legs || [];
+      if (legs.length <= 1) {
+        const leg = legs[0];
+        open1xBet(slip.onexbet_url || (leg && (leg.onexbet_url || matchUrl(leg.event_id, leg.league_id))));
+      } else {
+        legs.forEach((leg) => open1xBet(leg.onexbet_url || matchUrl(leg.event_id, leg.league_id)));
+      }
+    };
     overlay.querySelector('[data-act="placed"]').onclick = async () => {
       const res = await fetch("/api/assistant/workflow/placed", {
         method: "POST",
@@ -215,6 +236,8 @@ const BetAssistant = (() => {
       estimated_odds: leg.estimated_odds,
       half: leg.half,
       event_id: leg.event_id,
+      league_id: leg.league_id,
+      onexbet_url: matchUrl(leg.event_id, leg.league_id),
       recommendation: leg.recommendation,
     }));
     const odds = acca.combined_odds || 1;
@@ -227,9 +250,11 @@ const BetAssistant = (() => {
       `Potential profit: ${fmtMoney(profit)}`,
       "",
       "LEGS:",
-      ...legs.map((l, i) => `${i + 1}. ${l.match} — ${l.selection} — ${l.confidence}%`),
+      ...legs.flatMap((l, i) => [
+        `${i + 1}. ${l.match} — ${l.selection} — ${l.confidence}%`,
+        `   1xBet: ${l.onexbet_url}`,
+      ]),
       "",
-      "1xBet: https://1xbet.com/en/live/football",
     ];
     const slip = {
       id: `acca-${acca.id}`,
@@ -247,7 +272,7 @@ const BetAssistant = (() => {
         `Stake ${fmtMoney(stake)}`,
         "Place manually",
       ],
-      onexbet_url: "https://1xbet.com/en/live/football",
+      onexbet_url: legs[0]?.onexbet_url || "https://1xbet.com/en/live/football",
       export_text: lines.join("\n"),
     };
     registerSlip(slip);
@@ -255,6 +280,7 @@ const BetAssistant = (() => {
   }
 
   function slipFromLock(m, stake) {
+    const url = matchUrl(m.event_id, m.league_id);
     const slip = {
       id: `lock-${m.event_id}-${m.half}`,
       slip_type: "goal_lock",
@@ -273,6 +299,9 @@ const BetAssistant = (() => {
         period_score: m.period_score,
         minute: m.minute,
         half: m.half,
+        event_id: m.event_id,
+        league_id: m.league_id,
+        onexbet_url: url,
       }],
       checklist: [
         "Open match on 1xBet",
@@ -280,13 +309,14 @@ const BetAssistant = (() => {
         `Stake ${fmtMoney(stake)}`,
         "Place manually",
       ],
-      onexbet_url: "https://1xbet.com/en/live/football",
+      onexbet_url: url,
       export_text: [
         "PRO PUNTER · GOAL LOCK",
         m.lock_label,
         `${m.home_team} vs ${m.away_team}`,
         `Stake: ${fmtMoney(stake)}`,
         m.lock_market,
+        `1xBet: ${url}`,
       ].join("\n"),
     };
     registerSlip(slip);
@@ -295,6 +325,7 @@ const BetAssistant = (() => {
 
   return {
     copyText,
+    matchUrl,
     open1xBet,
     showConfirm,
     actionButtons,

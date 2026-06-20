@@ -9,7 +9,16 @@ from typing import Any, Optional
 import requests
 
 BASE_URL = "https://1xbet.com/web-api/LiveFeed"
+ONEXBET_SITE = "https://1xbet.com"
 FOOTBALL_SPORT_ID = 1
+
+
+def onexbet_match_url(game_id: int | str, league_id: Optional[int] = None) -> str:
+    """Deep link to a live football match on 1xBet."""
+    gid = int(game_id)
+    if league_id:
+        return f"{ONEXBET_SITE}/en/live/football/{int(league_id)}/{gid}"
+    return f"{ONEXBET_SITE}/en/live/football/{gid}"
 
 STAT_MAP = {
     "attacks": 45,
@@ -40,6 +49,7 @@ class OneXBetMatch:
     fh_away: int
     fh_goals: int
     stats: dict[str, int] = field(default_factory=dict)
+    league_id: int = 0
     home_possession: float = 50.0
     sh_home: int = 0
     sh_away: int = 0
@@ -235,6 +245,7 @@ class OneXBetClient:
 
         return OneXBetMatch(
             game_id=int(raw["I"]),
+            league_id=int(raw.get("LI") or (detail or {}).get("LI") or 0),
             home_team=raw.get("O1", ""),
             away_team=raw.get("O2", ""),
             league=raw.get("L", ""),

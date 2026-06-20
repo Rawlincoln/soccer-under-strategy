@@ -16,6 +16,7 @@ MIN_CONFIDENCE = 60
 @dataclass
 class AccaLeg:
     event_id: str
+    league_id: int = 0
     match: str
     home_team: str
     away_team: str
@@ -239,6 +240,7 @@ def _make_leg(entry: dict) -> AccaLeg:
     fusion = card.get("combined_analysis") or {}
     return AccaLeg(
         event_id=card.get("event_id", ""),
+        league_id=int(card.get("league_id") or 0),
         match=f"{card['home_team']} vs {card['away_team']}",
         home_team=card["home_team"],
         away_team=card["away_team"],

@@ -135,6 +135,7 @@ class Prediction:
 @dataclass
 class MatchCard:
     event_id: str
+    league_id: int = 0
     home_team: str
     away_team: str
     league: str
@@ -653,6 +654,7 @@ def _build_match_card(
 
     return MatchCard(
         event_id=str(m.game_id),
+        league_id=m.league_id,
         home_team=m.home_team,
         away_team=m.away_team,
         league=m.league,
@@ -695,6 +697,7 @@ def _build_half_time_card(
 ) -> MatchCard:
     return MatchCard(
         event_id=str(m.game_id),
+        league_id=m.league_id,
         home_team=m.home_team,
         away_team=m.away_team,
         league=m.league,
@@ -819,6 +822,7 @@ def _scan_live_football() -> tuple[
                 closing_window_count += 1
                 closing = build_closing_card(
                     event_id=str(m.game_id),
+                    league_id=m.league_id,
                     home_team=m.home_team,
                     away_team=m.away_team,
                     league=m.league,

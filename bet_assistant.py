@@ -12,9 +12,9 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import quote_plus
-
 import requests
+
+from onexbet_client import ONEXBET_SITE, onexbet_match_url
 
 DATA_DIR = Path(__file__).parent / "data"
 STATE_PATH = DATA_DIR / "assistant_state.json"
@@ -32,7 +32,7 @@ WAVE_WINDOWS = {
     "wave3": {"half": "any", "start": 0, "end": 999, "label": "Wave 3 · Closer / Goal Lock"},
 }
 
-ONEXBET_LIVE_URL = "https://1xbet.com/en/live/football"
+ONEXBET_LIVE_URL = f"{ONEXBET_SITE}/en/live/football"
 
 
 @dataclass
@@ -50,6 +50,8 @@ class SlipLeg:
     estimated_odds: float
     half: str = "fh"
     event_id: str = ""
+    league_id: int = 0
+    onexbet_url: str = ""
     recommendation: str = ""
 
 
@@ -175,9 +177,10 @@ def _profit(stake: float, odds: float) -> float:
     return round(stake * (odds - 1), 2)
 
 
-def _onexbet_search_url(home: str, away: str) -> str:
-    q = quote_plus(f"{home} {away}")
-    return f"{ONEXBET_LIVE_URL}?q={q}"
+def _leg_match_url(event_id: str, league_id: int = 0) -> str:
+    if event_id and str(event_id).isdigit():
+        return onexbet_match_url(event_id, league_id or None)
+    return ONEXBET_LIVE_URL
 
 
 def _default_checklist(stake: float) -> list[str]:
@@ -214,6 +217,8 @@ def _format_export(slip: BetSlip) -> str:
                 f"{i}. {leg.match} — {leg.selection} — {leg.confidence:.0f}% "
                 f"— {half} {leg.minute}' — {leg.period_score}"
             )
+            if leg.onexbet_url:
+                lines.append(f"   1xBet: {leg.onexbet_url}")
         lines.append("")
     lines.append("CHECKLIST:")
     for step in slip.checklist:
@@ -225,8 +230,11 @@ def _format_export(slip: BetSlip) -> str:
 
 
 def acca_to_slip(acca: dict, stake: float, wave: str = "") -> BetSlip:
-    legs = [
-        SlipLeg(
+    legs = []
+    for leg in acca.get("legs", []):
+        eid = str(leg.get("event_id", ""))
+        lid = int(leg.get("league_id") or 0)
+        legs.append(SlipLeg(
             match=leg["match"],
             home_team=leg["home_team"],
             away_team=leg["away_team"],
@@ -239,11 +247,11 @@ def acca_to_slip(acca: dict, stake: float, wave: str = "") -> BetSlip:
             confidence=float(leg.get("confidence", 0)),
             estimated_odds=float(leg.get("estimated_odds", 1.5)),
             half=leg.get("half", "fh"),
-            event_id=str(leg.get("event_id", "")),
+            event_id=eid,
+            league_id=lid,
+            onexbet_url=_leg_match_url(eid, lid),
             recommendation=leg.get("recommendation", ""),
-        )
-        for leg in acca.get("legs", [])
-    ]
+        ))
     odds = float(acca.get("combined_odds", 1.0))
     slip_id = f"acca-{acca.get('id', 0)}"
     slip = BetSlip(
@@ -259,13 +267,16 @@ def acca_to_slip(acca: dict, stake: float, wave: str = "") -> BetSlip:
         risk_level=acca.get("risk_level", ""),
         avg_confidence=float(acca.get("avg_confidence", 0)),
         checklist=_default_checklist(stake),
-        onexbet_url=ONEXBET_LIVE_URL,
+        onexbet_url=legs[0].onexbet_url if legs else ONEXBET_LIVE_URL,
     )
     slip.export_text = _format_export(slip)
     return slip
 
 
 def lock_to_slip(match: dict, stake: float) -> BetSlip:
+    eid = str(match.get("event_id", ""))
+    lid = int(match.get("league_id") or 0)
+    match_url = _leg_match_url(eid, lid)
     leg = SlipLeg(
         match=f"{match['home_team']} vs {match['away_team']}",
         home_team=match["home_team"],
@@ -279,7 +290,9 @@ def lock_to_slip(match: dict, stake: float) -> BetSlip:
         confidence=float(match.get("lock_pct", 0)),
         estimated_odds=1.05,
         half=match.get("half", "fh"),
-        event_id=str(match.get("event_id", "")),
+        event_id=eid,
+        league_id=lid,
+        onexbet_url=match_url,
         recommendation="LOCK",
     )
     slip_id = f"lock-{match.get('event_id')}-{match.get('half')}"
@@ -298,7 +311,7 @@ def lock_to_slip(match: dict, stake: float) -> BetSlip:
             f"Market: {match.get('lock_market', '')}",
             f"{match.get('minutes_left', '?')}' left to {match.get('closing_target', 'HT/FT')}",
         ],
-        onexbet_url=_onexbet_search_url(match["home_team"], match["away_team"]),
+        onexbet_url=match_url,
     )
     slip.export_text = _format_export(slip)
     return slip

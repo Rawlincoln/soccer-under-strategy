@@ -130,6 +130,17 @@
   border-bottom: 1px solid var(--border);
 }
 
+.ba-leg-link {
+  font-size: 0.75rem;
+  color: var(--orange, #ff8c32);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.ba-leg-link:hover {
+  text-decoration: underline;
+}
+
 .ba-modal-checklist {
   margin: 12px 0;
   padding-left: 0;

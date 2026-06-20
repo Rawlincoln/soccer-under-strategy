@@ -6,6 +6,7 @@ const BetAssistant = (() => {
   let seenAlertIds = new Set(JSON.parse(localStorage.getItem("pp_seen_alerts") || "[]"));
   let notifyEnabled = localStorage.getItem("pp_browser_alerts") !== "false";
   let pollTimer = null;
+  let onexbetSite = (localStorage.getItem("pp_onexbet_site") || "https://1xbet.com").replace(/\/$/, "");
 
   function toast(msg, ms = 2800) {
     const el = document.createElement("div");
@@ -36,18 +37,59 @@ const BetAssistant = (() => {
     }
   }
 
+  function setOnexbetSite(site) {
+    if (!site) return;
+    onexbetSite = String(site).trim().replace(/\/$/, "");
+    if (onexbetSite && !/^https?:\/\//i.test(onexbetSite)) {
+      onexbetSite = `https://${onexbetSite}`;
+    }
+    localStorage.setItem("pp_onexbet_site", onexbetSite);
+  }
+
+  function liveFootballUrl() {
+    return `${onexbetSite}/en/live/football`;
+  }
+
+  function isMobile() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+      || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+  }
+
   function matchUrl(eventId, leagueId) {
     const gid = parseInt(eventId, 10);
-    if (!gid || Number.isNaN(gid)) return "https://1xbet.com/en/live/football";
+    if (!gid || Number.isNaN(gid)) return liveFootballUrl();
     const lid = parseInt(leagueId, 10);
     if (lid && !Number.isNaN(lid)) {
-      return `https://1xbet.com/en/live/football/${lid}/${gid}`;
+      return `${onexbetSite}/en/live/football/${lid}/${gid}`;
     }
-    return `https://1xbet.com/en/live/football/${gid}`;
+    return `${onexbetSite}/en/live/football/${gid}`;
   }
 
   function open1xBet(url) {
-    window.open(url || "https://1xbet.com/en/live/football", "_blank", "noopener");
+    const target = url || liveFootballUrl();
+    if (isMobile()) {
+      window.location.assign(target);
+    } else {
+      window.open(target, "_blank", "noopener");
+    }
+  }
+
+  function bind1xBetLinks(root) {
+    (root || document).querySelectorAll("a.ba-1xbet-link").forEach((a) => {
+      a.onclick = (e) => {
+        if (!isMobile()) return;
+        e.preventDefault();
+        open1xBet(a.href);
+      };
+    });
+  }
+
+  async function loadOnexbetSite() {
+    try {
+      const res = await fetch("/api/assistant/config");
+      const cfg = await res.json();
+      if (cfg.onexbet_site) setOnexbetSite(cfg.onexbet_site);
+    } catch { /* ignore */ }
   }
 
   async function requestNotifyPermission() {
@@ -99,7 +141,7 @@ const BetAssistant = (() => {
         <span class="ba-modal-leg-meta">${clock} · ${leg.half === "sh" ? "2H" : "1H"} ${leg.period_score || "—"} · FT ${leg.full_score || "—"}</span><br>
         ${leg.selection || leg.market} · ${Number(leg.confidence).toFixed(0)}%${odds}
         ${leg.recommendation ? ` · ${leg.recommendation}` : ""}
-        <br><a href="${url}" target="_blank" rel="noopener" class="ba-leg-link">Open on 1xBet ↗</a>
+        <br><a href="${url}" ${isMobile() ? "" : 'target="_blank" rel="noopener"'} class="ba-leg-link ba-1xbet-link">Open on 1xBet ↗</a>
       </div>`;
     }).join("");
   }
@@ -148,6 +190,10 @@ const BetAssistant = (() => {
       if (legs.length <= 1) {
         const leg = legs[0];
         open1xBet(slip.onexbet_url || (leg && (leg.onexbet_url || matchUrl(leg.event_id, leg.league_id))));
+      } else if (isMobile()) {
+        const leg = legs[0];
+        open1xBet(leg.onexbet_url || matchUrl(leg.event_id, leg.league_id));
+        toast("Acca: open remaining legs one at a time on 1xBet");
       } else {
         legs.forEach((leg) => open1xBet(leg.onexbet_url || matchUrl(leg.event_id, leg.league_id)));
       }
@@ -173,6 +219,7 @@ const BetAssistant = (() => {
     };
     overlay.querySelector('[data-act="close"]').onclick = closeModal;
     document.body.appendChild(overlay);
+    bind1xBetLinks(overlay);
   }
 
   function actionButtons(slip, workflow, compact) {
@@ -290,7 +337,7 @@ const BetAssistant = (() => {
         `Stake ${fmtMoney(stake)}`,
         "Place manually",
       ],
-      onexbet_url: legs[0]?.onexbet_url || "https://1xbet.com/en/live/football",
+      onexbet_url: legs[0]?.onexbet_url || liveFootballUrl(),
       export_text: lines.join("\n"),
     };
     registerSlip(slip);
@@ -341,10 +388,19 @@ const BetAssistant = (() => {
     return slip;
   }
 
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", loadOnexbetSite);
+  } else {
+    loadOnexbetSite();
+  }
+
   return {
     copyText,
     matchUrl,
     open1xBet,
+    setOnexbetSite,
+    bind1xBetLinks,
+    isMobile,
     showConfirm,
     actionButtons,
     registerSlip,

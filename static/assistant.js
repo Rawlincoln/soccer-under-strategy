@@ -104,7 +104,7 @@ function renderLegDetail(leg, idx, slip) {
           <span class="asst-leg-chip conf">${conf}%</span>
           ${odds ? `<span class="asst-leg-chip">${odds}</span>` : ""}
           ${leg.recommendation ? `<span class="asst-leg-chip rec">${leg.recommendation}</span>` : ""}
-          <a class="asst-leg-chip link" href="${url}" target="_blank" rel="noopener">1xBet ↗</a>
+          <a class="asst-leg-chip link ba-1xbet-link" href="${url}" ${BetAssistant.isMobile() ? "" : 'target="_blank" rel="noopener"'}>1xBet ↗</a>
         </div>
       </div>
     </div>`;
@@ -141,6 +141,7 @@ function renderRecommendations(recs, wf) {
       </div>`;
   }).join("");
   BetAssistant.bindActions(box, wf);
+  BetAssistant.bind1xBetLinks(box);
 }
 
 function renderPlaced(wf) {
@@ -230,6 +231,11 @@ function applyConfig(cfg) {
   $("browserAlerts").checked = cfg.browser_alerts !== false;
   $("telegramEnabled").checked = !!cfg.telegram_enabled;
   $("stakeSetting").value = cfg.stake_per_slip || 5000;
+  if ($("onexbetSite")) {
+    $("onexbetSite").value = cfg.onexbet_site || "";
+    $("onexbetSite").placeholder = cfg.onexbet_site || "https://1xbet.co.ke";
+  }
+  if (cfg.onexbet_site) BetAssistant.setOnexbetSite(cfg.onexbet_site);
   BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
   updateTgStatus(cfg);
 }
@@ -241,6 +247,7 @@ async function saveConfig() {
     telegram_bot_token: $("tgToken").value.trim(),
     telegram_chat_id: $("tgChat").value.trim(),
     stake_per_slip: parseFloat($("stakeSetting").value) || 5000,
+    onexbet_site: $("onexbetSite").value.trim(),
   };
   const res = await fetch("/api/assistant/config", {
     method: "POST",
@@ -251,7 +258,9 @@ async function saveConfig() {
   if (data.ok) {
     BetAssistant.toast("Settings saved");
     BetAssistant.setBrowserAlerts(body.browser_alerts);
+    if (body.onexbet_site) BetAssistant.setOnexbetSite(body.onexbet_site);
     if (body.browser_alerts) BetAssistant.requestNotifyPermission();
+    if (data.config) applyConfig(data.config);
   }
 }
 
@@ -279,6 +288,7 @@ async function fetchData() {
     renderPlaced(wf);
     renderAlerts(data.alerts);
     applyConfig(data.config);
+    if (data.onexbet_site) BetAssistant.setOnexbetSite(data.onexbet_site);
 
     if (data.new_alerts?.length) BetAssistant.processAlerts(data.new_alerts);
   } catch (err) {

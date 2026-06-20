@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 import requests
 
-from onexbet_client import ONEXBET_SITE, onexbet_match_url
+from onexbet_client import get_onexbet_site, onexbet_live_url, onexbet_match_url
 
 DATA_DIR = Path(__file__).parent / "data"
 STATE_PATH = DATA_DIR / "assistant_state.json"
@@ -32,7 +32,9 @@ WAVE_WINDOWS = {
     "wave3": {"half": "any", "start": 0, "end": 999, "label": "Wave 3 · Closer / Goal Lock"},
 }
 
-ONEXBET_LIVE_URL = f"{ONEXBET_SITE}/en/live/football"
+def effective_onexbet_site(config: Optional[dict] = None) -> str:
+    cfg = config or STORE.load_config()
+    return get_onexbet_site(cfg.get("onexbet_site") or None)
 
 
 @dataclass
@@ -73,7 +75,7 @@ class BetSlip:
     avg_confidence: float = 0.0
     lock_pct: float = 0.0
     checklist: list[str] = field(default_factory=list)
-    onexbet_url: str = ONEXBET_LIVE_URL
+    onexbet_url: str = ""
     export_text: str = ""
 
 
@@ -133,6 +135,7 @@ class AssistantStore:
             "daily_target": DAILY_TARGET,
             "browser_alerts": True,
             "telegram_enabled": False,
+            "onexbet_site": "",
         })
         token = os.environ.get("TELEGRAM_BOT_TOKEN") or cfg.get("telegram_bot_token", "")
         chat_id = os.environ.get("TELEGRAM_CHAT_ID") or cfg.get("telegram_chat_id", "")
@@ -148,6 +151,7 @@ class AssistantStore:
             allowed = {
                 "stake_per_slip", "daily_target", "browser_alerts",
                 "telegram_enabled", "telegram_bot_token", "telegram_chat_id",
+                "onexbet_site",
             }
             for key, val in updates.items():
                 if key not in allowed:
@@ -183,10 +187,15 @@ def _profit(stake: float, odds: float) -> float:
     return round(stake * (odds - 1), 2)
 
 
-def _leg_match_url(event_id: str, league_id: int = 0) -> str:
+def _leg_match_url(
+    event_id: str,
+    league_id: int = 0,
+    config: Optional[dict] = None,
+) -> str:
+    site = effective_onexbet_site(config)
     if event_id and str(event_id).isdigit():
-        return onexbet_match_url(event_id, league_id or None)
-    return ONEXBET_LIVE_URL
+        return onexbet_match_url(event_id, league_id or None, site=site)
+    return onexbet_live_url(site)
 
 
 def _default_checklist(stake: float) -> list[str]:
@@ -281,7 +290,7 @@ def acca_to_slip(acca: dict, stake: float, wave: str = "") -> BetSlip:
         risk_level=acca.get("risk_level", ""),
         avg_confidence=float(acca.get("avg_confidence", 0)),
         checklist=_default_checklist(stake),
-        onexbet_url=legs[0].onexbet_url if legs else ONEXBET_LIVE_URL,
+        onexbet_url=legs[0].onexbet_url if legs else onexbet_live_url(effective_onexbet_site()),
     )
     slip.export_text = _format_export(slip)
     return slip
@@ -724,5 +733,6 @@ def build_assistant_payload(
         "new_alerts": new_alerts,
         "config": safe_config,
         "export_slips": export_slips,
-        "onexbet_live_url": ONEXBET_LIVE_URL,
+        "onexbet_site": effective_onexbet_site(config),
+        "onexbet_live_url": onexbet_live_url(effective_onexbet_site(config)),
     }

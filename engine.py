@@ -14,7 +14,7 @@ from typing import Any, Optional
 import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
-from bet_assistant import build_assistant_payload
+from bet_assistant import build_assistant_payload, effective_onexbet_site
 from closing_window import (
     MIN_LOCK_PCT,
     build_closing_card,
@@ -23,7 +23,7 @@ from closing_window import (
 )
 from combined_analysis import build_combined_analysis, combined_to_dict
 from filters import has_red_cards, is_excluded_match, is_excluded_raw
-from onexbet_client import OneXBetClient, OneXBetMatch
+from onexbet_client import OneXBetClient, OneXBetMatch, onexbet_live_url
 from prophitbet_stats import PROPHIT_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
 from market_odds import lookup_market_odds
@@ -918,11 +918,14 @@ def build_dashboard_payload() -> dict[str, Any]:
     cards, _, bet_signals, scored_under_15, scored_under_25, counts = _scan_live_football()
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
+    site = effective_onexbet_site()
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
+        "onexbet_site": site,
+        "onexbet_live_url": onexbet_live_url(site),
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "first_half_count": counts["fh_count"],
@@ -954,10 +957,13 @@ def build_dashboard_payload() -> dict[str, Any]:
 
 def build_closing_payload() -> dict[str, Any]:
     _, closing_cards, _, _, _, counts = _scan_live_football()
+    site = effective_onexbet_site()
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
+        "onexbet_site": site,
+        "onexbet_live_url": onexbet_live_url(site),
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "closing_window_count": counts["closing_window_count"],
@@ -980,10 +986,13 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
 
+    site = effective_onexbet_site()
     main = {
         "updated_at": updated,
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
+        "onexbet_site": site,
+        "onexbet_live_url": onexbet_live_url(site),
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "first_half_count": counts["fh_count"],
@@ -1015,6 +1024,8 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "updated_at": updated,
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
+        "onexbet_site": site,
+        "onexbet_live_url": onexbet_live_url(site),
         "total_live_football": counts["total_live"],
         "excluded_count": counts["excluded_count"],
         "closing_window_count": counts["closing_window_count"],

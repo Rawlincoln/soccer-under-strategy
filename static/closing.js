@@ -100,6 +100,9 @@ async function fetchData() {
   try {
     const res = await fetch("/api/closing");
     const data = await res.json();
+    if (typeof BetAssistant !== "undefined" && data.onexbet_site) {
+      BetAssistant.setOnexbetSite(data.onexbet_site);
+    }
     lastData = data;
     renderBaselines(data);
     renderMatches(data);

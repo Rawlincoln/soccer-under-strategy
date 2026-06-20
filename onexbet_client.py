@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -9,16 +10,35 @@ from typing import Any, Optional
 import requests
 
 BASE_URL = "https://1xbet.com/web-api/LiveFeed"
-ONEXBET_SITE = "https://1xbet.com"
 FOOTBALL_SPORT_ID = 1
 
 
-def onexbet_match_url(game_id: int | str, league_id: Optional[int] = None) -> str:
+def get_onexbet_site(override: Optional[str] = None) -> str:
+    """User-facing 1xBet domain (regional site opens the mobile app)."""
+    site = (override or os.environ.get("ONEXBET_SITE") or "https://1xbet.com").strip().rstrip("/")
+    if site and not site.startswith("http"):
+        site = f"https://{site}"
+    return site or "https://1xbet.com"
+
+
+ONEXBET_SITE = get_onexbet_site()
+
+
+def onexbet_live_url(site: Optional[str] = None) -> str:
+    return f"{get_onexbet_site(site)}/en/live/football"
+
+
+def onexbet_match_url(
+    game_id: int | str,
+    league_id: Optional[int] = None,
+    site: Optional[str] = None,
+) -> str:
     """Deep link to a live football match on 1xBet."""
+    base = get_onexbet_site(site)
     gid = int(game_id)
     if league_id:
-        return f"{ONEXBET_SITE}/en/live/football/{int(league_id)}/{gid}"
-    return f"{ONEXBET_SITE}/en/live/football/{gid}"
+        return f"{base}/en/live/football/{int(league_id)}/{gid}"
+    return f"{base}/en/live/football/{gid}"
 
 STAT_MAP = {
     "attacks": 45,

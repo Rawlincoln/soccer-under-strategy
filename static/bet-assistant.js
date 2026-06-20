@@ -152,9 +152,10 @@ const BetAssistant = (() => {
 
   function showConfirm(slip, workflow) {
     closeModal();
-    const canPlace = workflow?.can_place !== false;
-    const warning = !canPlace
-      ? `<div class="ba-modal-warning">${workflow?.stop_loss_hit ? "Stop-loss hit (2 losses). Do not place more bets today." : "Max daily slips reached."}</div>`
+    const streak = workflow?.loss_streak || 0;
+    const maxStreak = workflow?.max_loss_streak || 5;
+    const warning = streak >= maxStreak - 1 && streak > 0
+      ? `<div class="ba-modal-warning">${streak} losses in a row — session resets after ${maxStreak} consecutive losses.</div>`
       : "";
 
     const overlay = document.createElement("div");
@@ -175,7 +176,7 @@ const BetAssistant = (() => {
         <div class="ba-modal-actions">
           <button class="ba-btn primary" data-act="copy">Copy slip</button>
           <button class="ba-btn orange" data-act="1xbet">Open 1xBet</button>
-          <button class="ba-btn" data-act="placed" ${canPlace ? "" : "disabled"}>Mark placed</button>
+          <button class="ba-btn" data-act="placed">Mark placed</button>
           <button class="ba-btn" data-act="close">Close</button>
         </div>
       </div>`;

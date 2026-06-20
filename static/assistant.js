@@ -12,18 +12,20 @@ function renderWorkflow(wf) {
   $("profitRecorded").textContent = fmtMoney(wf.profit_recorded || 0);
   $("dailyTarget").textContent = fmtMoney(wf.daily_target || 100000);
   $("gapTarget").textContent = fmtMoney(wf.gap_to_target || 0);
-  $("slipsCount").textContent = `${wf.slips_placed || 0} / ${wf.max_slips || 5}`;
+  $("slipsCount").textContent = String(wf.slips_placed || 0);
   $("winsCount").textContent = wf.wins || 0;
   $("lossesCount").textContent = wf.losses || 0;
 
   const statusEl = $("workflowStatus");
   const card = $("statusCard");
-  if (wf.stop_loss_hit) {
-    statusEl.textContent = "STOP";
+  const streak = wf.loss_streak || 0;
+  const maxStreak = wf.max_loss_streak || 5;
+  if (wf.target_reached) {
+    statusEl.textContent = "TARGET";
+    statusEl.className = "asst-hero-value asst-status-ok";
+  } else if (streak >= maxStreak - 1 && streak > 0) {
+    statusEl.textContent = `${streak}L streak`;
     statusEl.className = "asst-hero-value asst-status-stop";
-  } else if (!wf.can_place) {
-    statusEl.textContent = "MAX SLIPS";
-    statusEl.className = "asst-hero-value asst-status-wait";
   } else if (wf.active_wave) {
     statusEl.textContent = wf.active_wave.label?.split("·")[0]?.trim() || "ACTIVE";
     statusEl.className = "asst-hero-value asst-status-ok";
@@ -167,26 +169,32 @@ function renderPlaced(wf) {
       </div>`;
   }).join("");
 
+  async function settleSlip(slipId, won, profit = 0) {
+    const res = await fetch("/api/assistant/workflow/result", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slip_id: slipId, won, profit }),
+    });
+    const data = await res.json();
+    if (data.session_reset) {
+      const msg = data.reset_reason === "target_reached"
+        ? "Profit target reached — new session started"
+        : "5-loss streak — new session started";
+      BetAssistant.toast(msg, 4200);
+    }
+    fetchData();
+  }
+
   box.querySelectorAll("[data-win]").forEach((btn) => {
     btn.onclick = async () => {
       const profit = prompt("Profit amount?", String(wf.stake_per_slip || 5000));
       if (profit == null) return;
-      await fetch("/api/assistant/workflow/result", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slip_id: btn.dataset.win, won: true, profit: parseFloat(profit) || 0 }),
-      });
-      fetchData();
+      await settleSlip(btn.dataset.win, true, parseFloat(profit) || 0);
     };
   });
   box.querySelectorAll("[data-loss]").forEach((btn) => {
     btn.onclick = async () => {
-      await fetch("/api/assistant/workflow/result", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slip_id: btn.dataset.loss, won: false }),
-      });
-      fetchData();
+      await settleSlip(btn.dataset.loss, false);
     };
   });
 }
@@ -278,7 +286,7 @@ async function fetchData() {
       $("statusText").textContent = "Loading live data…";
       $("connectionStatus").classList.remove("error");
     } else {
-      $("statusText").textContent = wf.can_place ? "Ready to assist" : "Stop / max slips";
+      $("statusText").textContent = "Ready to assist";
       $("connectionStatus").classList.add("live");
     }
 
@@ -378,10 +386,10 @@ $("browserAlerts").addEventListener("change", () => {
 });
 
 $("btnResetDay").addEventListener("click", async () => {
-  if (!confirm("Reset today's workflow counters?")) return;
+  if (!confirm("Reset session counters and start fresh?")) return;
   await fetch("/api/assistant/workflow/reset", { method: "POST" });
   fetchData();
-  BetAssistant.toast("Day reset");
+  BetAssistant.toast("Session reset");
 });
 
 fetchData();

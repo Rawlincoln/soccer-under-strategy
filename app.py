@@ -40,7 +40,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "5")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "6")
 
 
 def _no_cache(resp: Response) -> Response:

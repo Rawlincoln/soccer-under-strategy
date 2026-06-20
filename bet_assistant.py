@@ -23,8 +23,7 @@ ALERTS_PATH = DATA_DIR / "assistant_alerts.json"
 
 DAILY_TARGET = 100_000
 STAKE_PER_SLIP = 5_000
-MAX_SLIPS = 5
-MAX_LOSSES = 2
+MAX_LOSS_STREAK = 5
 
 WAVE_WINDOWS = {
     "wave1": {"half": "fh", "start": 15, "end": 20, "label": "Wave 1 · 1H anchor"},
@@ -86,7 +85,7 @@ class WorkflowState:
     wins: int = 0
     slips_placed: int = 0
     profit_recorded: float = 0.0
-    stop_loss_hit: bool = False
+    loss_streak: int = 0
     placed_slips: list[dict] = field(default_factory=list)
 
 
@@ -111,17 +110,16 @@ class AssistantStore:
             json.dump(data, f, indent=2)
 
     def load_state(self) -> WorkflowState:
-        today = date.today().isoformat()
         raw = self._read_json(STATE_PATH, {})
-        if raw.get("date") != today:
-            return WorkflowState(date=today)
+        if not raw:
+            return WorkflowState(date=_today())
         return WorkflowState(
-            date=today,
+            date=raw.get("date", _today()),
             losses=int(raw.get("losses", 0)),
             wins=int(raw.get("wins", 0)),
             slips_placed=int(raw.get("slips_placed", 0)),
             profit_recorded=float(raw.get("profit_recorded", 0)),
-            stop_loss_hit=bool(raw.get("stop_loss_hit", False)),
+            loss_streak=int(raw.get("loss_streak", 0)),
             placed_slips=list(raw.get("placed_slips", [])),
         )
 
@@ -432,48 +430,45 @@ def build_workflow(
     active_wave = next((w for w in waves if w["status"] == "ACTIVE"), None)
 
     recommendations: list[dict] = []
-    if not state.stop_loss_hit and state.slips_placed < MAX_SLIPS:
-        if active_wave and active_wave["id"] in ("wave1", "wave2"):
-            wave_accas = [a for a in accas if _acca_matches_wave(a, active_wave["id"])]
-            for acca in wave_accas[:2]:
-                slip = acca_to_slip(acca, stake, wave=active_wave["id"])
-                recommendations.append({
-                    "priority": "high" if active_wave["id"] == "wave1" else "medium",
-                    "reason": f"{active_wave['label']} — entry window open",
-                    "slip": asdict(slip),
-                })
-        for m in closing[:3]:
-            slip = lock_to_slip(m, stake)
+    if active_wave and active_wave["id"] in ("wave1", "wave2"):
+        wave_accas = [a for a in accas if _acca_matches_wave(a, active_wave["id"])]
+        for acca in wave_accas[:2]:
+            slip = acca_to_slip(acca, stake, wave=active_wave["id"])
             recommendations.append({
-                "priority": "high",
-                "reason": f"Goal Lock {m.get('lock_pct', 0):.0f}% — {m.get('minutes_left')}′ to {m.get('closing_target')}",
+                "priority": "high" if active_wave["id"] == "wave1" else "medium",
+                "reason": f"{active_wave['label']} — entry window open",
                 "slip": asdict(slip),
             })
-        if not recommendations and accas:
-            slip = acca_to_slip(accas[0], stake, wave="wave3")
-            recommendations.append({
-                "priority": "low",
-                "reason": "Best available acca (no active wave window)",
-                "slip": asdict(slip),
-            })
+    for m in closing[:3]:
+        slip = lock_to_slip(m, stake)
+        recommendations.append({
+            "priority": "high",
+            "reason": f"Goal Lock {m.get('lock_pct', 0):.0f}% — {m.get('minutes_left')}′ to {m.get('closing_target')}",
+            "slip": asdict(slip),
+        })
+    if not recommendations and accas:
+        slip = acca_to_slip(accas[0], stake, wave="wave3")
+        recommendations.append({
+            "priority": "low",
+            "reason": "Best available acca (no active wave window)",
+            "slip": asdict(slip),
+        })
 
     gap = max(0, target - state.profit_recorded)
-    slips_remaining = max(0, MAX_SLIPS - state.slips_placed)
 
     return {
         "date": state.date,
         "daily_target": target,
         "stake_per_slip": stake,
-        "max_slips": MAX_SLIPS,
-        "max_losses": MAX_LOSSES,
+        "max_loss_streak": MAX_LOSS_STREAK,
         "losses": state.losses,
         "wins": state.wins,
+        "loss_streak": state.loss_streak,
         "slips_placed": state.slips_placed,
-        "slips_remaining": slips_remaining,
         "profit_recorded": state.profit_recorded,
         "gap_to_target": gap,
-        "stop_loss_hit": state.stop_loss_hit,
-        "can_place": not state.stop_loss_hit and slips_remaining > 0,
+        "target_reached": state.profit_recorded >= target,
+        "can_place": True,
         "waves": waves,
         "active_wave": active_wave,
         "recommendations": recommendations,
@@ -483,10 +478,6 @@ def build_workflow(
 
 def record_slip_placed(slip_id: str, slip_type: str, stake: float, title: str) -> dict[str, Any]:
     state = STORE.load_state()
-    if state.stop_loss_hit:
-        return {"ok": False, "error": "Stop-loss active — max 2 losses reached"}
-    if state.slips_placed >= MAX_SLIPS:
-        return {"ok": False, "error": f"Max {MAX_SLIPS} slips per day reached"}
     state.slips_placed += 1
     state.placed_slips.append({
         "id": slip_id,
@@ -502,6 +493,8 @@ def record_slip_placed(slip_id: str, slip_type: str, stake: float, title: str) -
 
 def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str, Any]:
     state = STORE.load_state()
+    config = STORE.load_config()
+    target = float(config.get("daily_target", DAILY_TARGET))
     entry = next((s for s in state.placed_slips if s["id"] == slip_id and s.get("result") is None), None)
     if not entry:
         return {"ok": False, "error": "Slip not found or already settled"}
@@ -511,10 +504,29 @@ def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str
     if won:
         state.wins += 1
         state.profit_recorded += profit
+        state.loss_streak = 0
     else:
         state.losses += 1
-        if state.losses >= MAX_LOSSES:
-            state.stop_loss_hit = True
+        state.loss_streak += 1
+
+    reset_reason = None
+    if state.profit_recorded >= target:
+        reset_reason = "target_reached"
+    elif state.loss_streak >= MAX_LOSS_STREAK:
+        reset_reason = "loss_streak"
+
+    if reset_reason:
+        previous = asdict(state)
+        state = WorkflowState(date=_today())
+        STORE.save_state(state)
+        return {
+            "ok": True,
+            "state": asdict(state),
+            "session_reset": True,
+            "reset_reason": reset_reason,
+            "previous_session": previous,
+        }
+
     STORE.save_state(state)
     return {"ok": True, "state": asdict(state)}
 
@@ -575,15 +587,21 @@ def detect_alerts(
             })
             seen.add(aid)
 
-    if workflow.get("stop_loss_hit"):
-        aid = _alert_id("stop", "loss")
+    loss_streak = int(workflow.get("loss_streak") or 0)
+    max_streak = int(workflow.get("max_loss_streak") or MAX_LOSS_STREAK)
+    if loss_streak >= max(1, max_streak - 1):
+        aid = _alert_id("streak", str(loss_streak))
         if aid not in seen:
             new_alerts.append({
                 "id": aid,
-                "type": "stop_loss",
-                "priority": "critical",
-                "title": "Stop-loss hit",
-                "message": "2 slips lost today — stop placing bets for the rest of the day",
+                "type": "loss_streak",
+                "priority": "critical" if loss_streak >= max_streak else "high",
+                "title": f"{loss_streak}-loss streak",
+                "message": (
+                    f"{loss_streak} losses in a row — session resets after {max_streak}"
+                    if loss_streak < max_streak
+                    else f"{max_streak} losses in a row — session reset, fresh target started"
+                ),
                 "created_at": now,
             })
             seen.add(aid)

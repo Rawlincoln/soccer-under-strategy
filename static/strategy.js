@@ -1,6 +1,5 @@
 const DAILY_TARGET = 100000;
 const STAKE_PER_SLIP = 5000;
-const MAX_SLIPS = 5;
 const POLL_MS = 15000;
 
 const $ = (id) => document.getElementById(id);
@@ -52,7 +51,7 @@ function renderWaves() {
     <div class="wave-card">
       <div class="wave-time">Wave 3 · Late window</div>
       <h3>Closer slip(s)</h3>
-      <p>Up to <strong>2× 5,000</strong> on remaining 60%+ accas if still short of target and stop-loss not hit (max 2 losses).</p>
+      <p>Keep placing <strong>5,000</strong> on 60%+ accas until profit target or a 5-loss streak resets the session.</p>
       <div class="wave-target">Target profit: ~${fmtMoney(third)}</div>
     </div>
   `;
@@ -89,7 +88,7 @@ function renderLiveSlips(accas) {
   }
 
   let cumulative = 0;
-  const cards = accas.slice(0, MAX_SLIPS).map((a, i) => {
+  const cards = accas.map((a, i) => {
     const profit = profitFromStake(STAKE_PER_SLIP, a.combined_odds);
     cumulative += profit;
     const hitsTarget = profit >= DAILY_TARGET;
@@ -115,7 +114,7 @@ function renderLiveSlips(accas) {
   }).join("");
 
   const comboNote = accas.length > 1
-    ? `<div class="card-note" style="grid-column:1/-1">If all ${Math.min(accas.length, MAX_SLIPS)} slips win @ 5,000 each: <strong style="color:var(--green);font-family:var(--mono)">+${fmtMoney(cumulative)}</strong></div>`
+    ? `<div class="card-note" style="grid-column:1/-1">If all ${accas.length} slips win @ 5,000 each: <strong style="color:var(--green);font-family:var(--mono)">+${fmtMoney(cumulative)}</strong></div>`
     : "";
 
   box.innerHTML = comboNote + cards;
@@ -126,10 +125,12 @@ function renderLiveSlips(accas) {
 function renderWorkflowBanner(wf) {
   const banner = $("workflowBanner");
   if (!banner || !wf) return;
-  if (wf.stop_loss_hit) {
+  const streak = wf.loss_streak || 0;
+  const maxStreak = wf.max_loss_streak || 5;
+  if (streak >= maxStreak - 1 && streak > 0) {
     banner.hidden = false;
-    $("wfWave").textContent = "STOP-LOSS";
-    $("wfAction").textContent = "2 losses today — do not place more bets. Reset on Assistant if new day.";
+    $("wfWave").textContent = `${streak}L STREAK`;
+    $("wfAction").textContent = `${streak} losses in a row — session resets after ${maxStreak} consecutive losses.`;
     return;
   }
   const active = wf.active_wave;
@@ -142,7 +143,7 @@ function renderWorkflowBanner(wf) {
   if (wf.recommendations?.length) {
     banner.hidden = false;
     $("wfWave").textContent = "READY";
-    $("wfAction").textContent = `${wf.recommendations.length} slip(s) ready — ${wf.slips_remaining} remaining today`;
+    $("wfAction").textContent = `${wf.recommendations.length} slip(s) ready — no slip cap this session`;
     return;
   }
   banner.hidden = true;
@@ -169,8 +170,9 @@ async function fetchData() {
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${new Date(data.updated_at).toLocaleTimeString()}`;
     $("connectionStatus").classList.add("live");
-    const wfNote = workflowState?.stop_loss_hit ? " · STOP-LOSS" : workflowState?.active_wave ? ` · ${workflowState.active_wave.id}` : "";
-    $("statusText").textContent = `${data.accumulator_count ?? 0} accas · ${workflowState?.slips_placed ?? 0}/5 slips${wfNote}`;
+    const streak = workflowState?.loss_streak || 0;
+    const wfNote = streak >= 4 ? ` · ${streak}L streak` : workflowState?.active_wave ? ` · ${workflowState.active_wave.id}` : "";
+    $("statusText").textContent = `${data.accumulator_count ?? 0} accas · ${workflowState?.slips_placed ?? 0} slips${wfNote}`;
     renderLiveSlips(data.accumulators || []);
     renderWorkflowBanner(workflowState);
     if (asst.new_alerts?.length && typeof BetAssistant !== "undefined") {

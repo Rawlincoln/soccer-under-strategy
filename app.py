@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "20")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "21")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -136,17 +136,19 @@ def open_onexbet_match():
 <body>
   <div class="box">
     <h1>Open in 1xBet app</h1>
-    <p>Kenya app — tap the green button. Match opens in 1xBet: Sport Betting &amp; Casino.</p>
+    <p>Tap the green button — opens the match on <strong>1xbet.co.ke</strong> in your installed 1xBet app.</p>
     <div id="inapp-hint" class="hint" hidden>
       <strong>Using Telegram?</strong> Tap <strong>⋮</strong> (top right) → <strong>Open in Chrome</strong>,
       then tap the green button below.
     </div>
     <div id="settings-hint" class="hint" hidden>
-      <strong>App not opening?</strong> On your phone go to
-      <strong>Settings → Apps → 1xBet → Open by default</strong> and turn on
-      <strong>Open supported links</strong> for <strong>1xbet.co.ke</strong>.
+      <strong>One-time setup (required):</strong><br>
+      1. <strong>Settings → Apps → 1xBet</strong> (Sport Betting &amp; Casino)<br>
+      2. Tap <strong>Open by default</strong> → turn ON <strong>Open supported links</strong><br>
+      3. Add / enable <strong>1xbet.co.ke</strong><br>
+      Then links open the app instead of Play Store or browser.
     </div>
-    <button type="button" id="open-app" class="btn btn-primary">Open 1xBet App</button>
+    <button type="button" id="open-app" class="btn btn-primary">Open match in 1xBet app</button>
     <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
     <a id="open-web" class="btn btn-secondary" href="{https_url}">Open in browser instead</a>
     <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>

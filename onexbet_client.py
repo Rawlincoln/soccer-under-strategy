@@ -189,8 +189,6 @@ def onexbet_open_payload(
     pkg = android_package_for_site(site, package)
     return {
         "https": https_url,
-        "intent": onexbet_android_intent_url(https_url, site=site, package=pkg),
-        "android_app": onexbet_android_app_url(https_url, site=site, package=pkg),
         "package": pkg,
     }
 

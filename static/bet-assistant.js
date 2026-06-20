@@ -126,65 +126,23 @@ const BetAssistant = (() => {
     return onexbetAndroidPackage || guessAndroidPackage(siteBase());
   }
 
-  function androidIntentUrl(httpsUrl) {
-    try {
-      const u = new URL(httpsUrl);
-      const path = `${u.host}${u.pathname}${u.search}`;
-      return (
-        `intent://${path}#Intent;scheme=https;` +
-        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end"
-      );
-    } catch {
-      return httpsUrl;
-    }
-  }
-
-  function androidAppUrl(httpsUrl) {
-    const pkg = onexbetAndroidPackage || guessAndroidPackage(siteBase());
-    if (!pkg) return httpsUrl;
-    try {
-      const u = new URL(httpsUrl);
-      return `android-app://${pkg}/https/${u.host}${u.pathname}${u.search}`;
-    } catch {
-      return httpsUrl;
-    }
-  }
-
   function isInAppBrowser() {
     return /Telegram|WhatsApp|FBAN|FBAV|Instagram|Line\//i.test(navigator.userAgent || "");
   }
 
-  function tryOpenApp(httpsUrl) {
-    const intent = androidIntentUrl(httpsUrl);
-    const appUri = androidAppUrl(httpsUrl);
-    if (intent.indexOf("intent://") === 0) {
-      const frame = document.createElement("iframe");
-      frame.style.display = "none";
-      frame.src = intent;
-      document.body.appendChild(frame);
-      setTimeout(() => frame.remove(), 3000);
-      window.location.href = intent;
-    }
-    if (appUri.indexOf("android-app://") === 0) {
-      setTimeout(() => {
-        if (document.visibilityState !== "hidden") window.location.href = appUri;
-      }, 350);
-    }
-    setTimeout(() => {
-      if (document.visibilityState !== "hidden") {
-        toast("If the app did not open: Settings → Apps → 1xBet → Open by default → enable links");
-      }
-    }, 2200);
+  function showAppLinkHint() {
+    if (!isAndroid() || localStorage.getItem("pp_onexbet_hint_seen") === "1") return;
+    localStorage.setItem("pp_onexbet_hint_seen", "1");
+    toast(
+      "To open in the 1xBet app: Settings → Apps → 1xBet → Open by default → enable 1xbet.co.ke links",
+      5200
+    );
   }
 
   function matchLinkHref(httpsUrl) {
     const normalized = normalizeHttpsUrl(httpsUrl);
     if (!isMobile()) return normalized;
     if (isInAppBrowser()) return openerPageUrl(normalized);
-    if (isAndroid() && androidPackage()) {
-      const appUri = androidAppUrl(normalized);
-      if (appUri.indexOf("android-app://") === 0) return appUri;
-    }
     return normalized;
   }
 
@@ -231,13 +189,7 @@ const BetAssistant = (() => {
       window.location.href = openerPageUrl(httpsUrl);
       return;
     }
-    if (isAndroid() && androidPackage()) {
-      const appUri = androidAppUrl(httpsUrl);
-      if (appUri.indexOf("android-app://") === 0) {
-        window.location.href = appUri;
-        return;
-      }
-    }
+    showAppLinkHint();
     window.location.href = httpsUrl;
   }
 
@@ -298,7 +250,7 @@ const BetAssistant = (() => {
       a.dataset.baBound = "1";
       const httpsUrl = a.dataset.httpsUrl || a.getAttribute("href");
       if (httpsUrl && !a.dataset.httpsUrl) a.dataset.httpsUrl = httpsUrl;
-      if (isMobile() && httpsUrl && !/^intent:/i.test(a.getAttribute("href") || "")) {
+      if (isMobile() && httpsUrl) {
         a.setAttribute("href", matchLinkHref(httpsUrl));
       }
       a.onclick = (e) => {

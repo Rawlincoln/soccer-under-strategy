@@ -51,6 +51,11 @@ def basketball_page():
     return send_from_directory(STATIC, "basketball.html")
 
 
+@app.route("/closing")
+def closing_page():
+    return send_from_directory(STATIC, "closing.html")
+
+
 @app.route("/api/accumulators")
 def api_accumulators():
     _ensure_cache()
@@ -92,6 +97,18 @@ def api_basketball():
 def api_basketball_refresh():
     basketball_cache.refresh()
     return jsonify({"ok": True, "updated_at": basketball_cache.get().get("updated_at")})
+
+
+@app.route("/api/closing")
+def api_closing():
+    _ensure_cache()
+    return jsonify(cache.get_closing())
+
+
+@app.route("/api/closing/refresh", methods=["POST"])
+def api_closing_refresh():
+    cache.refresh()
+    return jsonify({"ok": True, "updated_at": cache.get_closing().get("updated_at")})
 
 
 @app.route("/health")

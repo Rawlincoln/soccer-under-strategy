@@ -3,28 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pro Punter · Basketball Q3</title>
+  <title>Pro Punter · Goal Lock</title>
   <link rel="stylesheet" href="/static/style.css?v=2" />
-  <link rel="stylesheet" href="/static/basketball.css?v=1" />
+  <link rel="stylesheet" href="/static/closing.css?v=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
 </head>
-<body class="basketball-page">
+<body class="closing-page">
   <header class="header">
     <div class="header-left">
       <div class="logo">
-        <span class="logo-icon">🏀</span>
+        <span class="logo-icon">🔒</span>
         <div>
-          <h1>Pro Punter · Basketball</h1>
-          <p class="subtitle">1xBet live · Q3 only · definite UNDER/OVER picks at 70%+ probability</p>
+          <h1>Pro Punter · Goal Lock</h1>
+          <p class="subtitle">FH 36′+ & SH 81′+ · 95%+ probability of no more goals before HT/FT · stats + history + market</p>
         </div>
       </div>
     </div>
     <div class="header-right">
       <nav class="nav-links">
         <a href="/">Soccer Live</a>
-        <a href="/closing">Goal Lock</a>
-        <a href="/basketball" class="active">Basketball Q3</a>
+        <a href="/closing" class="active">Goal Lock</a>
+        <a href="/basketball">Basketball Q3</a>
         <a href="/accumulator">Accumulators</a>
         <a href="/strategy">100K Strategy</a>
       </nav>
@@ -35,38 +35,25 @@
       <div class="meta">
         <span id="lastUpdate">—</span>
         <span class="sep">·</span>
-        <span id="matchCount">0 Q3 games</span>
+        <span id="matchCount">0 locks</span>
         <span class="sep">·</span>
-        <span id="liveTotal">0 live</span>
+        <span id="liveTotal">0 in window</span>
       </div>
     </div>
   </header>
 
   <section class="baselines" id="baselines"></section>
 
-  <section class="bet-signals" id="betSignalsSection" hidden>
-    <h2 class="section-title bet-title">
-      <span class="badge-live">SIGNALS</span>
-      Q3 over/under picks
-    </h2>
-    <div class="signals-grid" id="betSignals"></div>
-  </section>
-
   <section class="matches-section">
     <div class="section-header">
-      <h2 class="section-title">Live 3rd quarter · totals predictions</h2>
+      <h2 class="section-title">Late-period locks · 95%+ no more goals</h2>
       <button class="btn-refresh" id="btnRefresh" title="Force refresh">↻ Refresh</button>
     </div>
     <div class="matches-grid" id="matchesGrid">
-      <div class="loading">Loading 1xBet basketball…</div>
+      <div class="loading">Scanning closing-window matches…</div>
     </div>
   </section>
 
-  <footer class="footer">
-    Data: 1xBet basketball live · 3rd quarter filter · excludes cyber/NBA 2K/IPBL/esports ·
-    refreshes every <span id="refreshInterval">30</span>s
-  </footer>
-
-  <script src="/static/basketball.js?v=3"></script>
+  <script src="/static/closing.js?v=1"></script>
 </body>
 </html>

@@ -1,0 +1,148 @@
+.closing-page .nav-links a.active {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: rgba(255, 140, 50, 0.12);
+}
+
+.closing-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.closing-card.lock-pick {
+  border-color: rgba(255, 140, 50, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 140, 50, 0.15);
+}
+
+.closing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.closing-league {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.closing-teams {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-top: 2px;
+}
+
+.closing-clock {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--orange);
+  background: rgba(255, 140, 50, 0.12);
+  border: 1px solid rgba(255, 140, 50, 0.3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.closing-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.closing-score {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.closing-period {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.closing-lock-banner {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--orange);
+  background: linear-gradient(135deg, rgba(255, 140, 50, 0.18), rgba(255, 90, 30, 0.08));
+  border: 1px solid rgba(255, 140, 50, 0.45);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.closing-market {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.closing-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.closing-stat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+
+.closing-stat .num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.closing-stat .lbl {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.closing-signals {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.closing-signals li {
+  margin-bottom: 4px;
+}
+
+.closing-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.closing-empty strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+@media (max-width: 720px) {
+  .closing-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

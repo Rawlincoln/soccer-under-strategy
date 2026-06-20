@@ -14,6 +14,12 @@ from typing import Any, Optional
 import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
+from closing_window import (
+    MIN_LOCK_PCT,
+    build_closing_card,
+    closing_card_to_dict,
+    is_closing_window,
+)
 from combined_analysis import build_combined_analysis, combined_to_dict
 from filters import has_red_cards, is_excluded_match, is_excluded_raw
 from onexbet_client import OneXBetClient, OneXBetMatch
@@ -173,6 +179,11 @@ class DataCache:
             "baselines": {},
             "error": None,
         }
+        self._closing: dict[str, Any] = {
+            "updated_at": None,
+            "matches": [],
+            "error": None,
+        }
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -194,16 +205,22 @@ class DataCache:
 
     def refresh(self):
         try:
-            payload = build_dashboard_payload()
+            payload, closing_payload = build_all_payloads()
             with self._lock:
                 self._data = payload
+                self._closing = closing_payload
         except Exception as exc:
             with self._lock:
                 self._data["error"] = str(exc)
+                self._closing["error"] = str(exc)
 
     def get(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._data)
+
+    def get_closing(self) -> dict[str, Any]:
+        with self._lock:
+            return dict(self._closing)
 
 
 def _parse_kickoff(event: dict) -> Optional[datetime]:
@@ -696,8 +713,15 @@ def _build_half_time_card(
     )
 
 
-def build_dashboard_payload() -> dict[str, Any]:
+def _scan_live_football() -> tuple[
+    list[MatchCard],
+    list[dict],
+    list[dict],
+    list[dict],
+    dict[str, int],
+]:
     cards: list[MatchCard] = []
+    closing_cards: list[dict] = []
     bet_signals: list[dict] = []
     scored_under_15: list[dict] = []
     scored_under_25: list[dict] = []
@@ -713,6 +737,8 @@ def build_dashboard_payload() -> dict[str, Any]:
     fh_count = 0
     sh_count = 0
     ht_count = 0
+    closing_window_count = 0
+    closing_lock_count = 0
 
     for raw in raw_live:
         if is_excluded_raw(raw):
@@ -771,6 +797,40 @@ def build_dashboard_payload() -> dict[str, Any]:
                 continue
 
             live_stats = _onexbet_to_live_stats(m, half=half, period_stats=period_stats)
+            p_home = m.fh_home if half == "fh" else m.sh_home
+            p_away = m.fh_away if half == "fh" else m.sh_away
+            p_goals = m.fh_goals if half == "fh" else m.sh_goals
+            status = "1H" if half == "fh" else "2H"
+
+            if is_closing_window(m.minute, half):
+                closing_window_count += 1
+                closing = build_closing_card(
+                    event_id=str(m.game_id),
+                    home_team=m.home_team,
+                    away_team=m.away_team,
+                    league=m.league,
+                    score=f"{p_home} - {p_away}",
+                    minute=m.minute,
+                    period_minute=m.period_minute,
+                    half=half,
+                    period_goals=p_goals,
+                    period_score=f"{p_home}-{p_away}",
+                    full_score=f"{m.home_score}-{m.away_score}",
+                    live_stats=live_stats,
+                    prophit_stats=prophit_stats,
+                    soccerpunter_stats=soccerpunter_stats,
+                    fotmob_stats=fm_half,
+                    sportsdb_stats=sportsdb_stats,
+                    market_odds=odds_half,
+                    combined=combined,
+                    kickoff=m.period_name,
+                    status=status,
+                )
+                if closing:
+                    closing_lock_count += 1
+                    closing_cards.append(closing_card_to_dict(closing))
+                continue
+
             card = _build_match_card(
                 m, half, prophit_stats, soccerpunter_stats, fm_half,
                 sportsdb_stats, odds_half, preds, combined, live_stats,
@@ -784,7 +844,6 @@ def build_dashboard_payload() -> dict[str, Any]:
                 sh_count += 1
 
             card_dict = asdict(card)
-            p_goals = card.period_goals
             scored = p_goals >= 1
             for p in preds:
                 if not _qualifies_60(p):
@@ -816,6 +875,22 @@ def build_dashboard_payload() -> dict[str, Any]:
     scored_under_15.sort(key=lambda x: -x["pick"]["confidence"])
     scored_under_25.sort(key=lambda x: -x["pick"]["confidence"])
 
+    closing_cards.sort(key=lambda c: (-c["lock_pct"], c["minutes_left"]))
+
+    counts = {
+        "total_live": total_live,
+        "excluded_count": excluded_count,
+        "fh_count": fh_count,
+        "sh_count": sh_count,
+        "ht_count": ht_count,
+        "closing_window_count": closing_window_count,
+        "closing_lock_count": closing_lock_count,
+    }
+    return cards, closing_cards, bet_signals, scored_under_15, scored_under_25, counts
+
+
+def build_dashboard_payload() -> dict[str, Any]:
+    cards, _, bet_signals, scored_under_15, scored_under_25, counts = _scan_live_football()
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
 
@@ -823,11 +898,12 @@ def build_dashboard_payload() -> dict[str, Any]:
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "refresh_seconds": REFRESH_SECONDS,
         "source": "1xbet",
-        "total_live_football": total_live,
-        "excluded_count": excluded_count,
-        "first_half_count": fh_count,
-        "second_half_count": sh_count,
-        "half_time_count": ht_count,
+        "total_live_football": counts["total_live"],
+        "excluded_count": counts["excluded_count"],
+        "first_half_count": counts["fh_count"],
+        "second_half_count": counts["sh_count"],
+        "half_time_count": counts["ht_count"],
+        "closing_window_count": counts["closing_window_count"],
         "match_count": len(cards),
         "bet_signal_count": len(bet_signals),
         "scored_filter_count": sum(1 for c in cards if c.scored_filter),
@@ -849,3 +925,83 @@ def build_dashboard_payload() -> dict[str, Any]:
         "min_confidence": MIN_CONFIDENCE,
         "error": None,
     }
+
+
+def build_closing_payload() -> dict[str, Any]:
+    _, closing_cards, _, _, _, counts = _scan_live_football()
+    return {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "refresh_seconds": REFRESH_SECONDS,
+        "source": "1xbet",
+        "total_live_football": counts["total_live"],
+        "excluded_count": counts["excluded_count"],
+        "closing_window_count": counts["closing_window_count"],
+        "match_count": len(closing_cards),
+        "lock_count": counts["closing_lock_count"],
+        "min_lock_pct": MIN_LOCK_PCT,
+        "closing_start": {"fh": 36, "sh": 81},
+        "matches": closing_cards,
+        "prophitbet": PROPHIT_PROVIDER.status(),
+        "soccerpunter": SOCCERPUNTER_PROVIDER.status(),
+        "fotmob": FOTMOB_PROVIDER.status(),
+        "thesportsdb": SPORTSDB_PROVIDER.status(),
+        "error": None,
+    }
+
+
+def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
+    cards, closing_cards, bet_signals, scored_under_15, scored_under_25, counts = _scan_live_football()
+    updated = datetime.now(timezone.utc).isoformat()
+    match_dicts = [asdict(c) for c in cards]
+    accumulators = build_accumulators(match_dicts)
+
+    main = {
+        "updated_at": updated,
+        "refresh_seconds": REFRESH_SECONDS,
+        "source": "1xbet",
+        "total_live_football": counts["total_live"],
+        "excluded_count": counts["excluded_count"],
+        "first_half_count": counts["fh_count"],
+        "second_half_count": counts["sh_count"],
+        "half_time_count": counts["ht_count"],
+        "closing_window_count": counts["closing_window_count"],
+        "match_count": len(cards),
+        "bet_signal_count": len(bet_signals),
+        "scored_filter_count": sum(1 for c in cards if c.scored_filter),
+        "matches": match_dicts,
+        "bet_signals": bet_signals,
+        "scored_under_15": scored_under_15,
+        "scored_under_25": scored_under_25,
+        "accumulators": accumulators,
+        "baselines": {
+            "wc_under_15_pct": LEAGUE_BASELINES["default"]["under_15_fh_pct"],
+            "wc_avg_fh_goals": LEAGUE_BASELINES["default"]["avg_fh_goals"],
+            "wc_2026_observed": WC_2026_OBSERVED,
+            "time_decay_20_under_15": 100 - TIME_DECAY_0_0[20]["over_15_fh"],
+        },
+        "prophitbet": PROPHIT_PROVIDER.status(),
+        "soccerpunter": SOCCERPUNTER_PROVIDER.status(),
+        "fotmob": FOTMOB_PROVIDER.status(),
+        "thesportsdb": SPORTSDB_PROVIDER.status(),
+        "min_confidence": MIN_CONFIDENCE,
+        "error": None,
+    }
+    closing = {
+        "updated_at": updated,
+        "refresh_seconds": REFRESH_SECONDS,
+        "source": "1xbet",
+        "total_live_football": counts["total_live"],
+        "excluded_count": counts["excluded_count"],
+        "closing_window_count": counts["closing_window_count"],
+        "match_count": len(closing_cards),
+        "lock_count": counts["closing_lock_count"],
+        "min_lock_pct": MIN_LOCK_PCT,
+        "closing_start": {"fh": 36, "sh": 81},
+        "matches": closing_cards,
+        "prophitbet": PROPHIT_PROVIDER.status(),
+        "soccerpunter": SOCCERPUNTER_PROVIDER.status(),
+        "fotmob": FOTMOB_PROVIDER.status(),
+        "thesportsdb": SPORTSDB_PROVIDER.status(),
+        "error": None,
+    }
+    return main, closing

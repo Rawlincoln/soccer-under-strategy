@@ -54,8 +54,8 @@
     if (appBtn) appBtn.onclick = (e) => { e.preventDefault(); openMatch(); };
     if (webBtn) webBtn.onclick = (e) => { e.preventDefault(); openMatch(); };
 
-    if (isIOS && appBtn) {
-      appBtn.textContent = "Open match in 1xBet";
+    if (appBtn && !appBtn.textContent.includes("match")) {
+      appBtn.textContent = "Open match in 1xBet app";
     }
   }
 

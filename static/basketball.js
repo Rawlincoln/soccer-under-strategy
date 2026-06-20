@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 
 function link1x(item, label = "1xBet ↗") {
   if (typeof BetAssistant === "undefined") return "";
-  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "basketball");
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "basketball", item?.onexbet_url || "");
 }
 
 function fmtTime(iso) {
@@ -81,8 +81,8 @@ function renderMatchCard(m) {
       <span class="bb-pred-pick ${pickClass(p.pick)}">${p.label || `${p.pick} ${p.line}`}</span>
       <span class="bb-pred-conf">${Number(p.confidence).toFixed(0)}%</span>
       ${p.is_definite
-        ? BetAssistant.betLinkHtml({ ...p, event_id: m.event_id, league_id: m.league_id, game_odds: m.game_odds, q3_odds: m.q3_odds, recommendation: "BET" }, { label: "BET NOW", sport: "basketball" })
-        : BetAssistant.recBadgeHtml({ ...p, event_id: m.event_id, league_id: m.league_id, game_odds: m.game_odds, q3_odds: m.q3_odds }, { sport: "basketball" })}
+        ? BetAssistant.betLinkHtml({ ...p, event_id: m.event_id, league_id: m.league_id, onexbet_url: m.onexbet_url, game_odds: m.game_odds, q3_odds: m.q3_odds, recommendation: "BET" }, { label: "BET NOW", sport: "basketball" })
+        : BetAssistant.recBadgeHtml({ ...p, event_id: m.event_id, league_id: m.league_id, onexbet_url: m.onexbet_url, game_odds: m.game_odds, q3_odds: m.q3_odds }, { sport: "basketball" })}
     </div>
     <ul class="bb-signals">${(p.signals || []).slice(0, 5).map((s) => `<li>${s}</li>`).join("")}</ul>
   `).join("");

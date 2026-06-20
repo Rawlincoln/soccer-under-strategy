@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 function link1x(item, label = "1xBet ↗") {
   if (typeof BetAssistant === "undefined") return "";
-  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "football", item?.onexbet_url || "");
 }
 
 function fmtTime(iso) {
@@ -115,6 +115,7 @@ function renderPicks60(data) {
           recommendation: item.recommendation,
           event_id: item.event_id,
           league_id: item.league_id,
+          onexbet_url: item.card?.onexbet_url || item.onexbet_url,
           market: item.market,
           market_odds: item.pick?.market_odds || item.card?.market_odds,
         })}
@@ -154,6 +155,7 @@ function renderAcca(acca, stake) {
           recommendation: leg.recommendation,
           event_id: leg.event_id,
           league_id: leg.league_id,
+          onexbet_url: leg.onexbet_url,
           market: leg.market,
           estimated_odds: leg.estimated_odds,
         })}

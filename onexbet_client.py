@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any, Optional
 from urllib.parse import quote, urlparse
 
@@ -36,8 +39,143 @@ def onexbet_mobile_url(site: Optional[str] = None) -> str:
     return f"{get_onexbet_site(site)}/en/mobile?v=1"
 
 
-def onexbet_app_open_url(site: Optional[str] = None) -> str:
-    """Best URL for launching the native 1xBet Kenya app from a phone browser."""
+_CANONICAL_CACHE: dict[tuple[str, str, int, int], tuple[float, str]] = {}
+_CANONICAL_CACHE_LOCK = Lock()
+_CANONICAL_TTL_OK = 3600
+_CANONICAL_TTL_FAIL = 300
+_MATCH_RESOLVE_SESSION = requests.Session()
+_MATCH_RESOLVE_SESSION.headers.update({
+    "User-Agent": (
+        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+})
+
+_CANONICAL_META_PATTERNS = (
+    re.compile(r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']', re.I),
+    re.compile(r'<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']canonical["\']', re.I),
+    re.compile(r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)["\']', re.I),
+    re.compile(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:url["\']', re.I),
+)
+
+
+def _canonical_cache_key(
+    game_id: int,
+    league_id: int,
+    sport: str,
+    site: Optional[str] = None,
+) -> tuple[str, str, int, int]:
+    return (site_hostname(site), sport, int(league_id), int(game_id))
+
+
+def _extract_canonical_from_html(html: str, fallback: str) -> str:
+    for pattern in _CANONICAL_META_PATTERNS:
+        match = pattern.search(html or "")
+        if match:
+            url = match.group(1).strip()
+            if url.startswith("http"):
+                return url.rstrip("/")
+    return fallback
+
+
+def resolve_onexbet_match_url(
+    game_id: int | str,
+    league_id: Optional[int] = None,
+    *,
+    site: Optional[str] = None,
+    sport: str = "football",
+    session: Optional[requests.Session] = None,
+) -> str:
+    """Resolve a live match to its canonical slug URL (best for opening in the native app)."""
+    gid = int(game_id)
+    lid = int(league_id or 0)
+    numeric = onexbet_match_url(gid, lid or None, site=site, sport=sport)
+    if not lid:
+        return numeric
+
+    key = _canonical_cache_key(gid, lid, sport, site)
+    now = time.time()
+    with _CANONICAL_CACHE_LOCK:
+        cached = _CANONICAL_CACHE.get(key)
+        if cached and cached[0] > now:
+            return cached[1]
+
+    canonical = numeric
+    ok = False
+    try:
+        sess = session or _MATCH_RESOLVE_SESSION
+        resp = sess.get(
+            numeric,
+            timeout=18,
+            allow_redirects=True,
+            headers={"Referer": onexbet_live_url(site)},
+        )
+        if resp.status_code == 200:
+            ok = True
+            canonical = (resp.url or numeric).rstrip("/")
+            if re.search(r"/\d+/\d+$", canonical):
+                canonical = _extract_canonical_from_html(resp.text, canonical)
+    except requests.RequestException:
+        pass
+
+    ttl = _CANONICAL_TTL_OK if ok else _CANONICAL_TTL_FAIL
+    with _CANONICAL_CACHE_LOCK:
+        _CANONICAL_CACHE[key] = (now + ttl, canonical)
+    return canonical
+
+
+def resolve_onexbet_match_urls_batch(
+    matches: list[tuple[int, int, str]],
+    *,
+    site: Optional[str] = None,
+    max_workers: int = 8,
+) -> dict[tuple[int, int, str], str]:
+    """Resolve many match URLs concurrently (deduped, cached)."""
+    unique: dict[tuple[int, int, str], None] = {}
+    for game_id, league_id, sport in matches:
+        gid = int(game_id)
+        lid = int(league_id or 0)
+        if gid and lid:
+            unique[(gid, lid, sport or "football")] = None
+
+    if not unique:
+        return {}
+
+    results: dict[tuple[int, int, str], str] = {}
+    session = _MATCH_RESOLVE_SESSION
+    workers = min(max_workers, max(1, len(unique)))
+
+    def _resolve(item: tuple[int, int, str]) -> tuple[tuple[int, int, str], str]:
+        gid, lid, sport = item
+        return item, resolve_onexbet_match_url(gid, lid, site=site, sport=sport, session=session)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_resolve, item) for item in unique]
+        for future in as_completed(futures):
+            try:
+                key, url = future.result()
+                results[key] = url
+            except Exception:
+                pass
+    return results
+
+
+def onexbet_app_open_url(
+    site: Optional[str] = None,
+    game_id: int | str | None = None,
+    league_id: Optional[int] = None,
+    sport: str = "football",
+) -> str:
+    """Best URL for launching the native 1xBet app — exact match when IDs are provided."""
+    if game_id is not None and str(game_id).strip().isdigit():
+        return resolve_onexbet_match_url(
+            game_id,
+            league_id,
+            site=site,
+            sport=sport,
+        )
     return onexbet_mobile_url(site)
 
 

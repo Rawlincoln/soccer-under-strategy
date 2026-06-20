@@ -38,6 +38,7 @@ class AccaLeg:
     fusion_agreement: str = ""
     is_half_time: bool = False
     league_id: int = 0
+    onexbet_url: str = ""
 
 
 @dataclass
@@ -264,6 +265,7 @@ def _make_leg(entry: dict) -> AccaLeg:
         fusion_verdict=fusion.get("verdict", ""),
         fusion_agreement=fusion.get("agreement", ""),
         is_half_time=card.get("is_half_time", False),
+        onexbet_url=card.get("onexbet_url", ""),
     )
 
 

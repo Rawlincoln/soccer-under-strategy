@@ -32,7 +32,9 @@ from onexbet_client import (
     OneXBetMatch,
     onexbet_app_open_url,
     onexbet_live_url,
+    onexbet_match_url,
     onexbet_mobile_url,
+    resolve_onexbet_match_urls_batch,
 )
 from prophitbet_stats import PROPHIT_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
@@ -177,6 +179,7 @@ class MatchCard:
     period_name: str = ""
     period_minute: int = 0
     league_id: int = 0
+    onexbet_url: str = ""
 
 
 class DataCache:
@@ -747,8 +750,51 @@ def _build_half_time_card(
     )
 
 
+def _attach_onexbet_urls(
+    cards: list[MatchCard],
+    closing_cards: list[dict],
+    bet_signals: list[dict],
+    scored_under_15: list[dict],
+    scored_under_25: list[dict],
+) -> None:
+    site = effective_onexbet_site()
+    keys: list[tuple[int, int, str]] = []
+    for card in cards:
+        if card.event_id.isdigit() and card.league_id:
+            keys.append((int(card.event_id), card.league_id, "football"))
+    for row in closing_cards:
+        eid = str(row.get("event_id", ""))
+        lid = int(row.get("league_id") or 0)
+        if eid.isdigit() and lid:
+            keys.append((int(eid), lid, "football"))
+
+    resolved = resolve_onexbet_match_urls_batch(keys, site=site) if keys else {}
+
+    def _url_for(event_id: str, league_id: int) -> str:
+        if event_id.isdigit() and league_id:
+            key = (int(event_id), int(league_id), "football")
+            return resolved.get(key) or onexbet_match_url(event_id, league_id, site=site)
+        if event_id.isdigit():
+            return onexbet_match_url(event_id, None, site=site)
+        return onexbet_live_url(site)
+
+    for card in cards:
+        card.onexbet_url = _url_for(card.event_id, card.league_id)
+
+    for row in closing_cards:
+        row["onexbet_url"] = _url_for(str(row.get("event_id", "")), int(row.get("league_id") or 0))
+
+    for row in bet_signals:
+        row["onexbet_url"] = _url_for(str(row.get("event_id", "")), int(row.get("league_id") or 0))
+
+    for bucket in (scored_under_15, scored_under_25):
+        for row in bucket:
+            row["onexbet_url"] = _url_for(str(row.get("event_id", "")), int(row.get("league_id") or 0))
+
+
 def _scan_live_football() -> tuple[
     list[MatchCard],
+    list[dict],
     list[dict],
     list[dict],
     list[dict],
@@ -916,6 +962,8 @@ def _scan_live_football() -> tuple[
     scored_under_25.sort(key=lambda x: -x["pick"]["confidence"])
 
     closing_cards.sort(key=lambda c: (-c["lock_pct"], c["minutes_left"]))
+
+    _attach_onexbet_urls(cards, closing_cards, bet_signals, scored_under_15, scored_under_25)
 
     counts = {
         "total_live": total_live,

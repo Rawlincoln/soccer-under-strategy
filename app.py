@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "22")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "23")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -108,10 +108,15 @@ def open_onexbet_match():
     pkg = effective_onexbet_android_package(config)
     if game_id.isdigit():
         lid = int(league_id) if league_id.isdigit() else None
-        match_url = onexbet_match_url(game_id, lid, site=site, sport=sport)
+        match_url = onexbet_app_open_url(
+            site,
+            game_id=game_id,
+            league_id=lid,
+            sport=sport,
+        )
     else:
         match_url = onexbet_live_url(site)
-    https_url = onexbet_app_open_url(site)
+    https_url = match_url
     payload = {"https": https_url, "match": match_url, "package": pkg}
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -137,8 +142,8 @@ def open_onexbet_match():
 <body>
   <div class="box">
     <h1>Open in 1xBet app</h1>
-    <p>Tap the green button — opens the <strong>1xBet app</strong> via <strong>1xbet.co.ke/en/mobile</strong>.</p>
-    <p style="font-size:0.8rem;color:#8b949e;margin-top:-8px">Match link (in app → Live Football): <a href="{match_url}" style="color:#3fb950">{match_url}</a></p>
+    <p>Tap the green button — opens this <strong>exact match</strong> in the <strong>1xBet app</strong>.</p>
+    <p style="font-size:0.8rem;color:#8b949e;margin-top:-8px">Match: <a href="{match_url}" style="color:#3fb950">{match_url}</a></p>
     <div id="inapp-hint" class="hint" hidden>
       <strong>Using Telegram?</strong> Tap <strong>⋮</strong> (top right) → <strong>Open in Chrome</strong>,
       then tap the green button below.
@@ -150,7 +155,7 @@ def open_onexbet_match():
       3. Add / enable <strong>1xbet.co.ke</strong><br>
       Then links open the app instead of Play Store or browser.
     </div>
-    <button type="button" id="open-app" class="btn btn-primary">Open 1xBet app</button>
+    <button type="button" id="open-app" class="btn btn-primary">Open match in 1xBet app</button>
     <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
     <a id="open-web" class="btn btn-secondary" href="{match_url}">Open match in browser</a>
     <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
@@ -160,6 +165,26 @@ def open_onexbet_match():
 </body>
 </html>"""
     return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))
+
+
+@app.route("/api/onexbet/match-link")
+def api_onexbet_match_link():
+    game_id = request.args.get("game_id", "").strip()
+    league_id = request.args.get("league_id", "").strip()
+    sport = request.args.get("sport", "football").strip() or "football"
+    config = STORE.load_config()
+    site = effective_onexbet_site(config)
+    if not game_id.isdigit():
+        return jsonify({"error": "game_id required"}), 400
+    lid = int(league_id) if league_id.isdigit() else None
+    url = onexbet_app_open_url(site, game_id=game_id, league_id=lid, sport=sport)
+    return jsonify({
+        "game_id": int(game_id),
+        "league_id": lid,
+        "sport": sport,
+        "url": url,
+        "numeric_url": onexbet_match_url(game_id, lid, site=site, sport=sport),
+    })
 
 
 @app.route("/api/accumulators")

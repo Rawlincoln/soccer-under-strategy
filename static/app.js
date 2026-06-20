@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 
 function link1x(item, label = "1xBet ↗") {
   if (typeof BetAssistant === "undefined") return "";
-  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "football", item?.onexbet_url || "");
 }
 
 function fmtTime(iso) {
@@ -273,7 +273,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
         <div style="font-size:0.82rem;color:var(--muted);margin:8px 0">${marketLabel}</div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
           <span class="conf-big">${fmtConf(p.confidence)}%</span>
-          ${BetAssistant.recBadgeHtml({ ...p, event_id: item.event_id, league_id: item.league_id, market_odds: p.market_odds || item.market_odds })}
+          ${BetAssistant.recBadgeHtml({ ...p, event_id: item.event_id, league_id: item.league_id, onexbet_url: item.onexbet_url, market_odds: p.market_odds || item.market_odds })}
         </div>
         <div class="mini-stats">
           <span class="mini-minute">${fmtMinute(item, item.half)}</span>
@@ -308,7 +308,7 @@ function renderBetSignals(signals) {
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <span class="conf-big">${Math.round(p.confidence)}%</span>
-        ${BetAssistant.betLinkHtml(p, { label: "BET NOW" })}
+        ${BetAssistant.betLinkHtml({ ...p, onexbet_url: p.onexbet_url }, { label: "BET NOW" })}
       </div>
       <ul class="signals-list">${(p.signals || []).slice(0, 4).map((s) => `<li>${s}</li>`).join("")}</ul>
     </div>
@@ -353,7 +353,7 @@ function renderMatchCard(m) {
         <div class="confidence-bar ${confClass(p.confidence)}" style="width:${p.confidence}%"></div>
       </div>
       <span class="confidence-pct">${fmtConf(p.confidence)}%</span>
-      ${BetAssistant.recBadgeHtml({ ...p, event_id: m.event_id, league_id: m.league_id, market_odds: p.market_odds || m.market_odds })}
+      ${BetAssistant.recBadgeHtml({ ...p, event_id: m.event_id, league_id: m.league_id, onexbet_url: m.onexbet_url, market_odds: p.market_odds || m.market_odds })}
     </div>
   `).join("");
 

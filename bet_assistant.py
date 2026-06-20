@@ -206,16 +206,35 @@ def _leg_match_url(
     event_id: str,
     league_id: int = 0,
     config: Optional[dict] = None,
+    sport: str = "football",
 ) -> str:
     site = effective_onexbet_site(config)
     if event_id and str(event_id).isdigit():
-        return onexbet_match_url(event_id, league_id or None, site=site)
+        return onexbet_app_open_url(
+            site,
+            game_id=event_id,
+            league_id=league_id or None,
+            sport=sport,
+        )
     return onexbet_live_url(site)
 
 
-def _app_open_url(config: Optional[dict] = None) -> str:
-    """Phone link that opens the installed 1xBet app (Kenya /en/mobile page)."""
-    return onexbet_app_open_url(effective_onexbet_site(config))
+def _app_open_url(
+    config: Optional[dict] = None,
+    event_id: str = "",
+    league_id: int = 0,
+    sport: str = "football",
+) -> str:
+    """Phone link that opens the installed 1xBet app on the exact live match."""
+    site = effective_onexbet_site(config)
+    if event_id and str(event_id).isdigit():
+        return onexbet_app_open_url(
+            site,
+            game_id=event_id,
+            league_id=league_id or None,
+            sport=sport,
+        )
+    return onexbet_app_open_url(site)
 
 
 def _telegram_match_link(
@@ -265,7 +284,7 @@ def _format_telegram_alert(alert: dict, config: Optional[dict] = None) -> str:
                 lines.append(f"⚽ {label}")
                 lines.append(f"📱 Tap to open app:\n{link}")
                 if direct and direct != link:
-                    lines.append(f"🌐 Or on website:\n{direct}")
+                    lines.append(f"📲 Direct match (opens in app):\n{direct}")
     elif alert.get("type") == "loss_streak":
         lines.append(f"\n⚽ Live football")
         lines.append(f"📱 Tap to open app:\n{_telegram_match_link('', 0, config=config)}")
@@ -807,7 +826,7 @@ def detect_alerts(
         eid = str(m.get("event_id", ""))
         lid = int(m.get("league_id") or 0)
         tg_link = _telegram_match_link(eid, lid)
-        direct_link = _app_open_url()
+        direct_link = _app_open_url(event_id=eid, league_id=lid)
         new_alerts.append({
             "id": aid,
             "type": "goal_lock",
@@ -844,7 +863,7 @@ def detect_alerts(
                 leg_links.append({
                     "match": label,
                     "url": _telegram_match_link(eid, leg_lid),
-                    "direct_url": _app_open_url(),
+                    "direct_url": _app_open_url(event_id=eid, league_id=leg_lid),
                 })
             new_alerts.append({
                 "id": aid,

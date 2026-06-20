@@ -149,7 +149,7 @@ const BetAssistant = (() => {
     const normalized = normalizeHttpsUrl(httpsUrl);
     if (!isMobile()) return normalized;
     if (isInAppBrowser()) return openerPageUrl(normalized);
-    return appOpenUrl();
+    return normalized;
   }
 
   function mobileOpenUrl(httpsUrl) {
@@ -196,7 +196,7 @@ const BetAssistant = (() => {
       return;
     }
     showAppLinkHint();
-    window.location.href = appOpenUrl();
+    window.location.href = httpsUrl;
   }
 
   function oddsForMarket(item) {
@@ -227,7 +227,14 @@ const BetAssistant = (() => {
     const label = opts.label || "BET NOW";
     const odds = oddsForMarket(item);
     const text = odds ? `${label} @ ${Number(odds).toFixed(2)}` : label;
-    return matchLinkHtml(gid, item.league_id, text, "rec-badge bet ba-1xbet-link", sport);
+    return matchLinkHtml(
+      gid,
+      item.league_id,
+      text,
+      "rec-badge bet ba-1xbet-link",
+      sport,
+      item.onexbet_url || "",
+    );
   }
 
   function recBadgeHtml(item, opts = {}) {
@@ -241,10 +248,17 @@ const BetAssistant = (() => {
     return `<span class="rec-badge ${cls}">${rec || opts.fallback || "—"}</span>`;
   }
 
-  function matchLinkHtml(eventId, leagueId, label = "1xBet ↗", className = "ba-match-link ba-1xbet-link", sport = "football") {
+  function matchLinkHtml(
+    eventId,
+    leagueId,
+    label = "1xBet ↗",
+    className = "ba-match-link ba-1xbet-link",
+    sport = "football",
+    onexbetUrl = "",
+  ) {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return "";
-    const httpsUrl = matchUrl(eventId, leagueId, sport);
+    const httpsUrl = onexbetUrl || matchUrl(eventId, leagueId, sport);
     const href = matchLinkHref(httpsUrl);
     const blank = isMobile() ? "" : ' target="_blank" rel="noopener"';
     return `<a href="${href}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
@@ -506,7 +520,7 @@ const BetAssistant = (() => {
       half: leg.half,
       event_id: leg.event_id,
       league_id: leg.league_id,
-      onexbet_url: matchUrl(leg.event_id, leg.league_id),
+      onexbet_url: leg.onexbet_url || matchUrl(leg.event_id, leg.league_id),
       recommendation: leg.recommendation,
     }));
     const odds = acca.combined_odds || 1;
@@ -549,7 +563,7 @@ const BetAssistant = (() => {
   }
 
   function slipFromLock(m, stake) {
-    const url = matchUrl(m.event_id, m.league_id);
+    const url = m.onexbet_url || matchUrl(m.event_id, m.league_id);
     const slip = {
       id: `lock-${m.event_id}-${m.half}`,
       slip_type: "goal_lock",

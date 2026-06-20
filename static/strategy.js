@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 function link1x(item, label = "1xBet ↗") {
   if (typeof BetAssistant === "undefined") return "";
-  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label);
+  return BetAssistant.matchLinkHtml(item?.event_id, item?.league_id, label, "ba-match-link ba-1xbet-link", "football", item?.onexbet_url || "");
 }
 
 function fmtMoney(n) {

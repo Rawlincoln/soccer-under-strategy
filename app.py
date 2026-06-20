@@ -4,7 +4,7 @@ import os
 from dataclasses import asdict
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 from basketball_engine import REFRESH_SECONDS as BB_REFRESH_SECONDS, BasketballCache
 from bet_assistant import (
@@ -38,36 +38,51 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "4")
+
+
+def _no_cache(resp: Response) -> Response:
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+def _serve_html(filename: str) -> Response:
+    path = STATIC / filename
+    html = path.read_text(encoding="utf-8")
+    html = html.replace("{{ASSET_VERSION}}", ASSET_VERSION)
+    return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))
 
 
 @app.route("/")
 def index():
-    return send_from_directory(STATIC, "index.html")
+    return _serve_html("index.html")
 
 
 @app.route("/accumulator")
 def accumulator_page():
-    return send_from_directory(STATIC, "accumulator.html")
+    return _serve_html("accumulator.html")
 
 
 @app.route("/strategy")
 def strategy_page():
-    return send_from_directory(STATIC, "strategy.html")
+    return _serve_html("strategy.html")
 
 
 @app.route("/basketball")
 def basketball_page():
-    return send_from_directory(STATIC, "basketball.html")
+    return _serve_html("basketball.html")
 
 
 @app.route("/closing")
 def closing_page():
-    return send_from_directory(STATIC, "closing.html")
+    return _serve_html("closing.html")
 
 
 @app.route("/assistant")
 def assistant_page():
-    return send_from_directory(STATIC, "assistant.html")
+    return _serve_html("assistant.html")
 
 
 @app.route("/api/accumulators")
@@ -85,7 +100,7 @@ def api_accumulators():
 def static_files(filename):
     resp = send_from_directory(STATIC, filename)
     if filename.endswith((".js", ".html", ".css")):
-        resp.headers["Cache-Control"] = "no-cache"
+        return _no_cache(resp)
     return resp
 
 

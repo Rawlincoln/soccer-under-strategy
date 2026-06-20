@@ -135,7 +135,6 @@ class Prediction:
 @dataclass
 class MatchCard:
     event_id: str
-    league_id: int = 0
     home_team: str
     away_team: str
     league: str
@@ -167,6 +166,7 @@ class MatchCard:
     is_half_time: bool = False
     period_name: str = ""
     period_minute: int = 0
+    league_id: int = 0
 
 
 class DataCache:

@@ -31,7 +31,6 @@ def closing_target(half: str) -> str:
 @dataclass
 class ClosingCard:
     event_id: str
-    league_id: int = 0
     home_team: str
     away_team: str
     league: str
@@ -57,6 +56,7 @@ class ClosingCard:
     combined_analysis: Optional[dict] = None
     kickoff: str = ""
     status: str = ""
+    league_id: int = 0
 
 
 def _time_base_lock(period_goals: int, mins_left: int) -> float:

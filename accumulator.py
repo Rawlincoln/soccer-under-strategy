@@ -16,7 +16,6 @@ MIN_CONFIDENCE = 60
 @dataclass
 class AccaLeg:
     event_id: str
-    league_id: int = 0
     match: str
     home_team: str
     away_team: str
@@ -38,6 +37,7 @@ class AccaLeg:
     fusion_verdict: str = ""
     fusion_agreement: str = ""
     is_half_time: bool = False
+    league_id: int = 0
 
 
 @dataclass

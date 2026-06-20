@@ -142,8 +142,48 @@ def onexbet_android_intent_url(https_url: str, site: Optional[str] = None, packa
     fallback = quote(https_url, safe="")
     return (
         f"intent://{path}#Intent;scheme=https;package={pkg};"
+        f"action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;"
         f"S.browser_fallback_url={fallback};end"
     )
+
+
+def onexbet_android_app_url(
+    https_url: str,
+    site: Optional[str] = None,
+    package: Optional[str] = None,
+) -> str:
+    """android-app:// URI — alternate deep-link format for WebView taps."""
+    pkg = android_package_for_site(site, package)
+    if not pkg:
+        return https_url
+    parsed = urlparse(https_url)
+    if not parsed.scheme.startswith("http"):
+        return https_url
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    return f"android-app://{pkg}/https/{parsed.hostname}{path}"
+
+
+def onexbet_play_store_url(site: Optional[str] = None, package: Optional[str] = None) -> str:
+    pkg = android_package_for_site(site, package)
+    return f"market://details?id={pkg}" if pkg else ""
+
+
+def onexbet_open_payload(
+    https_url: str,
+    site: Optional[str] = None,
+    package: Optional[str] = None,
+) -> dict[str, str]:
+    """All URLs/strategies for opening the regional 1xBet Android app."""
+    pkg = android_package_for_site(site, package)
+    return {
+        "https": https_url,
+        "intent": onexbet_android_intent_url(https_url, site=site, package=pkg),
+        "android_app": onexbet_android_app_url(https_url, site=site, package=pkg),
+        "package": pkg,
+        "play_store": onexbet_play_store_url(site=site, package=pkg),
+    }
 
 
 STAT_MAP = {

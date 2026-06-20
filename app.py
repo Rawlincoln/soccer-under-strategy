@@ -23,9 +23,9 @@ from bet_assistant import (
     test_telegram,
 )
 from onexbet_client import (
-    onexbet_android_intent_url,
     onexbet_live_url,
     onexbet_match_url,
+    onexbet_open_payload,
 )
 from engine import REFRESH_SECONDS, DataCache
 
@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "16")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "17")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -99,7 +99,7 @@ def assistant_page():
 
 @app.route("/open/1xbet")
 def open_onexbet_match():
-    """Mobile redirect: Telegram/external link → 1xBet Kenya app (Android intent) or site."""
+    """Landing page: tap → 1xBet Kenya app (Android intent). Works from Telegram after Open in Chrome."""
     game_id = request.args.get("game_id", "").strip()
     league_id = request.args.get("league_id", "").strip()
     sport = request.args.get("sport", "football").strip() or "football"
@@ -111,7 +111,7 @@ def open_onexbet_match():
         https_url = onexbet_match_url(game_id, lid, site=site, sport=sport)
     else:
         https_url = onexbet_live_url(site)
-    intent_url = onexbet_android_intent_url(https_url, site=site, package=pkg)
+    payload = onexbet_open_payload(https_url, site=site, package=pkg)
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,25 +121,34 @@ def open_onexbet_match():
   <style>
     body {{ font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3;
       display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }}
-    .box {{ text-align: center; max-width: 320px; }}
-    a {{ color: #3fb950; font-weight: 700; }}
+    .box {{ text-align: center; max-width: 360px; width: 100%; }}
+    h1 {{ font-size: 1.25rem; margin: 0 0 8px; }}
+    p {{ color: #8b949e; font-size: 0.9rem; line-height: 1.45; margin: 0 0 16px; }}
+    .btn {{ display: block; width: 100%; box-sizing: border-box; margin: 10px 0; padding: 14px 16px;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none; }}
+    .btn-primary {{ background: #238636; color: #fff; }}
+    .btn-secondary {{ background: #21262d; color: #e6edf3; border: 1px solid #30363d; }}
+    .hint {{ background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; margin-bottom: 16px;
+      font-size: 0.85rem; color: #c9d1d9; text-align: left; }}
+    .pkg {{ font-size: 0.75rem; color: #6e7681; margin-top: 12px; word-break: break-all; }}
   </style>
 </head>
 <body>
   <div class="box">
-    <p>Opening 1xBet…</p>
-    <p><a id="fallback" href="{https_url}">Tap here if the app does not open</a></p>
+    <h1>Open in 1xBet app</h1>
+    <p>Kenya app — tap the green button. Match opens in 1xBet: Sport Betting &amp; Casino.</p>
+    <div id="inapp-hint" class="hint" hidden>
+      <strong>Using Telegram?</strong> Tap <strong>⋮</strong> (top right) → <strong>Open in Chrome</strong>,
+      then tap the green button below.
+    </div>
+    <button type="button" id="open-app" class="btn btn-primary">Open 1xBet App</button>
+    <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
+    <a id="open-web" class="btn btn-secondary" href="{https_url}">Open on 1xbet.co.ke</a>
+    <button type="button" id="install-app" class="btn btn-secondary" hidden>Install from Play Store</button>
+    <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
   </div>
-  <script>
-    const httpsUrl = {json.dumps(https_url)};
-    const intentUrl = {json.dumps(intent_url)};
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    if (isAndroid && intentUrl.indexOf("intent://") === 0) {{
-      window.location.replace(intentUrl);
-    }} else {{
-      window.location.replace(httpsUrl);
-    }}
-  </script>
+  <script>window.ONEXBET_OPEN = {json.dumps(payload)};</script>
+  <script src="/static/open-1xbet.js?v={ASSET_VERSION}"></script>
 </body>
 </html>"""
     return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))

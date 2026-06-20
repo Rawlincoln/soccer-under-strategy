@@ -254,10 +254,18 @@ def _format_telegram_alert(alert: dict, config: Optional[dict] = None) -> str:
         for item in entries:
             label = item.get("match") or "Open on 1xBet"
             link = item.get("url") or ""
+            direct = item.get("direct_url") or ""
             if link:
-                lines.append(f"⚽ {label}\n{link}")
+                lines.append(f"⚽ {label}")
+                lines.append(f"📱 Tap to open app:\n{link}")
+                if direct and direct != link:
+                    lines.append(f"🌐 Or on website:\n{direct}")
     elif alert.get("type") == "loss_streak":
-        lines.append(f"\n⚽ Live football\n{_telegram_match_link('', 0, config=config)}")
+        lines.append(f"\n⚽ Live football")
+        lines.append(f"📱 Tap to open app:\n{_telegram_match_link('', 0, config=config)}")
+        lines.append(f"🌐 Or on website:\n{_leg_match_url('', 0, config)}")
+    if entries or alert.get("type") == "loss_streak":
+        lines.append("\n💡 In Telegram: tap ⋮ → Open in Chrome, then tap the app link.")
     lines.append("\nPro Punter → Betting Assistant")
     return "\n".join(lines)
 
@@ -790,10 +798,10 @@ def detect_alerts(
         if aid in seen:
             continue
         match_label = _match_label(m.get("home_team", ""), m.get("away_team", ""))
-        tg_link = _telegram_match_link(
-            str(m.get("event_id", "")),
-            int(m.get("league_id") or 0),
-        )
+        eid = str(m.get("event_id", ""))
+        lid = int(m.get("league_id") or 0)
+        tg_link = _telegram_match_link(eid, lid)
+        direct_link = _leg_match_url(eid, lid)
         new_alerts.append({
             "id": aid,
             "type": "goal_lock",
@@ -805,7 +813,7 @@ def detect_alerts(
             "event_id": m.get("event_id"),
             "league_id": m.get("league_id"),
             "onexbet_url": tg_link,
-            "onexbet_urls": [{"match": match_label, "url": tg_link}],
+            "onexbet_urls": [{"match": match_label, "url": tg_link, "direct_url": direct_link}],
         })
         seen.add(aid)
 
@@ -826,9 +834,11 @@ def detect_alerts(
                 label = leg.get("match") or _match_label(
                     leg.get("home_team", ""), leg.get("away_team", ""),
                 )
+                leg_lid = int(leg.get("league_id") or 0)
                 leg_links.append({
                     "match": label,
-                    "url": _telegram_match_link(eid, int(leg.get("league_id") or 0)),
+                    "url": _telegram_match_link(eid, leg_lid),
+                    "direct_url": _leg_match_url(eid, leg_lid),
                 })
             new_alerts.append({
                 "id": aid,

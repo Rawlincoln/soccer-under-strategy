@@ -129,18 +129,54 @@ const BetAssistant = (() => {
       const u = new URL(httpsUrl);
       const path = `${u.host}${u.pathname}${u.search}`;
       const fallback = encodeURIComponent(httpsUrl);
-      return `intent://${path}#Intent;scheme=https;package=${pkg};S.browser_fallback_url=${fallback};end`;
+      return (
+        `intent://${path}#Intent;scheme=https;package=${pkg};` +
+        "action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;" +
+        `S.browser_fallback_url=${fallback};end`
+      );
     } catch {
       return httpsUrl;
     }
   }
 
-  function mobileOpenUrl(httpsUrl) {
-    const normalized = normalizeHttpsUrl(httpsUrl);
-    if (isAndroid() && (onexbetAndroidPackage || guessAndroidPackage(siteBase()))) {
-      return androidIntentUrl(normalized);
+  function androidAppUrl(httpsUrl) {
+    const pkg = onexbetAndroidPackage || guessAndroidPackage(siteBase());
+    if (!pkg) return httpsUrl;
+    try {
+      const u = new URL(httpsUrl);
+      return `android-app://${pkg}/https/${u.host}${u.pathname}${u.search}`;
+    } catch {
+      return httpsUrl;
     }
-    return normalized;
+  }
+
+  function isInAppBrowser() {
+    return /Telegram|WhatsApp|FBAN|FBAV|Instagram|Line\//i.test(navigator.userAgent || "");
+  }
+
+  function tryOpenApp(httpsUrl) {
+    const intent = androidIntentUrl(httpsUrl);
+    const appUri = androidAppUrl(httpsUrl);
+    if (intent.indexOf("intent://") === 0) {
+      const frame = document.createElement("iframe");
+      frame.style.display = "none";
+      frame.src = intent;
+      document.body.appendChild(frame);
+      setTimeout(() => frame.remove(), 3000);
+      window.location.href = intent;
+    }
+    if (appUri.indexOf("android-app://") === 0) {
+      setTimeout(() => {
+        if (document.visibilityState !== "hidden") window.location.href = appUri;
+      }, 400);
+    }
+    setTimeout(() => {
+      if (document.visibilityState !== "hidden") window.location.href = httpsUrl;
+    }, 1800);
+  }
+
+  function mobileOpenUrl(httpsUrl) {
+    return normalizeHttpsUrl(httpsUrl);
   }
 
   function matchUrl(eventId, leagueId, sport = "football") {
@@ -154,23 +190,47 @@ const BetAssistant = (() => {
     return `${base}/en/live/${sport}/${gid}`;
   }
 
+  function openerPageUrl(httpsUrl) {
+    try {
+      const u = new URL(httpsUrl);
+      const parts = u.pathname.split("/").filter(Boolean);
+      const gid = parts[parts.length - 1];
+      const lid = parts.length >= 2 ? parts[parts.length - 2] : "";
+      const sportIdx = parts.indexOf("live");
+      const sport = sportIdx >= 0 && parts[sportIdx + 1] ? parts[sportIdx + 1] : "football";
+      if (/^\d+$/.test(gid)) {
+        const params = new URLSearchParams({ game_id: gid });
+        if (/^\d+$/.test(lid)) params.set("league_id", lid);
+        if (sport && sport !== "football") params.set("sport", sport);
+        return `${window.location.origin}/open/1xbet?${params}`;
+      }
+    } catch { /* ignore */ }
+    return `${window.location.origin}/open/1xbet`;
+  }
+
   function open1xBet(url) {
     const httpsUrl = normalizeHttpsUrl(url || liveFootballUrl());
     if (!isMobile()) {
       window.open(httpsUrl, "_blank", "noopener");
       return;
     }
-    const openUrl = mobileOpenUrl(httpsUrl);
-    window.location.href = openUrl;
+    if (isInAppBrowser() && isAndroid()) {
+      window.location.href = openerPageUrl(httpsUrl);
+      return;
+    }
+    if (isAndroid() && (onexbetAndroidPackage || guessAndroidPackage(siteBase()))) {
+      tryOpenApp(httpsUrl);
+      return;
+    }
+    window.location.href = httpsUrl;
   }
 
   function matchLinkHtml(eventId, leagueId, label = "1xBet ↗", className = "ba-match-link ba-1xbet-link", sport = "football") {
     const gid = parseInt(eventId, 10);
     if (!gid || Number.isNaN(gid)) return "";
     const httpsUrl = matchUrl(eventId, leagueId, sport);
-    const href = isMobile() ? mobileOpenUrl(httpsUrl) : httpsUrl;
     const blank = isMobile() ? "" : ' target="_blank" rel="noopener"';
-    return `<a href="${href}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
+    return `<a href="${httpsUrl}" data-https-url="${httpsUrl}" class="${className}"${blank}>${label}</a>`;
   }
 
   function bind1xBetLinks(root) {

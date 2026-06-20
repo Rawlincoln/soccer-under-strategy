@@ -386,10 +386,10 @@ $("browserAlerts").addEventListener("change", () => {
 });
 
 $("btnResetDay").addEventListener("click", async () => {
-  if (!confirm("Reset session counters and start fresh?")) return;
+  if (!confirm("Reset today's workflow counters?")) return;
   await fetch("/api/assistant/workflow/reset", { method: "POST" });
   fetchData();
-  BetAssistant.toast("Session reset");
+  BetAssistant.toast("Day reset");
 });
 
 fetchData();

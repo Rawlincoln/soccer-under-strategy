@@ -51,7 +51,7 @@ function renderWaves() {
     <div class="wave-card">
       <div class="wave-time">Wave 3 · Late window</div>
       <h3>Closer slip(s)</h3>
-      <p>Keep placing <strong>5,000</strong> on 60%+ accas until profit target or a 5-loss streak resets the session.</p>
+      <p>Keep placing <strong>5,000</strong> on 60%+ accas until profit target, a 5-loss streak, or midnight resets the day.</p>
       <div class="wave-target">Target profit: ~${fmtMoney(third)}</div>
     </div>
   `;
@@ -143,7 +143,7 @@ function renderWorkflowBanner(wf) {
   if (wf.recommendations?.length) {
     banner.hidden = false;
     $("wfWave").textContent = "READY";
-    $("wfAction").textContent = `${wf.recommendations.length} slip(s) ready — no slip cap this session`;
+    $("wfAction").textContent = `${wf.recommendations.length} slip(s) ready — no slip cap today`;
     return;
   }
   banner.hidden = true;

@@ -110,11 +110,12 @@ class AssistantStore:
             json.dump(data, f, indent=2)
 
     def load_state(self) -> WorkflowState:
+        today = _today()
         raw = self._read_json(STATE_PATH, {})
-        if not raw:
-            return WorkflowState(date=_today())
+        if not raw or raw.get("date") != today:
+            return WorkflowState(date=today)
         return WorkflowState(
-            date=raw.get("date", _today()),
+            date=today,
             losses=int(raw.get("losses", 0)),
             wins=int(raw.get("wins", 0)),
             slips_placed=int(raw.get("slips_placed", 0)),

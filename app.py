@@ -12,6 +12,7 @@ from bet_assistant import (
     acca_to_slip,
     discover_telegram_chats,
     lock_to_slip,
+    log_bet_result,
     record_slip_placed,
     record_slip_result,
     reset_workflow,
@@ -40,7 +41,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "9")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "10")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -194,6 +195,9 @@ def api_assistant_placed():
         slip_type=str(body.get("slip_type", "accumulator")),
         stake=float(body.get("stake", 5000)),
         title=str(body.get("title", "Bet slip")),
+        wave=str(body.get("wave", "")),
+        potential_profit=float(body.get("potential_profit", 0)),
+        combined_odds=float(body.get("combined_odds", 0)),
     )
     if result.get("ok"):
         cache.refresh()
@@ -207,6 +211,21 @@ def api_assistant_result():
         slip_id=str(body.get("slip_id", "")),
         won=bool(body.get("won")),
         profit=float(body.get("profit", 0)),
+    )
+    if result.get("ok"):
+        cache.refresh()
+    return jsonify(result)
+
+
+@app.route("/api/assistant/workflow/log", methods=["POST"])
+def api_assistant_log():
+    body = request.get_json(silent=True) or {}
+    result = log_bet_result(
+        title=str(body.get("title", "Manual bet")),
+        stake=float(body.get("stake", 5000)),
+        won=bool(body.get("won")),
+        profit=float(body.get("profit", 0)),
+        slip_type=str(body.get("slip_type", "manual")),
     )
     if result.get("ok"):
         cache.refresh()

@@ -7,137 +7,147 @@ function fmtMoney(n) {
   return BetAssistant.fmtMoney(n);
 }
 
-function renderWorkflow(wf) {
+function waveShort(w) {
+  if (!w) return "";
+  if (w.id === "wave1") return "W1";
+  if (w.id === "wave2") return "W2";
+  return "W3";
+}
+
+function renderTracker(wf) {
   if (!wf) return;
-  $("profitRecorded").textContent = fmtMoney(wf.profit_recorded || 0);
-  $("dailyTarget").textContent = fmtMoney(wf.daily_target || 100000);
-  $("gapTarget").textContent = fmtMoney(wf.gap_to_target || 0);
-  $("slipsCount").textContent = String(wf.slips_placed || 0);
-  $("winsCount").textContent = wf.wins || 0;
-  $("lossesCount").textContent = wf.losses || 0;
-
-  const statusEl = $("workflowStatus");
-  const card = $("statusCard");
-  const streak = wf.loss_streak || 0;
-  const maxStreak = wf.max_loss_streak || 5;
-  if (wf.target_reached) {
-    statusEl.textContent = "TARGET";
-    statusEl.className = "asst-hero-value asst-status-ok";
-  } else if (streak >= maxStreak - 1 && streak > 0) {
-    statusEl.textContent = `${streak}L streak`;
-    statusEl.className = "asst-hero-value asst-status-stop";
-  } else if (wf.active_wave) {
-    statusEl.textContent = wf.active_wave.label?.split("·")[0]?.trim() || "ACTIVE";
-    statusEl.className = "asst-hero-value asst-status-ok";
-  } else {
-    statusEl.textContent = "Ready";
-    statusEl.className = "asst-hero-value asst-status-ok";
-  }
-}
-
-const WAVE_PLAN = {
-  wave1: {
-    time: "Wave 1 · 15′–20′ (1H)",
-    title: "Anchor slip",
-    body: (stake) =>
-      `Place <strong>1× ${fmtMoney(stake)}</strong> on the best 4–6 leg acca (highest fusion + 65%+ avg confidence). Prefer scored-but-under-alive games.`,
-  },
-  wave2: {
-    time: "Wave 2 · 60′–65′ (2H)",
-    title: "Booster slip",
-    body: (stake) =>
-      `Place <strong>1–2× ${fmtMoney(stake)}</strong> on 2H under accas. Only when entry window + BET signal align. Use second slip if Wave 1 lost.`,
-  },
-  wave3: {
-    time: "Wave 3 · Late window",
-    title: "Closer slip(s)",
-    body: (stake) =>
-      `Keep placing <strong>${fmtMoney(stake)}</strong> on 60%+ accas or goal locks until profit target, a 5-loss streak, or midnight resets the day.`,
-  },
-};
-
-function renderDailyRules(wf) {
-  const stake = fmtMoney(wf?.stake_per_slip || 5000);
-  const target = fmtMoney(wf?.daily_target || 100000);
-  const box = $("dailyRules");
-  if (!box) return;
-  box.innerHTML = `
-    <li><strong>Only 60%+ picks</strong> from Pro Punter — never force a bet when the app has no qualifier.</li>
-    <li><strong>No slip cap</strong> — keep placing ${stake} stakes until profit target or a 5-loss streak ends the day.</li>
-    <li><strong>1st half:</strong> enter between <strong>15′–20′</strong> on 1H under markets when fusion says BET / STRONG BET.</li>
-    <li><strong>2nd half:</strong> enter between <strong>60′–65′</strong> on 2H under markets with the same filter.</li>
-    <li><strong>Skip</strong> red-card games, virtual/esoccer, and student leagues (auto-excluded in app).</li>
-    <li><strong>Day resets</strong> at <strong>midnight</strong>, when <strong>${target} profit</strong> is reached, or after <strong>5 losses in a row</strong>.</li>
-    <li><strong>Split the target:</strong> aim for 2–4 winning accas, not one miracle longshot.</li>
-  `;
-}
-
-function renderProgress(wf) {
-  const target = wf?.daily_target || 100000;
-  const profit = wf?.profit_recorded || 0;
-  const gap = wf?.gap_to_target ?? Math.max(0, target - profit);
+  const target = wf.daily_target || 100000;
+  const profit = wf.profit_recorded || 0;
+  const gap = wf.gap_to_target ?? Math.max(0, target - profit);
   const pct = Math.min(100, Math.round((profit / target) * 100));
-  if ($("progressFill")) $("progressFill").style.width = `${pct}%`;
-  if ($("progressPct")) $("progressPct").textContent = `${pct}%`;
-  if ($("progressProfit")) $("progressProfit").textContent = fmtMoney(profit);
-  if ($("progressGap")) $("progressGap").textContent = fmtMoney(gap);
-}
 
-function renderWaveBanner(wf) {
-  const banner = $("waveBanner");
-  if (!banner || !wf) return;
-  const active = wf.active_wave;
+  $("profitRecorded").textContent = fmtMoney(profit);
+  $("dailyTarget").textContent = fmtMoney(target);
+  $("gapTarget").textContent = fmtMoney(gap);
+  $("progressFill").style.width = `${pct}%`;
+  $("progressPct").textContent = `${pct}%`;
+
   const streak = wf.loss_streak || 0;
   const maxStreak = wf.max_loss_streak || 5;
-  if (streak >= maxStreak - 1 && streak > 0) {
-    banner.hidden = false;
-    $("waveBannerLabel").textContent = `${streak}L STREAK`;
-    $("waveBannerAction").textContent =
-      `${streak} losses in a row — session resets after ${maxStreak} consecutive losses.`;
-    return;
+  const statusEl = $("workflowStatus");
+  if (wf.target_reached) {
+    statusEl.textContent = "Target reached";
+    statusEl.className = "asst-tracker-status ok";
+  } else if (streak >= maxStreak - 1 && streak > 0) {
+    statusEl.textContent = `${streak} losses in a row`;
+    statusEl.className = "asst-tracker-status stop";
+  } else if (wf.active_wave?.status === "ACTIVE") {
+    statusEl.textContent = wf.active_wave.label?.split("·")[0]?.trim() || "Wave active";
+    statusEl.className = "asst-tracker-status ok";
+  } else {
+    statusEl.textContent = "Waiting for entry window";
+    statusEl.className = "asst-tracker-status";
   }
-  if (active?.status === "ACTIVE") {
-    banner.hidden = false;
-    $("waveBannerLabel").textContent = active.label?.split("·")[0]?.trim() || active.id;
-    $("waveBannerAction").textContent = active.action || "Place slip now";
-    return;
+
+  const chips = $("waveChips");
+  if (chips) {
+    const waves = wf.waves || [];
+    chips.innerHTML = waves.map((w) => {
+      const cls = w.status === "ACTIVE" ? "on" : w.status === "STANDBY" ? "standby" : "";
+      return `<span class="asst-chip ${cls}" title="${w.action || ""}">${waveShort(w)}</span>`;
+    }).join("");
   }
-  if (wf.recommendations?.length) {
-    banner.hidden = false;
-    $("waveBannerLabel").textContent = "READY";
-    $("waveBannerAction").textContent = `${wf.recommendations.length} slip(s) ready — follow daily rules below`;
-    return;
+
+  const stats = $("trackerStats");
+  if (stats) {
+    stats.innerHTML = `
+      <div class="asst-stat"><span class="num">${wf.slips_placed || 0}</span><span class="lbl">Bets</span></div>
+      <div class="asst-stat"><span class="num win">${wf.wins || 0}</span><span class="lbl">Wins</span></div>
+      <div class="asst-stat"><span class="num loss">${wf.losses || 0}</span><span class="lbl">Losses</span></div>
+      <div class="asst-stat"><span class="num">${streak}</span><span class="lbl">Streak</span></div>
+      <div class="asst-stat"><span class="num">${fmtMoney(wf.total_staked || 0)}</span><span class="lbl">Staked</span></div>
+      <div class="asst-stat"><span class="num">${wf.pending_count || 0}</span><span class="lbl">Pending</span></div>
+    `;
   }
-  banner.hidden = true;
+
+  if ($("manualStake") && !document.activeElement?.isSameNode($("manualStake"))) {
+    $("manualStake").value = wf.stake_per_slip || 5000;
+  }
 }
 
-function renderWaves(waves, wf) {
-  const grid = $("wavesGrid");
-  if (!grid) return;
-  const stake = wf?.stake_per_slip || 5000;
-  const waveTarget = Math.round((wf?.daily_target || 100000) / 3);
-  const fallback = [
-    { id: "wave1", status: "WAITING", action: "Wait for 1H matches to hit 15′–20′ entry window", label: "Wave 1 · 1H anchor", start: 15, end: 20 },
-    { id: "wave2", status: "WAITING", action: "Wait for 2H matches to hit 60′–65′ entry window", label: "Wave 2 · 2H booster", start: 60, end: 65 },
-    { id: "wave3", status: "STANDBY", action: "Use late accas or goal locks if short of target", label: "Wave 3 · Closer / Goal Lock", start: 0, end: 999 },
-  ];
-  const list = waves?.length ? waves : fallback;
-  grid.innerHTML = list.map((w) => {
-    const plan = WAVE_PLAN[w.id] || WAVE_PLAN.wave3;
-    const badgeCls = w.status === "ACTIVE" ? "active" : w.status === "STANDBY" ? "standby" : "waiting";
-    const windowLabel = w.end === 999 ? "Late / Goal Lock" : `${w.start}′–${w.end}′`;
+async function settleSlip(slipId, won, profit = 0) {
+  const res = await fetch("/api/assistant/workflow/result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slip_id: slipId, won, profit }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    BetAssistant.toast(data.error || "Could not save result");
+    return;
+  }
+  if (data.session_reset) {
+    const msg = data.reset_reason === "target_reached"
+      ? "Target reached — day reset"
+      : "5-loss streak — day reset";
+    BetAssistant.toast(msg, 4200);
+  } else {
+    BetAssistant.toast(won ? "Win recorded" : "Loss recorded");
+  }
+  fetchData();
+}
+
+function renderBetJournal(wf) {
+  const box = $("betJournal");
+  if (!box) return;
+  const slips = [...(wf?.placed_slips || [])].reverse();
+  if (!slips.length) {
+    box.innerHTML = `<div class="asst-empty">No bets logged yet — mark a slip placed or log manually below</div>`;
+    return;
+  }
+
+  box.innerHTML = slips.map((s) => {
+    const settled = s.result != null;
+    const time = new Date(s.placed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const wave = s.wave ? `<span class="asst-bet-wave">${waveShort({ id: s.wave })}</span>` : "";
+    const defaultProfit = s.potential_profit || s.stake || wf.stake_per_slip || 5000;
+
+    if (settled) {
+      const pnl = Number(s.profit);
+      const pnlCls = pnl >= 0 ? "won" : "lost";
+      const pnlText = pnl >= 0 ? `+${fmtMoney(pnl)}` : fmtMoney(pnl);
+      return `
+        <div class="asst-bet-row ${pnlCls}">
+          <div class="asst-bet-main">
+            ${wave}
+            <div class="asst-bet-title">${s.title}</div>
+            <div class="asst-bet-meta">${s.type} · Stake ${fmtMoney(s.stake)} · ${time}</div>
+          </div>
+          <div class="asst-bet-pnl ${pnlCls}">${pnlText}</div>
+        </div>`;
+    }
+
     return `
-      <div class="asst-wave-card ${w.status === "ACTIVE" ? "active" : ""}">
-        <div class="asst-wave-card-top">
-          <div class="asst-wave-time">${plan.time}</div>
-          <span class="asst-wave-badge ${badgeCls}">${w.status}</span>
+      <div class="asst-bet-row pending">
+        <div class="asst-bet-main">
+          ${wave}
+          <div class="asst-bet-title">${s.title}</div>
+          <div class="asst-bet-meta">${s.type} · Stake ${fmtMoney(s.stake)} · ${time}${s.combined_odds ? ` · @ ${Number(s.combined_odds).toFixed(2)}` : ""}</div>
         </div>
-        <h3>${plan.title} · ${windowLabel}</h3>
-        <p class="asst-wave-body">${plan.body(stake)}</p>
-        <div class="asst-wave-live">${w.action || ""}</div>
-        <div class="asst-wave-target">Target profit: ~${fmtMoney(waveTarget)}</div>
+        <div class="asst-bet-settle">
+          <label class="asst-profit-label">Profit if won</label>
+          <input type="number" class="asst-profit-input" data-profit-for="${s.id}" value="${defaultProfit}" min="0" step="100" />
+          <button class="ba-btn primary" type="button" data-win="${s.id}">Won</button>
+          <button class="ba-btn" type="button" data-loss="${s.id}">Lost</button>
+        </div>
       </div>`;
   }).join("");
+
+  box.querySelectorAll("[data-win]").forEach((btn) => {
+    btn.onclick = () => {
+      const input = box.querySelector(`[data-profit-for="${btn.dataset.win}"]`);
+      const profit = parseFloat(input?.value) || 0;
+      settleSlip(btn.dataset.win, true, profit);
+    };
+  });
+  box.querySelectorAll("[data-loss]").forEach((btn) => {
+    btn.onclick = () => settleSlip(btn.dataset.loss, false);
+  });
 }
 
 function halfTag(h) {
@@ -202,7 +212,11 @@ function renderLegDetail(leg, idx, slip) {
 function renderRecommendations(recs, wf) {
   const box = $("recommendations");
   if (!recs?.length) {
-    box.innerHTML = `<div class="asst-empty">No recommendations right now. Check back during entry windows or when goal locks appear.</div>`;
+    const active = wf?.active_wave;
+    const hint = active?.status === "ACTIVE"
+      ? "Entry window open — waiting for a 60%+ qualifier that passes filters."
+      : "No qualifying slips right now. The assistant only surfaces bets when wave windows and confidence rules match.";
+    box.innerHTML = `<div class="asst-empty">${hint}</div>`;
     return;
   }
   box.innerHTML = recs.map((r) => {
@@ -233,59 +247,6 @@ function renderRecommendations(recs, wf) {
   BetAssistant.bind1xBetLinks(box);
 }
 
-function renderPlaced(wf) {
-  const box = $("placedSlips");
-  const slips = wf?.placed_slips || [];
-  if (!slips.length) {
-    box.innerHTML = `<div class="asst-empty">No slips marked placed today</div>`;
-    return;
-  }
-  box.innerHTML = slips.map((s) => {
-    const settled = s.result != null;
-    const resultHtml = settled
-      ? `<span class="${s.result === "won" ? "asst-rec-reason" : "asst-status-stop"}">${s.result.toUpperCase()}</span>`
-      : `<div class="asst-settle">
-          <button class="ba-btn primary" data-win="${s.id}" data-profit="0" type="button">Won</button>
-          <button class="ba-btn" data-loss="${s.id}" type="button">Lost</button>
-        </div>`;
-    return `
-      <div class="asst-placed-item">
-        <div class="title">${s.title}</div>
-        <div class="meta">${s.type} · Stake ${fmtMoney(s.stake)} · ${new Date(s.placed_at).toLocaleTimeString()}</div>
-        ${resultHtml}
-      </div>`;
-  }).join("");
-
-  async function settleSlip(slipId, won, profit = 0) {
-    const res = await fetch("/api/assistant/workflow/result", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slip_id: slipId, won, profit }),
-    });
-    const data = await res.json();
-    if (data.session_reset) {
-      const msg = data.reset_reason === "target_reached"
-        ? "Profit target reached — new session started"
-        : "5-loss streak — new session started";
-      BetAssistant.toast(msg, 4200);
-    }
-    fetchData();
-  }
-
-  box.querySelectorAll("[data-win]").forEach((btn) => {
-    btn.onclick = async () => {
-      const profit = prompt("Profit amount?", String(wf.stake_per_slip || 5000));
-      if (profit == null) return;
-      await settleSlip(btn.dataset.win, true, parseFloat(profit) || 0);
-    };
-  });
-  box.querySelectorAll("[data-loss]").forEach((btn) => {
-    btn.onclick = async () => {
-      await settleSlip(btn.dataset.loss, false);
-    };
-  });
-}
-
 function renderAlerts(alerts) {
   const box = $("alertsList");
   if (!alerts?.length) {
@@ -310,7 +271,7 @@ function updateTgStatus(cfg) {
     el.textContent = "Telegram: enabled — add chat ID and Save";
     el.className = "tg-status warn";
   } else if (cfg.telegram_configured) {
-    el.textContent = "Telegram: configured — enable checkbox and Save";
+    el.textContent = "Telegram: configured — enable and Save";
     el.className = "tg-status warn";
   } else if (cfg.telegram_token_set) {
     el.textContent = "Telegram: token saved — add chat ID";
@@ -326,13 +287,12 @@ function applyConfig(cfg) {
   $("browserAlerts").checked = cfg.browser_alerts !== false;
   $("telegramEnabled").checked = !!cfg.telegram_enabled;
   $("stakeSetting").value = cfg.stake_per_slip || 5000;
+  if ($("targetSetting")) $("targetSetting").value = cfg.daily_target || 100000;
   if ($("onexbetSite")) {
     $("onexbetSite").value = cfg.onexbet_site || "";
     $("onexbetSite").placeholder = cfg.onexbet_site || "https://1xbet.co.ke";
   }
-  if (cfg.telegram_chat_id) {
-    $("tgChat").value = cfg.telegram_chat_id;
-  }
+  if (cfg.telegram_chat_id) $("tgChat").value = cfg.telegram_chat_id;
   const tokenEl = $("tgToken");
   if (cfg.telegram_token_set) {
     tokenEl.placeholder = "Token saved on server (leave blank to keep)";
@@ -350,6 +310,7 @@ async function saveConfig() {
     browser_alerts: $("browserAlerts").checked,
     telegram_enabled: $("telegramEnabled").checked,
     stake_per_slip: parseFloat($("stakeSetting").value) || 5000,
+    daily_target: parseFloat($("targetSetting")?.value) || 100000,
     onexbet_site: $("onexbetSite").value.trim(),
   };
   const token = $("tgToken").value.trim();
@@ -368,6 +329,7 @@ async function saveConfig() {
     if (body.onexbet_site) BetAssistant.setOnexbetSite(body.onexbet_site);
     if (body.browser_alerts) BetAssistant.requestNotifyPermission();
     if (data.config) applyConfig(data.config);
+    fetchData();
   }
 }
 
@@ -385,21 +347,17 @@ async function fetchData() {
       $("statusText").textContent = "Loading live data…";
       $("connectionStatus").classList.remove("error");
     } else {
-      $("statusText").textContent = "Ready to assist";
+      const n = wf.recommendations?.length || 0;
+      $("statusText").textContent = n ? `${n} qualifying slip${n !== 1 ? "s" : ""}` : "Tracking your day";
       $("connectionStatus").classList.add("live");
     }
 
-    renderWorkflow(wf);
-    renderDailyRules(wf);
-    renderProgress(wf);
-    renderWaveBanner(wf);
-    renderWaves(wf.waves, wf);
+    renderTracker(wf);
+    renderBetJournal(wf);
     renderRecommendations(wf.recommendations, wf);
-    renderPlaced(wf);
     renderAlerts(data.alerts);
     applyConfig(data.config);
     if (data.onexbet_site) BetAssistant.setOnexbetSite(data.onexbet_site);
-
     if (data.new_alerts?.length) BetAssistant.processAlerts(data.new_alerts);
   } catch (err) {
     $("connectionStatus").classList.add("error");
@@ -421,25 +379,19 @@ async function discoverChat() {
     const box = $("tgChatPick");
     if (!data.ok || !data.chats?.length) {
       box.hidden = true;
-      const err = data.error || "No chat found — message your bot first";
-      BetAssistant.toast(token ? err : `${err} (or paste your bot token if not saved yet)`);
+      BetAssistant.toast(data.error || "No chat found — message your bot first");
       return;
     }
     box.hidden = false;
     box.innerHTML = data.chats.map((c) => `
       <button type="button" class="tg-chat-btn" data-chat="${c.chat_id}">
-        ${c.name || c.title || c.username || "Chat"} · ID ${c.chat_id} · ${c.type || "private"}
+        ${c.name || c.title || c.username || "Chat"} · ID ${c.chat_id}
       </button>
     `).join("");
     box.querySelectorAll(".tg-chat-btn").forEach((btn) => {
-      btn.onclick = () => {
-        $("tgChat").value = btn.dataset.chat;
-        BetAssistant.toast(`Chat ID ${btn.dataset.chat} selected`);
-      };
+      btn.onclick = () => { $("tgChat").value = btn.dataset.chat; };
     });
-    if (data.chats.length === 1) {
-      $("tgChat").value = data.chats[0].chat_id;
-    }
+    if (data.chats.length === 1) $("tgChat").value = data.chats[0].chat_id;
     BetAssistant.toast(`Found ${data.chats.length} chat(s)`);
   } catch {
     BetAssistant.toast("Could not reach Telegram API");
@@ -463,7 +415,7 @@ async function testTelegram() {
     });
     const data = await res.json();
     if (data.ok) {
-      BetAssistant.toast("Test alert sent — check Telegram");
+      BetAssistant.toast("Test alert sent");
       $("telegramEnabled").checked = true;
       await saveConfig();
     } else {
@@ -476,6 +428,37 @@ async function testTelegram() {
   }
 }
 
+$("manualLogForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const won = btn?.dataset.outcome === "won";
+  const stake = parseFloat($("manualStake").value) || 5000;
+  const profit = parseFloat($("manualProfit").value) || 0;
+  const res = await fetch("/api/assistant/workflow/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: $("manualTitle").value.trim(),
+      stake,
+      won,
+      profit: won ? profit : 0,
+    }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    BetAssistant.toast(data.error || "Could not log bet");
+    return;
+  }
+  $("manualTitle").value = "";
+  $("manualProfit").value = "";
+  if (data.session_reset) {
+    BetAssistant.toast(data.reset_reason === "target_reached" ? "Target reached — day reset" : "5-loss streak — day reset", 4200);
+  } else {
+    BetAssistant.toast(won ? "Win logged" : "Loss logged");
+  }
+  fetchData();
+});
+
 $("btnSaveConfig").addEventListener("click", saveConfig);
 $("btnDiscoverChat").addEventListener("click", discoverChat);
 $("btnTestTelegram").addEventListener("click", testTelegram);
@@ -485,26 +468,17 @@ $("browserAlerts").addEventListener("change", () => {
 });
 
 $("btnResetDay").addEventListener("click", async () => {
-  if (!confirm("Reset today's workflow counters?")) return;
+  if (!confirm("Reset today's counters?")) return;
   await fetch("/api/assistant/workflow/reset", { method: "POST" });
   fetchData();
   BetAssistant.toast("Day reset");
 });
 
 async function loadSavedConfig() {
-  const defaults = { stake_per_slip: 5000, daily_target: 100000 };
   try {
     const res = await fetch("/api/assistant/config");
-    const cfg = await res.json();
-    applyConfig(cfg);
-    defaults.stake_per_slip = cfg.stake_per_slip || 5000;
-    defaults.daily_target = cfg.daily_target || 100000;
-  } catch {
-    /* ignore — fetchData will retry via workflow config */
-  }
-  renderDailyRules(defaults);
-  renderProgress({ ...defaults, profit_recorded: 0, gap_to_target: defaults.daily_target });
-  renderWaves(null, defaults);
+    applyConfig(await res.json());
+  } catch { /* fetchData will apply config */ }
 }
 
 loadSavedConfig();

@@ -208,6 +208,9 @@ const BetAssistant = (() => {
           slip_type: slip.slip_type,
           stake: slip.stake,
           title: slip.title,
+          wave: slip.wave || "",
+          potential_profit: slip.potential_profit || 0,
+          combined_odds: slip.combined_odds || 0,
         }),
       });
       const data = await res.json();

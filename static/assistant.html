@@ -18,7 +18,7 @@
         <span class="logo-icon">📋</span>
         <div>
           <h1>Pro Punter · Betting Assistant</h1>
-          <p class="subtitle">100K workflow · slip export · confirm before you bet · Telegram & browser alerts</p>
+          <p class="subtitle">100K workflow · track results · rules applied to every slip</p>
         </div>
       </div>
     </div>
@@ -42,78 +42,67 @@
   </header>
 
   <main class="assistant-main">
-    <section class="asst-hero" id="workflowHero">
-      <div class="asst-hero-card">
-        <div class="asst-hero-label">Today's profit</div>
-        <div class="asst-hero-value" id="profitRecorded">0</div>
-        <div class="asst-hero-sub">Target <span id="dailyTarget">100,000</span> · Gap <span id="gapTarget">100,000</span></div>
-      </div>
-      <div class="asst-hero-card">
-        <div class="asst-hero-label">Slips today</div>
-        <div class="asst-hero-value" id="slipsCount">0</div>
-        <div class="asst-hero-sub">W <span id="winsCount">0</span> · L <span id="lossesCount">0</span> · resets at midnight, 5L streak, or target</div>
-      </div>
-      <div class="asst-hero-card" id="statusCard">
-        <div class="asst-hero-label">Status</div>
-        <div class="asst-hero-value asst-status-ok" id="workflowStatus">Ready</div>
-        <button class="ba-btn" id="btnResetDay" type="button">Reset day</button>
-      </div>
-    </section>
-
-    <section class="asst-wave-banner" id="waveBanner" hidden>
-      <span class="asst-wave-banner-badge" id="waveBannerLabel">Wave</span>
-      <span class="asst-wave-banner-text" id="waveBannerAction">—</span>
-    </section>
-
-    <section class="asst-plan-section">
-      <div class="asst-plan-grid">
-        <article class="asst-plan-card">
-          <h2 class="section-title">Daily rules</h2>
-          <ol class="asst-rules-list" id="dailyRules"></ol>
-        </article>
-        <article class="asst-plan-card asst-plan-progress">
-          <h2 class="section-title">Today's path</h2>
-          <p class="asst-plan-note">Progress toward your profit target this session.</p>
-          <div class="asst-progress-header">
-            <span>Recorded profit</span>
-            <span id="progressPct">0%</span>
+    <section class="asst-tracker" id="trackerSection">
+      <div class="asst-tracker-top">
+        <div>
+          <div class="asst-tracker-label">Daily profit target</div>
+          <div class="asst-tracker-target-row">
+            <span class="asst-tracker-profit" id="profitRecorded">0</span>
+            <span class="asst-tracker-of">/ <span id="dailyTarget">100,000</span></span>
           </div>
-          <div class="asst-progress-bar"><div class="asst-progress-fill" id="progressFill"></div></div>
-          <div class="asst-progress-foot">
-            <span>Profit: <strong id="progressProfit">0</strong></span>
-            <span>Gap: <strong id="progressGap">100,000</strong></span>
-          </div>
-        </article>
+          <div class="asst-tracker-gap">Gap: <strong id="gapTarget">100,000</strong></div>
+        </div>
+        <div class="asst-tracker-side">
+          <div class="asst-wave-chips" id="waveChips"></div>
+          <div class="asst-tracker-status" id="workflowStatus">Ready</div>
+          <button class="ba-btn" id="btnResetDay" type="button">Reset day</button>
+        </div>
       </div>
-
-      <article class="asst-plan-card asst-plan-wide">
-        <h2 class="section-title">Three-wave execution plan</h2>
-        <p class="asst-plan-note">Follow the framework below — live status updates when entry windows open.</p>
-        <div class="asst-waves-detail" id="wavesGrid"></div>
-      </article>
+      <div class="asst-progress-header">
+        <span>Progress to target</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="asst-progress-bar"><div class="asst-progress-fill" id="progressFill"></div></div>
+      <div class="asst-tracker-stats" id="trackerStats"></div>
     </section>
 
     <section class="asst-section">
-      <h2 class="section-title">Recommended slips now</h2>
-      <p class="asst-note">Copy or review each slip, then place manually on 1xBet. Mark placed to track your 100K day.</p>
+      <h2 class="section-title">Your bets today</h2>
+      <p class="asst-note">Mark slips placed from recommendations, then record win or loss. Profit updates toward your target.</p>
+      <div id="betJournal" class="asst-journal">
+        <div class="asst-empty">No bets logged yet</div>
+      </div>
+      <form class="asst-manual-form" id="manualLogForm">
+        <div class="asst-manual-title">Log a bet manually</div>
+        <div class="asst-manual-grid">
+          <input type="text" id="manualTitle" placeholder="Bet description" required />
+          <input type="number" id="manualStake" placeholder="Stake" min="100" step="100" value="5000" required />
+          <input type="number" id="manualProfit" placeholder="Profit if won" min="0" step="100" />
+          <div class="asst-manual-actions">
+            <button class="ba-btn primary" type="submit" data-outcome="won">Won</button>
+            <button class="ba-btn" type="submit" data-outcome="lost">Lost</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="asst-section">
+      <h2 class="section-title">Qualifying slips now</h2>
+      <p class="asst-note">Only picks that pass the 3-wave windows and 60%+ filters appear here.</p>
       <div id="recommendations" class="asst-recs">
-        <div class="loading">Loading recommendations…</div>
+        <div class="loading">Loading…</div>
       </div>
     </section>
 
     <div class="asst-grid">
       <section class="asst-section">
-        <h2 class="section-title">Placed slips</h2>
-        <div id="placedSlips" class="asst-placed">
-          <div class="asst-empty">No slips marked placed today</div>
-        </div>
+        <h2 class="section-title">Alerts</h2>
+        <div id="alertsList" class="asst-alerts"></div>
       </section>
 
       <section class="asst-section">
-        <h2 class="section-title">Alerts</h2>
-        <div id="alertsList" class="asst-alerts"></div>
+        <h2 class="section-title">Settings</h2>
         <div class="asst-settings">
-          <h3>Alert settings</h3>
           <div class="tg-status" id="tgStatus">Telegram: not configured</div>
           <label class="asst-check">
             <input type="checkbox" id="browserAlerts" checked />
@@ -124,11 +113,10 @@
             Telegram alerts
           </label>
           <div class="tg-setup-steps">
-            <p><strong>Setup (2 minutes)</strong></p>
+            <p><strong>Telegram setup</strong></p>
             <ol>
-              <li>Open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> → <code>/newbot</code> → copy the <strong>bot token</strong></li>
-              <li>Open your new bot in Telegram → tap <strong>Start</strong> → send any message</li>
-              <li>Paste token below → <strong>Find chat ID</strong> → Save → <strong>Send test</strong></li>
+              <li><a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> → <code>/newbot</code> → copy token</li>
+              <li>Message your bot → <strong>Find chat ID</strong> → Save → Test</li>
             </ol>
           </div>
           <label for="tgToken">Bot token</label>
@@ -141,14 +129,14 @@
           <div id="tgChatPick" class="tg-chat-pick" hidden></div>
           <label for="onexbetSite">Your 1xBet site (opens app on phone)</label>
           <input type="url" id="onexbetSite" placeholder="https://1xbet.co.ke" autocomplete="off" />
-          <p class="asst-hint">Use the same domain you use in the 1xBet app (e.g. <code>1xbet.co.ke</code> for Kenya). Match links then open the app to that game.</p>
           <label for="stakeSetting">Stake per slip</label>
           <input type="number" id="stakeSetting" value="5000" min="100" step="100" />
+          <label for="targetSetting">Daily profit target</label>
+          <input type="number" id="targetSetting" value="100000" min="1000" step="1000" />
           <div class="tg-actions">
             <button class="ba-btn primary" id="btnSaveConfig" type="button">Save settings</button>
             <button class="ba-btn orange" id="btnTestTelegram" type="button">Send test alert</button>
           </div>
-          <p class="asst-hint">Production: set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> on Render (Environment).</p>
         </div>
       </section>
     </div>

@@ -446,15 +446,19 @@ def build_workflow(
             "reason": f"Goal Lock {m.get('lock_pct', 0):.0f}% — {m.get('minutes_left')}′ to {m.get('closing_target')}",
             "slip": asdict(slip),
         })
-    if not recommendations and accas:
-        slip = acca_to_slip(accas[0], stake, wave="wave3")
-        recommendations.append({
-            "priority": "low",
-            "reason": "Best available acca (no active wave window)",
-            "slip": asdict(slip),
-        })
-
     gap = max(0, target - state.profit_recorded)
+    if not recommendations and accas and gap > 0:
+        wave3_only = active_wave is None or active_wave.get("id") == "wave3"
+        if wave3_only:
+            slip = acca_to_slip(accas[0], stake, wave="wave3")
+            recommendations.append({
+                "priority": "medium",
+                "reason": "Wave 3 · closer acca",
+                "slip": asdict(slip),
+            })
+
+    total_staked = sum(float(s.get("stake") or 0) for s in state.placed_slips)
+    settled = [s for s in state.placed_slips if s.get("result") is not None]
 
     return {
         "date": state.date,
@@ -473,39 +477,29 @@ def build_workflow(
         "active_wave": active_wave,
         "recommendations": recommendations,
         "placed_slips": state.placed_slips,
+        "settled_count": len(settled),
+        "pending_count": len(state.placed_slips) - len(settled),
+        "total_staked": round(total_staked, 2),
     }
 
 
-def record_slip_placed(slip_id: str, slip_type: str, stake: float, title: str) -> dict[str, Any]:
-    state = STORE.load_state()
-    state.slips_placed += 1
-    state.placed_slips.append({
-        "id": slip_id,
-        "type": slip_type,
-        "stake": stake,
-        "title": title,
-        "placed_at": datetime.now(timezone.utc).isoformat(),
-        "result": None,
-    })
-    STORE.save_state(state)
-    return {"ok": True, "state": asdict(state)}
-
-
-def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str, Any]:
-    state = STORE.load_state()
-    config = STORE.load_config()
-    target = float(config.get("daily_target", DAILY_TARGET))
-    entry = next((s for s in state.placed_slips if s["id"] == slip_id and s.get("result") is None), None)
-    if not entry:
-        return {"ok": False, "error": "Slip not found or already settled"}
-
+def _apply_settlement(
+    state: WorkflowState,
+    entry: dict,
+    won: bool,
+    profit: float,
+    target: float,
+) -> dict[str, Any]:
     entry["result"] = "won" if won else "lost"
     entry["settled_at"] = datetime.now(timezone.utc).isoformat()
+    stake = float(entry.get("stake") or 0)
     if won:
+        entry["profit"] = round(profit, 2)
         state.wins += 1
         state.profit_recorded += profit
         state.loss_streak = 0
     else:
+        entry["profit"] = round(-stake, 2)
         state.losses += 1
         state.loss_streak += 1
 
@@ -529,6 +523,76 @@ def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str
 
     STORE.save_state(state)
     return {"ok": True, "state": asdict(state)}
+
+
+def record_slip_placed(
+    slip_id: str,
+    slip_type: str,
+    stake: float,
+    title: str,
+    *,
+    wave: str = "",
+    potential_profit: float = 0.0,
+    combined_odds: float = 0.0,
+) -> dict[str, Any]:
+    state = STORE.load_state()
+    state.slips_placed += 1
+    state.placed_slips.append({
+        "id": slip_id,
+        "type": slip_type,
+        "stake": stake,
+        "title": title,
+        "wave": wave,
+        "potential_profit": round(potential_profit, 2),
+        "combined_odds": round(combined_odds, 2),
+        "placed_at": datetime.now(timezone.utc).isoformat(),
+        "result": None,
+        "profit": None,
+    })
+    STORE.save_state(state)
+    return {"ok": True, "state": asdict(state)}
+
+
+def record_slip_result(slip_id: str, won: bool, profit: float = 0.0) -> dict[str, Any]:
+    state = STORE.load_state()
+    config = STORE.load_config()
+    target = float(config.get("daily_target", DAILY_TARGET))
+    entry = next((s for s in state.placed_slips if s["id"] == slip_id and s.get("result") is None), None)
+    if not entry:
+        return {"ok": False, "error": "Slip not found or already settled"}
+    if won and profit <= 0:
+        profit = float(entry.get("potential_profit") or entry.get("stake") or 0)
+    return _apply_settlement(state, entry, won, profit, target)
+
+
+def log_bet_result(
+    title: str,
+    stake: float,
+    won: bool,
+    profit: float = 0.0,
+    slip_type: str = "manual",
+) -> dict[str, Any]:
+    state = STORE.load_state()
+    config = STORE.load_config()
+    target = float(config.get("daily_target", DAILY_TARGET))
+    slip_id = f"manual-{int(datetime.now(timezone.utc).timestamp())}"
+    state.slips_placed += 1
+    entry = {
+        "id": slip_id,
+        "type": slip_type,
+        "stake": stake,
+        "title": title.strip() or "Manual bet",
+        "wave": "",
+        "potential_profit": round(profit if won else 0, 2),
+        "combined_odds": 0.0,
+        "placed_at": datetime.now(timezone.utc).isoformat(),
+        "result": None,
+        "profit": None,
+    }
+    state.placed_slips.append(entry)
+    if won and profit <= 0:
+        profit = stake
+    return _apply_settlement(state, entry, won, profit, target)
 
 
 def reset_workflow() -> dict[str, Any]:

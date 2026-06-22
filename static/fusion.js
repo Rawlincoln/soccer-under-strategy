@@ -92,9 +92,23 @@ function agreementClass(a) {
   return "agree-neutral";
 }
 
-function tierBadge(agreement) {
-  const cls = agreement === "CONFIRMED" ? "tier-confirmed" : "tier-aligned";
-  return `<span class="fusion-tier-badge ${cls}">${agreement}</span>`;
+function marketSnapshot(m, f) {
+  return f?.market_odds_summary || m.market_odds || {};
+}
+
+function hasStrongUnderLean(m, f) {
+  return marketSnapshot(m, f).market_lean === "strong_under";
+}
+
+function tierBadge(m) {
+  const tier = m.fusion_tier || (m.combined_analysis || {}).agreement || "ALIGNED";
+  const cls = {
+    CONFIRMED: "tier-confirmed",
+    ALIGNED: "tier-aligned",
+    STRONG_UNDER: "tier-strong-under",
+  }[tier] || "tier-aligned";
+  const label = tier === "STRONG_UNDER" ? "STRONG UNDER" : tier;
+  return `<span class="fusion-tier-badge ${cls}">${label}</span>`;
 }
 
 function sourceChips(f, m) {
@@ -107,7 +121,8 @@ function sourceChips(f, m) {
   const lowForm = form === "defensive" || form === "low_scoring";
   const lowSp = sp === "defensive" || sp === "low_scoring";
   const fmOk = fm !== "unknown" && !["fast", "high_scoring"].includes(fm);
-  const mktLean = mkt.market_lean && mkt.market_lean !== "neutral";
+  const mktLean = mkt.market_lean === "strong_under"
+    || (mkt.market_lean && mkt.market_lean !== "neutral");
 
   const chip = (label, ok, detail, partial) => {
     const cls = ok ? "ok" : partial ? "warn" : "miss";
@@ -120,7 +135,12 @@ function sourceChips(f, m) {
     chip("ProphitBet", lowForm, `${form.replace(/_/g, " ")} form`, form === "balanced"),
     chip("SoccerPunter", lowSp, `${sp.replace(/_/g, " ")} H2H`, sp === "balanced"),
     chip("FotMob", fmOk, `${fm.replace(/_/g, " ")} xG`, fm === "unknown"),
-    chip("Market", mktLean, mkt.market_lean ? `${mkt.market_lean} lean` : "no lean", false),
+    chip(
+      "Market",
+      mkt.market_lean === "strong_under" || mktLean,
+      mkt.market_lean ? `${mkt.market_lean.replace(/_/g, " ")} lean` : "no lean",
+      mkt.market_lean === "under",
+    ),
   ].join("");
 }
 
@@ -209,8 +229,15 @@ function renderFusionAnalysis(m) {
 function renderFusionCard(m) {
   const f = m.combined_analysis || {};
   const stats = m.live_stats || {};
-  const agreement = f.agreement || "ALIGNED";
-  const tierCls = agreement === "CONFIRMED" ? "tier-confirmed-card" : "";
+  const tier = m.fusion_tier || f.agreement || "ALIGNED";
+  const mkt = marketSnapshot(m, f);
+  const tierCls = {
+    CONFIRMED: "tier-confirmed-card",
+    STRONG_UNDER: "tier-strong-under-card",
+  }[tier] || "";
+  const marketTag = mkt.under_15_implied_pct
+    ? `<span class="market-lean-tag market-lean-strong_under">${mkt.under_15_implied_pct}% U1.5</span>`
+    : "";
 
   const betItem = {
     event_id: m.event_id,
@@ -228,7 +255,8 @@ function renderFusionCard(m) {
       <div class="match-header">
         <div class="match-league">
           ${m.league || "Football"}
-          ${tierBadge(agreement)}
+          ${tierBadge(m)}
+          ${marketTag}
           <span class="source-tag">${halfLabel(m.half)}</span>
         </div>
         <div class="teams-row">
@@ -261,10 +289,13 @@ function renderFusionCard(m) {
 function filterMatches(matches) {
   return (matches || []).filter((m) => {
     const f = m.combined_analysis || {};
-    const agreement = f.agreement;
+    const tier = m.fusion_tier || f.agreement;
     const rec = f.best_recommendation;
-    if (currentFilter === "confirmed") return agreement === "CONFIRMED";
-    if (currentFilter === "aligned") return agreement === "ALIGNED";
+    if (currentFilter === "confirmed") return tier === "CONFIRMED";
+    if (currentFilter === "aligned") return tier === "ALIGNED";
+    if (currentFilter === "strong_under") {
+      return tier === "STRONG_UNDER" || hasStrongUnderLean(m, f);
+    }
     if (currentFilter === "bet") return rec === "BET";
     return true;
   });
@@ -279,6 +310,7 @@ function renderBaselines(data) {
     <div class="baseline-card"><div class="label">Fusion picks</div><div class="value green">${data.fusion_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Confirmed</div><div class="value" style="color:#d29922">${data.confirmed_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Aligned</div><div class="value green">${data.aligned_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Strong under</div><div class="value green">${data.strong_under_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">BET ready</div><div class="value green">${data.bet_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Live football</div><div class="value">${data.total_live_football ?? 0}</div></div>
     <div class="baseline-card"><div class="label">ProphitBet</div><div class="value">${pb?.loaded ? `${pb.teams_count} teams` : "…"}</div></div>
@@ -292,7 +324,10 @@ function renderMatches(matches) {
   const grid = $("matchesGrid");
   const filtered = filterMatches(matches);
   if (!filtered.length) {
-    grid.innerHTML = `<div class="empty">No ${currentFilter === "all" ? "fusion" : currentFilter} matches right now. Live tempo and historical form must align — check back when games are in play.</div>`;
+    const emptyMsg = currentFilter === "strong_under"
+      ? "No strong under lean matches right now — 1xBet needs ≥72% implied on Under 1.5 for this half."
+      : `No ${currentFilter === "all" ? "fusion" : currentFilter.replace(/_/g, " ")} matches right now. Check back when games are in play.`;
+    grid.innerHTML = `<div class="empty">${emptyMsg}</div>`;
     return;
   }
   grid.innerHTML = filtered.map(renderFusionCard).join("");
@@ -310,7 +345,7 @@ async function fetchData() {
     refreshSeconds = data.refresh_seconds || 30;
     $("refreshInterval").textContent = refreshSeconds;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
-    $("matchCount").textContent = `${data.fusion_count ?? 0} fusion · ${data.confirmed_count ?? 0} confirmed`;
+    $("matchCount").textContent = `${data.fusion_count ?? 0} fusion · ${data.strong_under_count ?? 0} market`;
     $("liveTotal").textContent = `${data.total_live_football ?? 0} live scanned`;
 
     $("connectionStatus").classList.add("live");

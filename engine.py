@@ -1130,26 +1130,68 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
 FUSION_AGREEMENTS = frozenset({"CONFIRMED", "ALIGNED"})
 
 
+def _fusion_market_snapshot(m: dict[str, Any]) -> dict[str, Any]:
+    fusion = m.get("combined_analysis") or {}
+    return m.get("market_odds") or fusion.get("market_odds_summary") or {}
+
+
+def _fusion_market_lean(m: dict[str, Any]) -> str:
+    return _fusion_market_snapshot(m).get("market_lean") or "neutral"
+
+
+def _fusion_u15_implied(m: dict[str, Any]) -> float:
+    try:
+        return float(_fusion_market_snapshot(m).get("under_15_implied_pct") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _fusion_event_key(m: dict[str, Any]) -> tuple[str, str]:
+    return (str(m.get("event_id") or ""), str(m.get("half") or "fh"))
+
+
 def build_fusion_payload(main: dict[str, Any]) -> dict[str, Any]:
-    """Matches where live 1xBet tempo aligns with historical form (CONFIRMED / ALIGNED)."""
+    """CONFIRMED/ALIGNED fusion plus 1xBet strong-under market-lean picks."""
     picks: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
     for m in main.get("matches") or []:
         fusion = m.get("combined_analysis") or {}
-        if fusion.get("agreement") not in FUSION_AGREEMENTS:
-            continue
         if fusion.get("best_recommendation") == "SKIP":
             continue
-        picks.append(m)
 
-    picks.sort(key=lambda m: (
-        0 if (m.get("combined_analysis") or {}).get("agreement") == "CONFIRMED" else 1,
-        -(m.get("combined_analysis") or {}).get("confidence", 0),
+        key = _fusion_event_key(m)
+        agreement = fusion.get("agreement")
+
+        if agreement in FUSION_AGREEMENTS:
+            entry = dict(m)
+            entry["fusion_tier"] = "CONFIRMED" if agreement == "CONFIRMED" else "ALIGNED"
+            picks.append(entry)
+            seen.add(key)
+            continue
+
+        if _fusion_market_lean(m) == "strong_under" and key not in seen:
+            entry = dict(m)
+            entry["fusion_tier"] = "STRONG_UNDER"
+            picks.append(entry)
+            seen.add(key)
+
+    picks.sort(key=lambda m: {
+        "CONFIRMED": (0, 0),
+        "ALIGNED": (0, 1),
+        "STRONG_UNDER": (1, 0),
+    }.get(m.get("fusion_tier", ""), (2, 0)) + (
+        -(
+            (m.get("combined_analysis") or {}).get("confidence", 0)
+            if m.get("fusion_tier") != "STRONG_UNDER"
+            else _fusion_u15_implied(m)
+        ),
     ))
 
-    confirmed = sum(
-        1 for m in picks
-        if (m.get("combined_analysis") or {}).get("agreement") == "CONFIRMED"
-    )
+    confirmed = sum(1 for m in picks if m.get("fusion_tier") == "CONFIRMED")
+    aligned = sum(1 for m in picks if m.get("fusion_tier") == "ALIGNED")
+    strong_under = sum(1 for m in picks if m.get("fusion_tier") == "STRONG_UNDER")
+    strong_under_lean = sum(1 for m in picks if _fusion_market_lean(m) == "strong_under")
     bet_count = sum(
         1 for m in picks
         if (m.get("combined_analysis") or {}).get("best_recommendation") == "BET"
@@ -1163,7 +1205,9 @@ def build_fusion_payload(main: dict[str, Any]) -> dict[str, Any]:
         "onexbet_android_package": main.get("onexbet_android_package"),
         "fusion_count": len(picks),
         "confirmed_count": confirmed,
-        "aligned_count": len(picks) - confirmed,
+        "aligned_count": aligned,
+        "strong_under_count": strong_under,
+        "strong_under_lean_count": strong_under_lean,
         "bet_count": bet_count,
         "total_live_football": main.get("total_live_football"),
         "prophitbet": main.get("prophitbet"),

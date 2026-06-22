@@ -341,11 +341,28 @@ class ProphitBetStatsProvider:
             "loading": self._loading,
             "updated_at": self._updated_at,
             "leagues_loaded": self._leagues_loaded,
+            "leagues_configured": self._leagues_configured(),
             "teams_count": self._teams_count,
             "form_window": self._window,
             "error": self._error,
             "source": "football-data.co.uk (ProphitBet StatisticsEngine)",
         }
+
+    def _leagues_configured(self) -> int:
+        try:
+            with open(LEAGUES_CFG, encoding="utf-8") as f:
+                cfg = json.load(f)
+            return len(cfg.get("leagues") or [])
+        except (OSError, json.JSONDecodeError):
+            return 0
+
+    def _leagues_version(self) -> int:
+        try:
+            with open(LEAGUES_CFG, encoding="utf-8") as f:
+                cfg = json.load(f)
+            return int(cfg.get("version") or 0)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            return 0
 
     def ensure_loaded(self, background: bool = True) -> None:
         if self._loaded or self._loading:
@@ -368,6 +385,8 @@ class ProphitBetStatsProvider:
                 info = json.load(f)
             updated = datetime.fromisoformat(info["updated_at"])
             age_h = (datetime.now(timezone.utc) - updated).total_seconds() / 3600
+            if info.get("leagues_version", 0) != self._leagues_version():
+                return False
             return age_h < CACHE_TTL_HOURS and (DATA_DIR / "team_index.json").exists()
         except (json.JSONDecodeError, KeyError, ValueError):
             return False
@@ -393,6 +412,7 @@ class ProphitBetStatsProvider:
         meta = {
             "updated_at": self._updated_at,
             "leagues_loaded": self._leagues_loaded,
+            "leagues_version": self._leagues_version(),
             "teams_count": self._teams_count,
             "form_window": self._window,
         }

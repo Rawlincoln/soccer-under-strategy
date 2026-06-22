@@ -18,6 +18,8 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from team_aliases import apply_team_alias
+
 ROOT = Path(__file__).parent
 DATA_DIR = ROOT / "data" / "prophitbet"
 LEAGUES_CFG = ROOT / "data" / "leagues.json"
@@ -484,7 +486,7 @@ class ProphitBetStatsProvider:
     def _resolve_team(self, name: str) -> Optional[dict[str, Any]]:
         if not self._team_index:
             return None
-        norm = _normalize_team(name)
+        norm = _normalize_team(apply_team_alias(name))
         if norm in self._team_index:
             return self._team_index[norm]
 

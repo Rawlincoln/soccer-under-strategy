@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from team_aliases import is_virtual_esoccer_team
+
 # League / competition keywords (case-insensitive substring match)
 EXCLUDED_LEAGUE_KEYWORDS = (
     "4x4",
@@ -16,6 +18,7 @@ EXCLUDED_LEAGUE_KEYWORDS = (
     "esports",
     "e-sports",
     "virtual",
+    "mls+",
     "mls",
     "short football",
     "volta",
@@ -66,7 +69,9 @@ def is_excluded_match(
         return True
 
     # MLS variants: "MLS+", "MLS ", "Major League Soccer"
-    league_lower = league.lower()
+    league_lower = league.lower().strip()
+    if league_lower in ("mls+", "mls +") or "mls+" in league_lower:
+        return True
     if "mls" in league_lower or "major league soccer" in league_lower:
         return True
 
@@ -74,6 +79,8 @@ def is_excluded_match(
         return True
 
     for team in (home_team, away_team):
+        if is_virtual_esoccer_team(team):
+            return True
         if _TEAM_RE.search(team):
             return True
         if _contains_keyword(team, ("4x4", "5x5", "2x2", "3x3")):

@@ -16,7 +16,11 @@ from typing import Any, Optional
 
 import requests
 
+from team_aliases import apply_team_alias, league_context_score
+
 BASE_URL = "https://www.fotmob.com/api/data"
+FUZZY_TEAM_THRESHOLD = 0.78
+FUZZY_LEAGUE_MIN_SCORE = 0.35
 MATCHES_TTL_SECONDS = 120
 DETAIL_TTL_SECONDS = 90
 DETAIL_MIN_INTERVAL = 1.0
@@ -30,6 +34,7 @@ HEADERS = {
 
 
 def _normalize_team(name: str) -> str:
+    name = apply_team_alias(name)
     name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     name = name.lower()
     name = re.sub(r"\b(fc|cf|sc|ac|fk|cd|ud|sv|vfb|vfl|rb|tsg|1\.)\b", "", name)
@@ -222,6 +227,8 @@ class FotMobStatsProvider:
                 r.raise_for_status()
                 for league in r.json().get("leagues", []):
                     league_name = league.get("name", "")
+                    league_ccode = league.get("ccode", "") or ""
+                    parent_name = league.get("parentLeagueName", "") or ""
                     for m in league.get("matches", []):
                         home = (m.get("home") or {}).get("name", "")
                         away = (m.get("away") or {}).get("name", "")
@@ -233,6 +240,8 @@ class FotMobStatsProvider:
                             "home_team": home,
                             "away_team": away,
                             "league": league_name,
+                            "ccode": league_ccode,
+                            "parent_league": parent_name,
                             "status": m.get("status", {}),
                         }
                         index[_pair_key(home, away)] = entry
@@ -248,29 +257,64 @@ class FotMobStatsProvider:
             with self._lock:
                 self._loading = False
 
-    def _resolve_match(self, home: str, away: str) -> Optional[dict[str, Any]]:
-        key = _pair_key(home, away)
+    def _resolve_match(
+        self,
+        home: str,
+        away: str,
+        league: str = "",
+        country: str = "",
+    ) -> Optional[dict[str, Any]]:
+        home_alias = apply_team_alias(home)
+        away_alias = apply_team_alias(away)
+        key = _pair_key(home_alias, away_alias)
         with self._lock:
             if key in self._match_index:
-                return self._match_index[key]
+                entry = self._match_index[key]
+                if self._league_ok(league, country, entry):
+                    return entry
 
         best_key = None
-        best_score = 0.0
+        best_combined = 0.0
         with self._lock:
-            keys = list(self._match_index.keys())
-        hn, an = _normalize_team(home), _normalize_team(away)
-        for cand in keys:
-            if "|" not in cand:
+            entries = list(self._match_index.items())
+        hn, an = _normalize_team(home_alias), _normalize_team(away_alias)
+        for cand_key, entry in entries:
+            if "|" not in cand_key:
                 continue
-            ch, ca = cand.split("|", 1)
-            score = (SequenceMatcher(None, hn, ch).ratio() + SequenceMatcher(None, an, ca).ratio()) / 2
-            if score > best_score:
-                best_score = score
-                best_key = cand
-        if best_key and best_score >= 0.78:
+            ch, ca = cand_key.split("|", 1)
+            team_score = (
+                SequenceMatcher(None, hn, ch).ratio()
+                + SequenceMatcher(None, an, ca).ratio()
+            ) / 2
+            if team_score < FUZZY_TEAM_THRESHOLD:
+                continue
+            ctx_score = league_context_score(
+                league,
+                country,
+                entry.get("league", ""),
+                entry.get("ccode", ""),
+            )
+            if ctx_score < FUZZY_LEAGUE_MIN_SCORE:
+                continue
+            combined = team_score * 0.65 + ctx_score * 0.35
+            if combined > best_combined:
+                best_combined = combined
+                best_key = cand_key
+        if best_key:
             with self._lock:
                 return self._match_index.get(best_key)
         return None
+
+    @staticmethod
+    def _league_ok(league: str, country: str, entry: dict[str, Any]) -> bool:
+        if not league and not country:
+            return True
+        return league_context_score(
+            league,
+            country,
+            entry.get("league", ""),
+            entry.get("ccode", ""),
+        ) >= FUZZY_LEAGUE_MIN_SCORE
 
     def _fetch_detail(self, match_id: int) -> Optional[dict[str, Any]]:
         cache_key = str(match_id)
@@ -301,12 +345,19 @@ class FotMobStatsProvider:
                 cached = self._detail_cache.get(cache_key)
             return cached[1] if cached else None
 
-    def lookup_match(self, home: str, away: str, half: str = "fh") -> Optional[dict[str, Any]]:
+    def lookup_match(
+        self,
+        home: str,
+        away: str,
+        half: str = "fh",
+        league: str = "",
+        country: str = "",
+    ) -> Optional[dict[str, Any]]:
         self.ensure_loaded(background=True)
         if self._index_loaded_at == 0:
             self._load_index()
 
-        resolved = self._resolve_match(home, away)
+        resolved = self._resolve_match(home, away, league=league, country=country)
         if not resolved:
             return None
 

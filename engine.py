@@ -836,7 +836,10 @@ def _scan_live_football() -> tuple[
 
         prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
         soccerpunter_stats = SOCCERPUNTER_PROVIDER.lookup_match(m.home_team, m.away_team)
-        fotmob_stats = FOTMOB_PROVIDER.lookup_match(m.home_team, m.away_team, half="fh")
+        fotmob_stats = FOTMOB_PROVIDER.lookup_match(
+            m.home_team, m.away_team, half="fh",
+            league=m.league, country=m.country,
+        )
         sportsdb_stats = SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
         game_detail = ONEXBET_CLIENT.fetch_game_detail(m.game_id)
         market_odds_fh = lookup_market_odds(
@@ -863,7 +866,10 @@ def _scan_live_football() -> tuple[
             period_stats = ONEXBET_CLIENT.fetch_period_subgame_stats(m, half)
             if has_red_cards(period_stats):
                 continue
-            fm_half = FOTMOB_PROVIDER.lookup_match(m.home_team, m.away_team, half=half)
+            fm_half = FOTMOB_PROVIDER.lookup_match(
+                m.home_team, m.away_team, half=half,
+                league=m.league, country=m.country,
+            )
             odds_half = lookup_market_odds(
                 ONEXBET_CLIENT, m.game_id, half=half, cached_detail=game_detail,
             )

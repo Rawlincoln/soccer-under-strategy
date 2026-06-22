@@ -1,0 +1,133 @@
+{
+  "generated_at": "2026-06-22T20:14:02Z",
+  "summary": {
+    "total": 7,
+    "fotmob_index_matched": 4,
+    "fotmob_stats_matched": 3,
+    "fotmob_index_only": 1,
+    "fotmob_matched": 3,
+    "prophitbet_matched": 3,
+    "both_matched": 3,
+    "neither_matched": 4
+  },
+  "by_league": {
+    "Ireland. Premier League": {
+      "n": 2,
+      "fotmob": 2,
+      "prophitbet": 2
+    },
+    "Iceland. Urvalsdeild": {
+      "n": 1,
+      "fotmob": 1,
+      "prophitbet": 1
+    },
+    "Kuwait. Premier League": {
+      "n": 1,
+      "fotmob": 0,
+      "prophitbet": 0
+    },
+    "Peru. Copa de la Liga": {
+      "n": 1,
+      "fotmob": 0,
+      "prophitbet": 0
+    },
+    "Iceland. Urvalsdeild. Women": {
+      "n": 1,
+      "fotmob": 0,
+      "prophitbet": 0
+    },
+    "Northern Ireland. County Antrim Shield. Women": {
+      "n": 1,
+      "fotmob": 0,
+      "prophitbet": 0
+    }
+  },
+  "misses": [
+    {
+      "league": "Kuwait. Premier League",
+      "match": "Qadsia vs Kazma",
+      "half": "sh",
+      "minute": 62,
+      "fotmob_index": true,
+      "fotmob": false,
+      "fotmob_league": "Premier League Championship Group",
+      "fotmob_xg": null,
+      "prophitbet": false,
+      "pb_u15": null
+    },
+    {
+      "league": "Peru. Copa de la Liga",
+      "match": "Atletico Grau vs Molinos El Pirata",
+      "half": "fh",
+      "minute": 0,
+      "fotmob_index": false,
+      "fotmob": false,
+      "fotmob_league": "",
+      "fotmob_xg": null,
+      "prophitbet": false,
+      "pb_u15": null
+    },
+    {
+      "league": "Iceland. Urvalsdeild. Women",
+      "match": "Stjarnan (Women) vs Fram Reykjavik (Women)",
+      "half": "ht",
+      "minute": 45,
+      "fotmob_index": false,
+      "fotmob": false,
+      "fotmob_league": "",
+      "fotmob_xg": null,
+      "prophitbet": false,
+      "pb_u15": null
+    },
+    {
+      "league": "Northern Ireland. County Antrim Shield. Women",
+      "match": "Crusaders Newtownabbey Strikers (Women) vs Ballyclare Comrades (Women)",
+      "half": "sh",
+      "minute": 58,
+      "fotmob_index": false,
+      "fotmob": false,
+      "fotmob_league": "",
+      "fotmob_xg": null,
+      "prophitbet": false,
+      "pb_u15": null
+    }
+  ],
+  "hits": [
+    {
+      "league": "Ireland. Premier League",
+      "match": "Shelbourne vs Bohemian Dublin",
+      "half": "sh",
+      "minute": 68,
+      "fotmob_index": true,
+      "fotmob": true,
+      "fotmob_league": "Premier Division",
+      "fotmob_xg": 0.2,
+      "prophitbet": true,
+      "pb_u15": 100.0
+    },
+    {
+      "league": "Ireland. Premier League",
+      "match": "Shamrock Rovers vs Derry City",
+      "half": "sh",
+      "minute": 53,
+      "fotmob_index": true,
+      "fotmob": true,
+      "fotmob_league": "Premier Division",
+      "fotmob_xg": 0.02,
+      "prophitbet": true,
+      "pb_u15": 100.0
+    },
+    {
+      "league": "Iceland. Urvalsdeild",
+      "match": "Knattspyrnufelag Reykjav\u00edkur vs IA Akranes",
+      "half": "ht",
+      "minute": 45,
+      "fotmob_index": true,
+      "fotmob": true,
+      "fotmob_league": "Besta deildin",
+      "fotmob_xg": 0.0,
+      "prophitbet": true,
+      "pb_u15": 100.0
+    }
+  ]
+}

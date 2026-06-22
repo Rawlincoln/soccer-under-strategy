@@ -27,7 +27,7 @@ from onexbet_client import (
     onexbet_live_url,
     onexbet_match_url,
 )
-from engine import REFRESH_SECONDS, DataCache
+from engine import REFRESH_SECONDS, DataCache, build_fusion_payload
 
 app = Flask(__name__, static_folder="static")
 cache = DataCache()
@@ -50,7 +50,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "23")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "24")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -90,6 +90,11 @@ def basketball_page():
 @app.route("/closing")
 def closing_page():
     return _serve_html("closing.html")
+
+
+@app.route("/fusion")
+def fusion_page():
+    return _serve_html("fusion.html")
 
 
 @app.route("/assistant")
@@ -213,6 +218,12 @@ def static_files(filename):
 def api_predictions():
     _ensure_cache()
     return jsonify(cache.get())
+
+
+@app.route("/api/fusion")
+def api_fusion():
+    _ensure_cache()
+    return jsonify(build_fusion_payload(cache.get()))
 
 
 @app.route("/api/refresh", methods=["POST"])

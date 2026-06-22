@@ -1119,3 +1119,51 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "error": None,
     }
     return main, closing
+
+
+FUSION_AGREEMENTS = frozenset({"CONFIRMED", "ALIGNED"})
+
+
+def build_fusion_payload(main: dict[str, Any]) -> dict[str, Any]:
+    """Matches where live 1xBet tempo aligns with historical form (CONFIRMED / ALIGNED)."""
+    picks: list[dict[str, Any]] = []
+    for m in main.get("matches") or []:
+        fusion = m.get("combined_analysis") or {}
+        if fusion.get("agreement") not in FUSION_AGREEMENTS:
+            continue
+        if fusion.get("best_recommendation") == "SKIP":
+            continue
+        picks.append(m)
+
+    picks.sort(key=lambda m: (
+        0 if (m.get("combined_analysis") or {}).get("agreement") == "CONFIRMED" else 1,
+        -(m.get("combined_analysis") or {}).get("confidence", 0),
+    ))
+
+    confirmed = sum(
+        1 for m in picks
+        if (m.get("combined_analysis") or {}).get("agreement") == "CONFIRMED"
+    )
+    bet_count = sum(
+        1 for m in picks
+        if (m.get("combined_analysis") or {}).get("best_recommendation") == "BET"
+    )
+
+    return {
+        "updated_at": main.get("updated_at"),
+        "refresh_seconds": main.get("refresh_seconds", REFRESH_SECONDS),
+        "onexbet_site": main.get("onexbet_site"),
+        "onexbet_app_open_url": main.get("onexbet_app_open_url"),
+        "onexbet_android_package": main.get("onexbet_android_package"),
+        "fusion_count": len(picks),
+        "confirmed_count": confirmed,
+        "aligned_count": len(picks) - confirmed,
+        "bet_count": bet_count,
+        "total_live_football": main.get("total_live_football"),
+        "prophitbet": main.get("prophitbet"),
+        "soccerpunter": main.get("soccerpunter"),
+        "fotmob": main.get("fotmob"),
+        "thesportsdb": main.get("thesportsdb"),
+        "matches": picks,
+        "error": main.get("error"),
+    }

@@ -10,61 +10,146 @@ const FusionAlerts = (() => {
     }
   }
 
-  function updateStatus(cfg) {
+  function setFieldLock(input, locked, hintText) {
+    if (!input) return;
+    input.disabled = !!locked;
+    const hintId = `${input.id}-lock`;
+    let hint = document.getElementById(hintId);
+    if (locked) {
+      if (!hint) {
+        hint = document.createElement("p");
+        hint.id = hintId;
+        hint.className = "env-lock-hint";
+        input.insertAdjacentElement("afterend", hint);
+      }
+      hint.textContent = hintText || "Locked — set via Render environment variables (permanent)";
+      hint.hidden = false;
+    } else if (hint) {
+      hint.hidden = true;
+    }
+  }
+
+  function updateServerBanner(cfg, status) {
+    const banner = $("faServerBanner");
+    if (!banner) return;
+    const st = status || {};
+    if (cfg?.server_push_ready && st.scanner_running) {
+      const ch = (st.channels_ready || []).join(", ") || "configured";
+      banner.hidden = false;
+      banner.className = "fusion-server-banner permanent";
+      banner.innerHTML = (
+        `✅ <strong>24/7 server alerts ACTIVE</strong> — scanning every 30s, pushing via ${ch}. `
+        + "Close this tab; alerts still arrive on your phone."
+      );
+      return;
+    }
+    if (cfg?.alerts_permanent && !cfg?.server_push_ready) {
+      banner.hidden = false;
+      banner.className = "fusion-server-banner";
+      banner.textContent = "Keys saved in Render env — add your Telegram chat ID (or Discord/WhatsApp) to finish setup.";
+      return;
+    }
+    if (cfg?.needs_chat_id) {
+      banner.hidden = false;
+      banner.className = "fusion-server-banner";
+      banner.innerHTML = (
+        "Almost ready — bot token is set but <strong>chat ID is missing</strong>. "
+        + "Message your bot → Find chat ID → Save, or set <code>TELEGRAM_CHAT_ID</code> in Render once."
+      );
+      return;
+    }
+    if (st.on_render && !cfg?.server_push_ready) {
+      banner.hidden = false;
+      banner.className = "fusion-server-banner";
+      banner.innerHTML = (
+        "For alerts that survive redeploys: Render dashboard → Environment → add "
+        + "<code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code> (or Discord/WhatsApp vars). Set once, never re-enter."
+      );
+      return;
+    }
+    banner.hidden = true;
+  }
+
+  function updateStatus(cfg, status) {
     const el = $("fusionAlertStatus");
     if (!el || !cfg) return;
+    const st = status || {};
     const parts = [];
-    if (cfg.fusion_alerts_enabled !== false) parts.push("Fusion scans ON");
+    if (st.scanner_running) parts.push("Server scanner ON");
+    if (cfg.fusion_alerts_enabled !== false) parts.push("Fusion alerts ON");
     if (cfg.telegram_enabled && cfg.telegram_configured) parts.push("Telegram ✓");
     else if (cfg.telegram_enabled) parts.push("Telegram — add chat ID");
     if (cfg.discord_enabled && cfg.discord_configured) parts.push("Discord ✓");
     else if (cfg.discord_enabled) parts.push("Discord — add webhook");
     if (cfg.whatsapp_enabled && cfg.whatsapp_configured) parts.push("WhatsApp ✓");
     else if (cfg.whatsapp_enabled) parts.push("WhatsApp — finish setup");
-    if (cfg.browser_alerts !== false) parts.push("Browser ✓");
-    const ready = (
-      cfg.fusion_alerts_enabled !== false && (
-        (cfg.telegram_enabled && cfg.telegram_configured)
-        || (cfg.discord_enabled && cfg.discord_configured)
-        || (cfg.whatsapp_enabled && cfg.whatsapp_configured)
-        || cfg.browser_alerts !== false
-      )
-    );
-    el.textContent = parts.length ? parts.join(" · ") : "Not configured — expand setup below";
-    el.className = "fusion-alert-status" + (ready ? " ready" : " warn");
+    if (cfg.browser_alerts !== false) parts.push("Browser (tab open only)");
+
+    const serverReady = cfg.server_push_ready && st.scanner_running !== false;
+    if (serverReady) {
+      el.textContent = `24/7 server push ACTIVE · ${parts.filter((p) => !p.startsWith("Browser")).join(" · ")}`;
+      el.className = "fusion-alert-status active-247";
+    } else {
+      el.textContent = parts.length ? parts.join(" · ") : "Not configured — expand setup below";
+      const ready = (
+        cfg.fusion_alerts_enabled !== false && (
+          (cfg.telegram_enabled && cfg.telegram_configured)
+          || (cfg.discord_enabled && cfg.discord_configured)
+          || (cfg.whatsapp_enabled && cfg.whatsapp_configured)
+        )
+      );
+      el.className = "fusion-alert-status" + (ready ? " ready" : " warn");
+    }
+    updateServerBanner(cfg, st);
   }
 
-  function applyConfig(cfg) {
+  function applyConfig(cfg, status) {
     if (!cfg) return;
+    const locked = cfg.env_locked || {};
     if ($("faBrowser")) $("faBrowser").checked = cfg.browser_alerts !== false;
     if ($("faTelegram")) $("faTelegram").checked = !!cfg.telegram_enabled;
     if ($("faDiscord")) $("faDiscord").checked = !!cfg.discord_enabled;
     if ($("faWhatsapp")) $("faWhatsapp").checked = !!cfg.whatsapp_enabled;
     if (cfg.telegram_chat_id && $("faTgChat")) $("faTgChat").value = cfg.telegram_chat_id;
     if (cfg.whatsapp_phone && $("faWaPhone")) $("faWaPhone").value = cfg.whatsapp_phone;
+
     const tgToken = $("faTgToken");
     if (tgToken) {
-      tgToken.placeholder = cfg.telegram_token_set
-        ? "Token saved (leave blank to keep)"
-        : "Paste bot token from @BotFather";
-      if (cfg.telegram_token_set) tgToken.value = "";
+      tgToken.placeholder = locked.telegram_token
+        ? "Token set via Render env (permanent)"
+        : (cfg.telegram_token_set ? "Token saved (leave blank to keep)" : "Paste bot token from @BotFather");
+      if (cfg.telegram_token_set || locked.telegram_token) tgToken.value = "";
+      setFieldLock(tgToken, locked.telegram_token);
     }
+
+    const tgChat = $("faTgChat");
+    if (tgChat) {
+      setFieldLock(tgChat, locked.telegram_chat, "Chat ID set via Render env (permanent)");
+    }
+
     const discord = $("faDiscordUrl");
     if (discord) {
-      discord.placeholder = cfg.discord_webhook_set
-        ? "Webhook saved (leave blank to keep)"
-        : "https://discord.com/api/webhooks/...";
+      discord.placeholder = locked.discord
+        ? "Webhook set via Render env (permanent)"
+        : (cfg.discord_webhook_set ? "Webhook saved (leave blank to keep)" : "https://discord.com/api/webhooks/...");
+      setFieldLock(discord, locked.discord);
     }
+
+    const waPhone = $("faWaPhone");
+    if (waPhone) setFieldLock(waPhone, locked.whatsapp_phone);
+
     const waKey = $("faWaKey");
     if (waKey) {
-      waKey.placeholder = cfg.whatsapp_apikey_set
-        ? "API key saved (leave blank to keep)"
-        : "CallMeBot API key";
+      waKey.placeholder = locked.whatsapp_apikey
+        ? "API key set via Render env (permanent)"
+        : (cfg.whatsapp_apikey_set ? "API key saved (leave blank to keep)" : "CallMeBot API key");
+      setFieldLock(waKey, locked.whatsapp_apikey);
     }
+
     if (typeof BetAssistant !== "undefined") {
       BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
     }
-    updateStatus(cfg);
+    updateStatus(cfg, status);
   }
 
   function buildSaveBody() {
@@ -88,10 +173,22 @@ const FusionAlerts = (() => {
     return body;
   }
 
+  async function fetchAlertStatus() {
+    try {
+      const res = await fetch("/api/alerts/status");
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
   async function loadConfig() {
     try {
-      const res = await fetch("/api/assistant/config");
-      applyConfig(await res.json());
+      const [cfgRes, status] = await Promise.all([
+        fetch("/api/assistant/config"),
+        fetchAlertStatus(),
+      ]);
+      applyConfig(await cfgRes.json(), status);
     } catch {
       updateStatus({ fusion_alerts_enabled: true, browser_alerts: true });
     }
@@ -108,14 +205,15 @@ const FusionAlerts = (() => {
       });
       const data = await res.json();
       if (!data.ok) throw new Error("Save failed");
-      applyConfig(data.config);
+      const status = await fetchAlertStatus();
+      applyConfig(data.config, status);
       if (typeof BetAssistant !== "undefined") {
         BetAssistant.setBrowserAlerts(data.config.browser_alerts !== false);
         if (data.config.browser_alerts !== false) {
           await BetAssistant.requestNotifyPermission();
         }
       }
-      toast("Alert settings saved");
+      toast(data.config.server_push_ready ? "Saved — 24/7 server alerts active" : "Alert settings saved");
     } catch (e) {
       toast(e.message || "Could not save settings");
     } finally {
@@ -136,7 +234,7 @@ const FusionAlerts = (() => {
       const ch = data.channels || {};
       const lines = Object.entries(ch).map(([k, v]) => `${k}: ${v.ok ? "OK" : (v.error || "failed")}`);
       if (data.ok) {
-        toast(lines.join(" · ") || "Test sent!");
+        toast(lines.join(" · ") || "Test sent to your phone!");
         await saveConfig();
       } else {
         toast(data.error || lines.join(" · ") || "Test failed — check your settings");
@@ -189,13 +287,16 @@ const FusionAlerts = (() => {
 
   async function pollFusionAlerts() {
     try {
-      const res = await fetch("/api/assistant");
-      const data = await res.json();
+      const [asstRes, status] = await Promise.all([
+        fetch("/api/assistant"),
+        fetchAlertStatus(),
+      ]);
+      const data = await asstRes.json();
       const fusion = (data.new_alerts || []).filter((a) => a.type === "fusion");
       if (fusion.length && typeof BetAssistant !== "undefined") {
         BetAssistant.processAlerts(fusion);
       }
-      if (data.config) applyConfig(data.config);
+      if (data.config) applyConfig(data.config, status);
     } catch { /* ignore */ }
   }
 

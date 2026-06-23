@@ -156,28 +156,12 @@ class AssistantStore:
             "onexbet_site": DEFAULT_ONEXBET_SITE,
             "onexbet_android_package": DEFAULT_ANDROID_PACKAGE,
         })
-        token = os.environ.get("TELEGRAM_BOT_TOKEN") or cfg.get("telegram_bot_token", "")
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID") or cfg.get("telegram_chat_id", "")
-        cfg["telegram_bot_token"] = token
-        cfg["telegram_chat_id"] = chat_id
-        cfg["telegram_configured"] = bool(token and chat_id)
-        cfg["discord_webhook_url"] = (
-            os.environ.get("DISCORD_WEBHOOK_URL") or cfg.get("discord_webhook_url") or ""
-        ).strip()
-        cfg["discord_configured"] = bool(cfg["discord_webhook_url"])
-        cfg["whatsapp_phone"] = (
-            os.environ.get("WHATSAPP_PHONE") or cfg.get("whatsapp_phone") or ""
-        ).strip()
-        cfg["whatsapp_apikey"] = (
-            os.environ.get("WHATSAPP_APIKEY") or cfg.get("whatsapp_apikey") or ""
-        ).strip()
-        cfg["whatsapp_configured"] = bool(cfg["whatsapp_phone"] and cfg["whatsapp_apikey"])
-        if "fusion_alerts_enabled" not in cfg:
-            cfg["fusion_alerts_enabled"] = True
-        return cfg
+        return _merge_env_alert_config(cfg)
 
     def save_config(self, updates: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
+            current = _merge_env_alert_config(self._read_json(CONFIG_PATH, {}))
+            env_locked = current.get("env_locked") or {}
             cfg = self._read_json(CONFIG_PATH, {})
             allowed = {
                 "stake_per_slip", "daily_target", "browser_alerts",
@@ -187,8 +171,19 @@ class AssistantStore:
                 "whatsapp_enabled", "whatsapp_phone", "whatsapp_apikey",
                 "onexbet_site", "onexbet_android_package",
             }
+            skip_if_locked = {
+                "telegram_bot_token": "telegram_token",
+                "telegram_chat_id": "telegram_chat",
+                "discord_webhook_url": "discord",
+                "whatsapp_phone": "whatsapp_phone",
+                "whatsapp_apikey": "whatsapp_apikey",
+                "fusion_alerts_enabled": "fusion_alerts",
+            }
             for key, val in updates.items():
                 if key not in allowed:
+                    continue
+                lock_key = skip_if_locked.get(key)
+                if lock_key and env_locked.get(lock_key):
                     continue
                 if key in (
                     "telegram_bot_token", "telegram_chat_id",
@@ -214,6 +209,72 @@ class AssistantStore:
 
 
 STORE = AssistantStore()
+
+
+def _env_truthy(name: str, default: bool = True) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _merge_env_alert_config(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Env vars override file config — survives Render redeploys without re-entering keys."""
+    env_locked: dict[str, bool] = {}
+
+    if os.environ.get("TELEGRAM_BOT_TOKEN"):
+        cfg["telegram_bot_token"] = os.environ["TELEGRAM_BOT_TOKEN"].strip()
+        env_locked["telegram_token"] = True
+    if os.environ.get("TELEGRAM_CHAT_ID"):
+        cfg["telegram_chat_id"] = os.environ["TELEGRAM_CHAT_ID"].strip()
+        env_locked["telegram_chat"] = True
+    if env_locked.get("telegram_token") or env_locked.get("telegram_chat"):
+        cfg["telegram_enabled"] = _env_truthy("TELEGRAM_ENABLED", True)
+
+    if os.environ.get("DISCORD_WEBHOOK_URL"):
+        cfg["discord_webhook_url"] = os.environ["DISCORD_WEBHOOK_URL"].strip()
+        cfg["discord_enabled"] = _env_truthy("DISCORD_ENABLED", True)
+        env_locked["discord"] = True
+
+    if os.environ.get("WHATSAPP_PHONE"):
+        cfg["whatsapp_phone"] = os.environ["WHATSAPP_PHONE"].strip()
+        env_locked["whatsapp_phone"] = True
+    if os.environ.get("WHATSAPP_APIKEY"):
+        cfg["whatsapp_apikey"] = os.environ["WHATSAPP_APIKEY"].strip()
+        env_locked["whatsapp_apikey"] = True
+    if env_locked.get("whatsapp_phone") or env_locked.get("whatsapp_apikey"):
+        cfg["whatsapp_enabled"] = _env_truthy("WHATSAPP_ENABLED", True)
+
+    if os.environ.get("FUSION_ALERTS_ENABLED") is not None:
+        cfg["fusion_alerts_enabled"] = _env_truthy("FUSION_ALERTS_ENABLED", True)
+        env_locked["fusion_alerts"] = True
+    elif "fusion_alerts_enabled" not in cfg:
+        cfg["fusion_alerts_enabled"] = True
+
+    token = (cfg.get("telegram_bot_token") or "").strip()
+    chat_id = str(cfg.get("telegram_chat_id") or "").strip()
+    cfg["telegram_bot_token"] = token
+    cfg["telegram_chat_id"] = chat_id
+    cfg["telegram_configured"] = bool(token and chat_id)
+
+    cfg["discord_webhook_url"] = (cfg.get("discord_webhook_url") or "").strip()
+    cfg["discord_configured"] = bool(cfg["discord_webhook_url"])
+
+    cfg["whatsapp_phone"] = (cfg.get("whatsapp_phone") or "").strip()
+    cfg["whatsapp_apikey"] = (cfg.get("whatsapp_apikey") or "").strip()
+    cfg["whatsapp_configured"] = bool(cfg["whatsapp_phone"] and cfg["whatsapp_apikey"])
+
+    cfg["env_locked"] = env_locked
+    cfg["alerts_permanent"] = bool(env_locked)
+    cfg["server_push_ready"] = (
+        cfg.get("fusion_alerts_enabled", True)
+        and (
+            (cfg.get("telegram_enabled") and cfg["telegram_configured"])
+            or (cfg.get("discord_enabled") and cfg["discord_configured"])
+            or (cfg.get("whatsapp_enabled") and cfg["whatsapp_configured"])
+        )
+    )
+    return cfg
 
 
 def _today() -> str:
@@ -1162,7 +1223,7 @@ def dispatch_new_alerts(alerts: list[dict], config: Optional[dict] = None) -> in
 
 def _safe_config(config: dict[str, Any]) -> dict[str, Any]:
     safe = {k: v for k, v in config.items() if k not in (
-        "telegram_bot_token", "discord_webhook_url", "whatsapp_apikey",
+        "telegram_bot_token", "discord_webhook_url", "whatsapp_apikey", "env_locked",
     )}
     safe["telegram_configured"] = config.get("telegram_configured", False)
     safe["telegram_token_set"] = bool(config.get("telegram_bot_token"))
@@ -1170,7 +1231,35 @@ def _safe_config(config: dict[str, Any]) -> dict[str, Any]:
     safe["discord_webhook_set"] = bool(config.get("discord_webhook_url"))
     safe["whatsapp_configured"] = config.get("whatsapp_configured", False)
     safe["whatsapp_apikey_set"] = bool(config.get("whatsapp_apikey"))
+    safe["alerts_permanent"] = config.get("alerts_permanent", False)
+    safe["server_push_ready"] = config.get("server_push_ready", False)
+    safe["env_locked"] = config.get("env_locked") or {}
     return safe
+
+
+def get_alerts_status(*, scanner_running: bool = False) -> dict[str, Any]:
+    cfg = STORE.load_config()
+    channels = []
+    if cfg.get("telegram_enabled") and cfg.get("telegram_configured"):
+        channels.append("telegram")
+    if cfg.get("discord_enabled") and cfg.get("discord_configured"):
+        channels.append("discord")
+    if cfg.get("whatsapp_enabled") and cfg.get("whatsapp_configured"):
+        channels.append("whatsapp")
+    return {
+        "scanner_running": scanner_running,
+        "fusion_alerts_enabled": cfg.get("fusion_alerts_enabled", True),
+        "server_push_ready": cfg.get("server_push_ready", False),
+        "alerts_permanent": cfg.get("alerts_permanent", False),
+        "channels_ready": channels,
+        "needs_chat_id": bool(cfg.get("telegram_bot_token") and not cfg.get("telegram_chat_id")),
+        "on_render": bool(os.environ.get("RENDER")),
+        "hint": (
+            "Server scans every 30s and pushes alerts — no browser needed."
+            if cfg.get("server_push_ready")
+            else "Add Telegram chat ID or set Render environment variables once."
+        ),
+    }
 
 
 def build_assistant_payload(

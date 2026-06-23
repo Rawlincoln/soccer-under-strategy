@@ -57,6 +57,48 @@
   color: var(--orange, #ff8c32);
 }
 
+.fusion-alert-status.active-247 {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-dim);
+  font-weight: 600;
+}
+
+.fusion-server-banner {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fusion-server-banner.permanent {
+  border-color: var(--green);
+  background: var(--green-dim);
+  color: var(--text);
+}
+
+.fusion-server-banner code {
+  font-size: 0.72rem;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.env-lock-hint {
+  font-size: 0.72rem;
+  color: var(--green);
+  margin-top: 6px;
+}
+
+.fusion-alert-channel input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .fusion-alerts-body {
   margin-top: 12px;
   padding: 16px;

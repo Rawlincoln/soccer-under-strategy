@@ -10,7 +10,31 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.13.0"
+      # Set these once in Render dashboard — they survive redeploys (no re-entering keys)
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: TELEGRAM_ENABLED
+        value: "true"
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: DISCORD_ENABLED
+        value: "true"
+      - key: WHATSAPP_PHONE
+        sync: false
+      - key: WHATSAPP_APIKEY
+        sync: false
+      - key: WHATSAPP_ENABLED
+        value: "true"
+      - key: FUSION_ALERTS_ENABLED
+        value: "true"
+
+  # Pings /health every 12 min so the free tier stays awake and keeps scanning 24/7
+  - type: cron
+    name: soccer-keepalive
+    runtime: python
+    plan: free
+    schedule: "*/12 * * * *"
+    buildCommand: "true"
+    startCommand: python -c "import urllib.request; urllib.request.urlopen('https://soccer-under-strategy.onrender.com/health', timeout=60).read()"

@@ -69,8 +69,12 @@
       <span class="fusion-alerts-chevron">▼</span>
     </button>
     <div class="fusion-alert-status warn" id="fusionAlertStatus">Loading alert settings…</div>
+    <div class="fusion-server-banner" id="faServerBanner" hidden></div>
     <div class="fusion-alerts-body" id="faBody" hidden>
-      <p class="fusion-alerts-lead">Get notified when a new match appears on this Fusion page. Pick one or more channels below.</p>
+      <p class="fusion-alerts-lead">
+        The server scans every 30s and pushes alerts to your phone — <strong>no need to keep this page open</strong>.
+        Set Telegram, Discord, or WhatsApp once (Render env vars stay forever after redeploys).
+      </p>
       <div class="fusion-alerts-grid">
         <div class="fusion-alert-channel">
           <label class="asst-check"><input type="checkbox" id="faBrowser" checked /> Browser notifications (this device)</label>

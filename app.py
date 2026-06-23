@@ -14,6 +14,7 @@ from bet_assistant import (
     discover_telegram_chats,
     effective_onexbet_android_package,
     effective_onexbet_site,
+    get_alerts_status,
     lock_to_slip,
     log_bet_result,
     record_slip_outcome,
@@ -43,6 +44,10 @@ def _ensure_cache():
     if not _cache_started:
         cache.start()
         _cache_started = True
+
+
+def _scanner_running() -> bool:
+    return _cache_started and getattr(cache, "_running", False)
 
 
 def _ensure_basketball_cache():
@@ -415,8 +420,22 @@ def api_export_lock():
 
 @app.route("/health")
 def health():
-    return jsonify({"ok": True})
+    status = get_alerts_status(scanner_running=_scanner_running())
+    return jsonify({
+        "ok": True,
+        "scanner_running": status["scanner_running"],
+        "server_push_ready": status["server_push_ready"],
+        "channels_ready": status["channels_ready"],
+        "fusion_alerts_enabled": status["fusion_alerts_enabled"],
+    })
 
+
+@app.route("/api/alerts/status")
+def api_alerts_status():
+    return jsonify(get_alerts_status(scanner_running=_scanner_running()))
+
+
+_ensure_cache()
 
 if __name__ == "__main__":
     _ensure_cache()

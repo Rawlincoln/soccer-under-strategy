@@ -20,7 +20,9 @@ from bet_assistant import (
     record_slip_placed,
     record_slip_result,
     reset_workflow,
+    test_all_alerts,
     test_telegram,
+    _safe_config,
 )
 from onexbet_client import (
     onexbet_app_open_url,
@@ -50,7 +52,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "25")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "26")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -265,30 +267,42 @@ def api_assistant():
 @app.route("/api/assistant/config", methods=["GET", "POST"])
 def api_assistant_config():
     if request.method == "GET":
-        cfg = STORE.load_config()
-        safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
-        safe["telegram_token_set"] = bool(cfg.get("telegram_bot_token"))
-        return jsonify(safe)
+        return jsonify(_safe_config(STORE.load_config()))
     body = request.get_json(silent=True) or {}
     cfg = STORE.save_config(body)
-    safe = {k: v for k, v in cfg.items() if k != "telegram_bot_token"}
-    safe["telegram_token_set"] = bool(cfg.get("telegram_bot_token"))
-    return jsonify({"ok": True, "config": safe})
+    return jsonify({"ok": True, "config": _safe_config(cfg)})
 
 
 @app.route("/api/assistant/telegram/test", methods=["POST"])
 def api_telegram_test():
     body = request.get_json(silent=True) or {}
-    cfg = STORE.load_config()
-    if body.get("telegram_bot_token"):
-        cfg = {**cfg, "telegram_bot_token": body["telegram_bot_token"]}
-    if body.get("telegram_chat_id"):
-        cfg = {**cfg, "telegram_chat_id": str(body["telegram_chat_id"])}
-    if body.get("telegram_enabled") is not None:
-        cfg = {**cfg, "telegram_enabled": bool(body["telegram_enabled"])}
-    elif not cfg.get("telegram_enabled"):
-        cfg = {**cfg, "telegram_enabled": True}
+    cfg = _merge_alert_test_config(body)
     return jsonify(test_telegram(cfg))
+
+
+@app.route("/api/assistant/alerts/test", methods=["POST"])
+def api_alerts_test():
+    body = request.get_json(silent=True) or {}
+    cfg = _merge_alert_test_config(body)
+    return jsonify(test_all_alerts(cfg))
+
+
+def _merge_alert_test_config(body: dict) -> dict:
+    cfg = STORE.load_config()
+    for key in (
+        "telegram_bot_token", "telegram_chat_id", "telegram_enabled",
+        "discord_webhook_url", "discord_enabled",
+        "whatsapp_phone", "whatsapp_apikey", "whatsapp_enabled",
+        "fusion_alerts_enabled",
+    ):
+        if key in body and body[key] is not None:
+            if key.endswith("_enabled"):
+                cfg[key] = bool(body[key])
+            elif str(body[key]).strip():
+                cfg[key] = body[key]
+    if body.get("telegram_enabled") is not False and not cfg.get("telegram_enabled"):
+        cfg["telegram_enabled"] = True
+    return cfg
 
 
 @app.route("/api/assistant/telegram/discover", methods=["POST"])

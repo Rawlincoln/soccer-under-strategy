@@ -385,3 +385,7 @@ function startPolling() {
 }
 
 startPolling();
+
+if (typeof FusionAlerts !== "undefined") {
+  FusionAlerts.init(POLL_MS);
+}

@@ -7,6 +7,7 @@
   <title>Pro Punter · Fusion Confirmed</title>
   <link rel="stylesheet" href="/static/style.css?v={{ASSET_VERSION}}" />
   <link rel="stylesheet" href="/static/fusion.css?v={{ASSET_VERSION}}" />
+  <link rel="stylesheet" href="/static/assistant.css?v={{ASSET_VERSION}}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
 </head>
@@ -62,6 +63,53 @@
 
   <section class="baselines" id="baselines"></section>
 
+  <section class="fusion-alerts-panel">
+    <button type="button" class="fusion-alerts-toggle" id="faToggle" aria-expanded="false">
+      🔔 Fusion match alerts — Telegram · Discord · WhatsApp · Browser
+      <span class="fusion-alerts-chevron">▼</span>
+    </button>
+    <div class="fusion-alert-status warn" id="fusionAlertStatus">Loading alert settings…</div>
+    <div class="fusion-alerts-body" id="faBody" hidden>
+      <p class="fusion-alerts-lead">Get notified when a new match appears on this Fusion page. Pick one or more channels below.</p>
+      <div class="fusion-alerts-grid">
+        <div class="fusion-alert-channel">
+          <label class="asst-check"><input type="checkbox" id="faBrowser" checked /> Browser notifications (this device)</label>
+          <p class="asst-hint">Allow notifications when prompted. Works while this tab is open.</p>
+        </div>
+        <div class="fusion-alert-channel">
+          <label class="asst-check"><input type="checkbox" id="faTelegram" /> Telegram</label>
+          <ol class="fa-steps">
+            <li><a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> → <code>/newbot</code> → copy token</li>
+            <li>Message your bot → tap <strong>Start</strong></li>
+            <li>Paste token → <strong>Find chat ID</strong> → Save → Test</li>
+          </ol>
+          <input type="password" id="faTgToken" placeholder="Bot token" autocomplete="off" />
+          <div class="fa-row">
+            <input type="text" id="faTgChat" placeholder="Chat ID" />
+            <button type="button" class="ba-btn" id="faDiscover">Find chat ID</button>
+          </div>
+          <div id="faChatPick" class="tg-chat-pick" hidden></div>
+        </div>
+        <div class="fusion-alert-channel">
+          <label class="asst-check"><input type="checkbox" id="faDiscord" /> Discord webhook</label>
+          <p class="asst-hint">Discord channel → Settings → Integrations → Webhooks → New Webhook → copy URL</p>
+          <input type="password" id="faDiscordUrl" placeholder="Webhook URL" autocomplete="off" />
+        </div>
+        <div class="fusion-alert-channel">
+          <label class="asst-check"><input type="checkbox" id="faWhatsapp" /> WhatsApp (CallMeBot)</label>
+          <p class="asst-hint"><a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">callmebot.com</a> — link your number, then paste details below</p>
+          <input type="text" id="faWaPhone" placeholder="Phone international, no + (e.g. 2547…)" autocomplete="off" />
+          <input type="password" id="faWaKey" placeholder="CallMeBot API key" autocomplete="off" />
+        </div>
+      </div>
+      <div class="fa-actions">
+        <button type="button" class="ba-btn primary" id="faSave">Save alerts</button>
+        <button type="button" class="ba-btn orange" id="faTest">Send test</button>
+        <a href="/assistant" class="fa-assistant-link">Full assistant settings →</a>
+      </div>
+    </div>
+  </section>
+
   <section class="matches-section">
     <div class="section-header">
       <h2 class="section-title">All sources agree · under outcome</h2>
@@ -86,6 +134,7 @@
 
   <link rel="stylesheet" href="/static/bet-assistant.css?v={{ASSET_VERSION}}" />
   <script src="/static/bet-assistant.js?v={{ASSET_VERSION}}"></script>
+  <script src="/static/fusion-alerts.js?v={{ASSET_VERSION}}"></script>
   <script src="/static/fusion.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>

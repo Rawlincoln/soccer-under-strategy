@@ -408,28 +408,34 @@ function renderAlerts(alerts) {
 function updateTgStatus(cfg) {
   const el = $("tgStatus");
   if (!el || !cfg) return;
-  if (cfg.telegram_enabled && cfg.telegram_configured) {
-    el.textContent = `Telegram: active · chat ${cfg.telegram_chat_id || "—"}`;
-    el.className = "tg-status ok";
-  } else if (cfg.telegram_enabled && cfg.telegram_token_set) {
-    el.textContent = "Telegram: enabled — add chat ID and Save";
-    el.className = "tg-status warn";
-  } else if (cfg.telegram_configured) {
-    el.textContent = "Telegram: configured — enable and Save";
-    el.className = "tg-status warn";
-  } else if (cfg.telegram_token_set) {
-    el.textContent = "Telegram: token saved — add chat ID";
-    el.className = "tg-status warn";
-  } else {
-    el.textContent = "Telegram: not configured";
-    el.className = "tg-status";
-  }
+  const parts = [];
+  if (cfg.fusion_alerts_enabled !== false) parts.push("Fusion ON");
+  if (cfg.telegram_enabled && cfg.telegram_configured) parts.push("Telegram ✓");
+  else if (cfg.telegram_enabled) parts.push("Telegram (setup)");
+  if (cfg.discord_enabled && cfg.discord_configured) parts.push("Discord ✓");
+  else if (cfg.discord_enabled) parts.push("Discord (setup)");
+  if (cfg.whatsapp_enabled && cfg.whatsapp_configured) parts.push("WhatsApp ✓");
+  else if (cfg.whatsapp_enabled) parts.push("WhatsApp (setup)");
+  if (cfg.browser_alerts !== false) parts.push("Browser");
+  el.textContent = parts.length ? `Alerts: ${parts.join(" · ")}` : "Alerts: not configured";
+  const ready = (
+    (cfg.telegram_enabled && cfg.telegram_configured)
+    || (cfg.discord_enabled && cfg.discord_configured)
+    || (cfg.whatsapp_enabled && cfg.whatsapp_configured)
+    || cfg.browser_alerts !== false
+  );
+  el.className = ready ? "tg-status ok" : "tg-status warn";
 }
 
 function applyConfig(cfg) {
   if (!cfg) return;
   $("browserAlerts").checked = cfg.browser_alerts !== false;
+  if ($("fusionAlertsEnabled")) $("fusionAlertsEnabled").checked = cfg.fusion_alerts_enabled !== false;
   $("telegramEnabled").checked = !!cfg.telegram_enabled;
+  if ($("discordEnabled")) $("discordEnabled").checked = !!cfg.discord_enabled;
+  if ($("whatsappEnabled")) $("whatsappEnabled").checked = !!cfg.whatsapp_enabled;
+  if (cfg.telegram_chat_id) $("tgChat").value = cfg.telegram_chat_id;
+  if ($("whatsappPhone") && cfg.whatsapp_phone) $("whatsappPhone").value = cfg.whatsapp_phone;
   $("stakeSetting").value = cfg.stake_per_slip || 5000;
   if ($("targetSetting")) $("targetSetting").value = cfg.daily_target || 100000;
   if ($("onexbetSite")) {
@@ -438,13 +444,26 @@ function applyConfig(cfg) {
   if ($("onexbetAndroidPkg")) {
     $("onexbetAndroidPkg").value = cfg.onexbet_android_package || "org.xbet.client.ke_ps";
   }
-  if (cfg.telegram_chat_id) $("tgChat").value = cfg.telegram_chat_id;
   const tokenEl = $("tgToken");
+  const discordEl = $("discordWebhook");
+  const waKeyEl = $("whatsappApikey");
   if (cfg.telegram_token_set) {
     tokenEl.placeholder = "Token saved on server (leave blank to keep)";
     tokenEl.value = "";
   } else {
     tokenEl.placeholder = "123456789:ABCdefGHI...";
+  }
+  if (discordEl) {
+    discordEl.placeholder = cfg.discord_webhook_set
+      ? "Webhook saved (leave blank to keep)"
+      : "https://discord.com/api/webhooks/...";
+    if (!cfg.discord_webhook_set) discordEl.value = "";
+  }
+  if (waKeyEl) {
+    waKeyEl.placeholder = cfg.whatsapp_apikey_set
+      ? "API key saved (leave blank to keep)"
+      : "CallMeBot API key";
+    if (!cfg.whatsapp_apikey_set) waKeyEl.value = "";
   }
   BetAssistant.applyOnexbetConfig(cfg);
   BetAssistant.setBrowserAlerts(cfg.browser_alerts !== false);
@@ -454,7 +473,10 @@ function applyConfig(cfg) {
 async function saveConfig() {
   const body = {
     browser_alerts: $("browserAlerts").checked,
+    fusion_alerts_enabled: $("fusionAlertsEnabled")?.checked !== false,
     telegram_enabled: $("telegramEnabled").checked,
+    discord_enabled: $("discordEnabled")?.checked || false,
+    whatsapp_enabled: $("whatsappEnabled")?.checked || false,
     stake_per_slip: parseFloat($("stakeSetting").value) || 5000,
     daily_target: parseFloat($("targetSetting")?.value) || 100000,
     onexbet_site: $("onexbetSite").value.trim(),
@@ -462,8 +484,14 @@ async function saveConfig() {
   };
   const token = $("tgToken").value.trim();
   const chatId = $("tgChat").value.trim();
+  const discordUrl = $("discordWebhook")?.value.trim();
+  const waPhone = $("whatsappPhone")?.value.trim();
+  const waKey = $("whatsappApikey")?.value.trim();
   if (token) body.telegram_bot_token = token;
   if (chatId) body.telegram_chat_id = chatId;
+  if (discordUrl) body.discord_webhook_url = discordUrl;
+  if (waPhone) body.whatsapp_phone = waPhone;
+  if (waKey) body.whatsapp_apikey = waKey;
   const res = await fetch("/api/assistant/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -547,31 +575,47 @@ async function discoverChat() {
   }
 }
 
-async function testTelegram() {
-  const body = { telegram_enabled: true };
+function alertTestBody() {
+  const body = {
+    telegram_enabled: $("telegramEnabled").checked,
+    discord_enabled: $("discordEnabled")?.checked || false,
+    whatsapp_enabled: $("whatsappEnabled")?.checked || false,
+    fusion_alerts_enabled: $("fusionAlertsEnabled")?.checked !== false,
+  };
   const token = $("tgToken").value.trim();
   const chatId = $("tgChat").value.trim();
+  const discordUrl = $("discordWebhook")?.value.trim();
+  const waPhone = $("whatsappPhone")?.value.trim();
+  const waKey = $("whatsappApikey")?.value.trim();
   if (token) body.telegram_bot_token = token;
   if (chatId) body.telegram_chat_id = chatId;
-  $("btnTestTelegram").disabled = true;
+  if (discordUrl) body.discord_webhook_url = discordUrl;
+  if (waPhone) body.whatsapp_phone = waPhone;
+  if (waKey) body.whatsapp_apikey = waKey;
+  return body;
+}
+
+async function testAlerts() {
+  $("btnTestAlerts").disabled = true;
   try {
-    const res = await fetch("/api/assistant/telegram/test", {
+    const res = await fetch("/api/assistant/alerts/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(alertTestBody()),
     });
     const data = await res.json();
+    const ch = data.channels || {};
+    const lines = Object.entries(ch).map(([k, v]) => `${k}: ${v.ok ? "OK" : v.error || "failed"}`);
     if (data.ok) {
-      BetAssistant.toast("Test alert sent");
-      $("telegramEnabled").checked = true;
+      BetAssistant.toast(lines.length ? lines.join(" · ") : "Test alert sent");
       await saveConfig();
     } else {
-      BetAssistant.toast(data.error || "Test failed");
+      BetAssistant.toast(data.error || lines.join(" · ") || "Test failed");
     }
   } catch {
     BetAssistant.toast("Test request failed");
   } finally {
-    $("btnTestTelegram").disabled = false;
+    $("btnTestAlerts").disabled = false;
   }
 }
 
@@ -608,7 +652,7 @@ $("manualLogForm").addEventListener("submit", async (e) => {
 
 $("btnSaveConfig").addEventListener("click", saveConfig);
 $("btnDiscoverChat").addEventListener("click", discoverChat);
-$("btnTestTelegram").addEventListener("click", testTelegram);
+$("btnTestAlerts").addEventListener("click", testAlerts);
 $("browserAlerts").addEventListener("change", () => {
   BetAssistant.setBrowserAlerts($("browserAlerts").checked);
   if ($("browserAlerts").checked) BetAssistant.requestNotifyPermission();

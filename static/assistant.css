@@ -799,6 +799,17 @@
   color: var(--orange, #ff8c32);
 }
 
+.alert-channel-divider {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
 .tg-setup-steps {
   font-size: 0.78rem;
   color: var(--muted);

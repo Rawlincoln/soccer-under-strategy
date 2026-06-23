@@ -228,7 +228,10 @@ class DataCache:
     def refresh(self):
         try:
             payload, closing_payload = build_all_payloads()
-            assistant_payload = build_assistant_payload(payload, closing_payload)
+            fusion_payload = build_fusion_payload(payload)
+            assistant_payload = build_assistant_payload(
+                payload, closing_payload, fusion_payload,
+            )
             payload["loading"] = False
             closing_payload["loading"] = False
             assistant_payload["loading"] = False

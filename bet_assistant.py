@@ -150,6 +150,9 @@ class AssistantStore:
             "daily_target": DAILY_TARGET,
             "browser_alerts": True,
             "telegram_enabled": False,
+            "fusion_alerts_enabled": True,
+            "discord_enabled": False,
+            "whatsapp_enabled": False,
             "onexbet_site": DEFAULT_ONEXBET_SITE,
             "onexbet_android_package": DEFAULT_ANDROID_PACKAGE,
         })
@@ -158,6 +161,19 @@ class AssistantStore:
         cfg["telegram_bot_token"] = token
         cfg["telegram_chat_id"] = chat_id
         cfg["telegram_configured"] = bool(token and chat_id)
+        cfg["discord_webhook_url"] = (
+            os.environ.get("DISCORD_WEBHOOK_URL") or cfg.get("discord_webhook_url") or ""
+        ).strip()
+        cfg["discord_configured"] = bool(cfg["discord_webhook_url"])
+        cfg["whatsapp_phone"] = (
+            os.environ.get("WHATSAPP_PHONE") or cfg.get("whatsapp_phone") or ""
+        ).strip()
+        cfg["whatsapp_apikey"] = (
+            os.environ.get("WHATSAPP_APIKEY") or cfg.get("whatsapp_apikey") or ""
+        ).strip()
+        cfg["whatsapp_configured"] = bool(cfg["whatsapp_phone"] and cfg["whatsapp_apikey"])
+        if "fusion_alerts_enabled" not in cfg:
+            cfg["fusion_alerts_enabled"] = True
         return cfg
 
     def save_config(self, updates: dict[str, Any]) -> dict[str, Any]:
@@ -166,12 +182,18 @@ class AssistantStore:
             allowed = {
                 "stake_per_slip", "daily_target", "browser_alerts",
                 "telegram_enabled", "telegram_bot_token", "telegram_chat_id",
+                "fusion_alerts_enabled",
+                "discord_enabled", "discord_webhook_url",
+                "whatsapp_enabled", "whatsapp_phone", "whatsapp_apikey",
                 "onexbet_site", "onexbet_android_package",
             }
             for key, val in updates.items():
                 if key not in allowed:
                     continue
-                if key in ("telegram_bot_token", "telegram_chat_id") and not str(val).strip():
+                if key in (
+                    "telegram_bot_token", "telegram_chat_id",
+                    "discord_webhook_url", "whatsapp_apikey", "whatsapp_phone",
+                ) and not str(val).strip():
                     continue
                 cfg[key] = val
             self._write_json(CONFIG_PATH, cfg)
@@ -809,14 +831,68 @@ def _alert_id(kind: str, key: str) -> str:
     return f"{kind}:{key}:{_today()}"
 
 
+def _fusion_minute_label(m: dict[str, Any]) -> str:
+    minute = m.get("minute")
+    half = m.get("half")
+    if m.get("is_half_time") or m.get("status") == "HT":
+        return "HT"
+    if minute is None:
+        return "live"
+    if half == "sh":
+        return f"{minute}' 2H"
+    return f"{minute}' 1H"
+
+
 def detect_alerts(
     main_payload: dict[str, Any],
     closing_payload: dict[str, Any],
     workflow: dict[str, Any],
+    fusion_payload: Optional[dict[str, Any]] = None,
+    *,
+    config: Optional[dict] = None,
 ) -> list[dict]:
+    config = config or STORE.load_config()
     seen = STORE.get_seen_ids()
     new_alerts: list[dict] = []
     now = datetime.now(timezone.utc).isoformat()
+
+    if config.get("fusion_alerts_enabled", True):
+        for m in (fusion_payload or {}).get("matches") or []:
+            aid = _alert_id("fusion", f"{m.get('event_id')}-{m.get('half')}")
+            if aid in seen:
+                continue
+            f = m.get("combined_analysis") or {}
+            tier = m.get("fusion_tier") or f.get("agreement") or "FUSION"
+            tier_label = "STRONG UNDER" if tier == "STRONG_UNDER" else str(tier)
+            match_label = _match_label(m.get("home_team", ""), m.get("away_team", ""))
+            eid = str(m.get("event_id", ""))
+            lid = int(m.get("league_id") or 0)
+            tg_link = _telegram_match_link(eid, lid)
+            direct_link = _app_open_url(event_id=eid, league_id=lid)
+            conf = float(f.get("confidence") or 0)
+            rec = f.get("best_recommendation") or "WATCH"
+            market = f.get("best_market") or "Under"
+            minute_lbl = _fusion_minute_label(m)
+            score = m.get("score") or "—"
+            priority = "high" if tier in ("CONFIRMED", "STRONG_UNDER") or rec == "BET" else "medium"
+            new_alerts.append({
+                "id": aid,
+                "type": "fusion",
+                "priority": priority,
+                "title": f"Fusion {tier_label} · {conf:.0f}%",
+                "message": (
+                    f"{match_label} · {minute_lbl} · {score}\n"
+                    f"{market} · {rec} · {m.get('league', 'Football')}"
+                ),
+                "created_at": now,
+                "slip_hint": "fusion",
+                "event_id": m.get("event_id"),
+                "league_id": m.get("league_id"),
+                "fusion_tier": tier,
+                "onexbet_url": tg_link,
+                "onexbet_urls": [{"match": match_label, "url": tg_link, "direct_url": direct_link}],
+            })
+            seen.add(aid)
 
     for m in closing_payload.get("matches") or []:
         aid = _alert_id("lock", f"{m.get('event_id')}-{m.get('half')}")
@@ -988,18 +1064,57 @@ def send_telegram_alert(text: str, config: Optional[dict] = None) -> bool:
     return ok
 
 
-def test_telegram(config: Optional[dict] = None) -> dict[str, Any]:
+def send_discord_alert(text: str, config: Optional[dict] = None) -> bool:
+    config = config or STORE.load_config()
+    if not config.get("discord_enabled"):
+        return False
+    webhook = (config.get("discord_webhook_url") or "").strip()
+    if not webhook:
+        return False
+    content = text[:1900]
+    try:
+        r = requests.post(webhook, json={"content": content}, timeout=15)
+        return r.ok
+    except requests.RequestException:
+        return False
+
+
+def send_whatsapp_alert(text: str, config: Optional[dict] = None) -> bool:
+    config = config or STORE.load_config()
+    if not config.get("whatsapp_enabled"):
+        return False
+    phone = (config.get("whatsapp_phone") or "").strip()
+    apikey = (config.get("whatsapp_apikey") or "").strip()
+    if not phone or not apikey:
+        return False
+    try:
+        r = requests.get(
+            "https://api.callmebot.com/whatsapp.php",
+            params={"phone": phone, "text": text[:1500], "apikey": apikey},
+            timeout=20,
+        )
+        return r.ok and "error" not in (r.text or "").lower()[:200]
+    except requests.RequestException:
+        return False
+
+
+def _test_alert_message(config: Optional[dict] = None) -> str:
     config = config or STORE.load_config()
     sample_link = _telegram_match_link("", 0, config=config)
-    msg = (
-        "✅ Pro Punter Telegram alerts are working!\n\n"
+    return (
+        "✅ Pro Punter alerts are working!\n\n"
         "You will receive notifications for:\n"
-        "• Goal Lock picks (95%+) — with 1xBet match links\n"
-        "• Wave 1 / Wave 2 acca signals — link per leg\n"
+        "• Fusion page matches (CONFIRMED / ALIGNED / STRONG UNDER)\n"
+        "• Goal Lock picks (95%+)\n"
+        "• Wave 1 / Wave 2 acca signals\n"
         "• Stop-loss warnings\n\n"
         f"⚽ Test link (opens 1xBet Kenya app):\n{sample_link}"
     )
-    ok, detail = send_telegram_message(msg, config=config)
+
+
+def test_telegram(config: Optional[dict] = None) -> dict[str, Any]:
+    config = config or STORE.load_config()
+    ok, detail = send_telegram_message(_test_alert_message(config), config=config)
     return {
         "ok": ok,
         "error": None if ok else detail,
@@ -1008,30 +1123,71 @@ def test_telegram(config: Optional[dict] = None) -> dict[str, Any]:
     }
 
 
+def test_all_alerts(config: Optional[dict] = None) -> dict[str, Any]:
+    config = config or STORE.load_config()
+    msg = _test_alert_message(config)
+    results: dict[str, Any] = {}
+    if config.get("telegram_enabled"):
+        ok, detail = send_telegram_message(msg, config=config)
+        results["telegram"] = {"ok": ok, "error": None if ok else detail}
+    if config.get("discord_enabled"):
+        ok = send_discord_alert(msg, config)
+        results["discord"] = {"ok": ok, "error": None if ok else "Discord webhook failed"}
+    if config.get("whatsapp_enabled"):
+        ok = send_whatsapp_alert(msg, config)
+        results["whatsapp"] = {"ok": ok, "error": None if ok else "WhatsApp (CallMeBot) failed"}
+    any_ok = any(r.get("ok") for r in results.values())
+    enabled = [k for k in results]
+    if not enabled:
+        return {"ok": False, "error": "Enable at least one alert channel and save settings", "channels": results}
+    return {"ok": any_ok, "channels": results, "error": None if any_ok else "All enabled channels failed"}
+
+
 def dispatch_new_alerts(alerts: list[dict], config: Optional[dict] = None) -> int:
     config = config or STORE.load_config()
     sent = 0
     for alert in alerts:
         body = _format_telegram_alert(alert, config)
+        delivered = False
         if send_telegram_alert(body, config):
+            delivered = True
+        if send_discord_alert(body, config):
+            delivered = True
+        if send_whatsapp_alert(body, config):
+            delivered = True
+        if delivered:
             sent += 1
     return sent
+
+
+def _safe_config(config: dict[str, Any]) -> dict[str, Any]:
+    safe = {k: v for k, v in config.items() if k not in (
+        "telegram_bot_token", "discord_webhook_url", "whatsapp_apikey",
+    )}
+    safe["telegram_configured"] = config.get("telegram_configured", False)
+    safe["telegram_token_set"] = bool(config.get("telegram_bot_token"))
+    safe["discord_configured"] = config.get("discord_configured", False)
+    safe["discord_webhook_set"] = bool(config.get("discord_webhook_url"))
+    safe["whatsapp_configured"] = config.get("whatsapp_configured", False)
+    safe["whatsapp_apikey_set"] = bool(config.get("whatsapp_apikey"))
+    return safe
 
 
 def build_assistant_payload(
     main_payload: dict[str, Any],
     closing_payload: dict[str, Any],
+    fusion_payload: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     config = STORE.load_config()
     workflow = build_workflow(main_payload, closing_payload)
-    new_alerts = detect_alerts(main_payload, closing_payload, workflow)
+    new_alerts = detect_alerts(
+        main_payload, closing_payload, workflow, fusion_payload, config=config,
+    )
     if new_alerts:
         dispatch_new_alerts(new_alerts, config)
 
     all_alerts = STORE.load_alerts()
-    safe_config = {k: v for k, v in config.items() if k != "telegram_bot_token"}
-    safe_config["telegram_configured"] = config.get("telegram_configured", False)
-    safe_config["telegram_token_set"] = bool(config.get("telegram_bot_token"))
+    safe_config = _safe_config(config)
 
     accas = (main_payload.get("accumulators") or {}).get("accumulators") or []
     stake = float(config.get("stake_per_slip", STAKE_PER_SLIP))

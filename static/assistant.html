@@ -120,6 +120,10 @@
             Browser desktop notifications
           </label>
           <label class="asst-check">
+            <input type="checkbox" id="fusionAlertsEnabled" checked />
+            Fusion page match alerts (all CONFIRMED / ALIGNED / STRONG UNDER picks)
+          </label>
+          <label class="asst-check">
             <input type="checkbox" id="telegramEnabled" />
             Telegram alerts
           </label>
@@ -138,6 +142,27 @@
           <label for="tgChat">Chat ID</label>
           <input type="text" id="tgChat" placeholder="e.g. 123456789" />
           <div id="tgChatPick" class="tg-chat-pick" hidden></div>
+
+          <div class="alert-channel-divider">Discord</div>
+          <label class="asst-check">
+            <input type="checkbox" id="discordEnabled" />
+            Discord webhook alerts
+          </label>
+          <label for="discordWebhook">Webhook URL</label>
+          <input type="password" id="discordWebhook" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" />
+          <p class="asst-hint">Discord → channel Settings → Integrations → Webhooks → New Webhook → copy URL</p>
+
+          <div class="alert-channel-divider">WhatsApp (CallMeBot)</div>
+          <label class="asst-check">
+            <input type="checkbox" id="whatsappEnabled" />
+            WhatsApp alerts via CallMeBot
+          </label>
+          <label for="whatsappPhone">Phone (international, no +)</label>
+          <input type="text" id="whatsappPhone" placeholder="e.g. 254712345678" autocomplete="off" />
+          <label for="whatsappApikey">CallMeBot API key</label>
+          <input type="password" id="whatsappApikey" placeholder="From callmebot.com" autocomplete="off" />
+          <p class="asst-hint">Free setup: <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">callmebot.com</a> → link your number → paste API key</p>
+
           <label for="onexbetSite">1xBet Kenya site</label>
           <input type="url" id="onexbetSite" placeholder="https://1xbet.co.ke" value="https://1xbet.co.ke" autocomplete="off" />
           <label for="onexbetAndroidPkg">Kenya Android app package</label>
@@ -149,7 +174,7 @@
           <input type="number" id="targetSetting" value="100000" min="1000" step="1000" />
           <div class="tg-actions">
             <button class="ba-btn primary" id="btnSaveConfig" type="button">Save settings</button>
-            <button class="ba-btn orange" id="btnTestTelegram" type="button">Send test alert</button>
+            <button class="ba-btn orange" id="btnTestAlerts" type="button">Send test to all channels</button>
           </div>
         </div>
       </section>

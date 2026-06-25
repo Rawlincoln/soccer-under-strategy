@@ -1247,5 +1247,4 @@ def build_fusion_payload(main: dict[str, Any]) -> dict[str, Any]:
         "fotmob": main.get("fotmob"),
         "thesportsdb": main.get("thesportsdb"),
         "matches": picks,
-        "error": main.get("error"),
     }

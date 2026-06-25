@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -44,6 +45,7 @@ from thesportsdb_stats import SPORTSDB_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
 REFRESH_SECONDS = 30
+REFRESH_TIMEOUT_SECONDS = 240
 ONEXBET_CLIENT = OneXBetClient()
 
 LEAGUE_BASELINES = {
@@ -226,33 +228,45 @@ class DataCache:
             self.refresh()
             time.sleep(REFRESH_SECONDS)
 
+    def _refresh_work(self) -> None:
+        payload, closing_payload = build_all_payloads()
+        fusion_payload = build_fusion_payload(payload)
+        assistant_payload = build_assistant_payload(
+            payload, closing_payload, fusion_payload,
+        )
+        payload["loading"] = False
+        closing_payload["loading"] = False
+        assistant_payload["loading"] = False
+        with self._lock:
+            self._data = payload
+            self._closing = closing_payload
+            self._assistant = assistant_payload
+
+    def _set_refresh_error(self, message: str) -> None:
+        with self._lock:
+            self._data["error"] = message
+            self._data["loading"] = False
+            self._closing["error"] = message
+            self._closing["loading"] = False
+            self._assistant["error"] = message
+            self._assistant["loading"] = False
+
     def refresh(self) -> bool:
         """Run one full scan. Returns False if a refresh is already in progress."""
         if self._refresh_in_progress:
             return False
         self._refresh_in_progress = True
         try:
-            payload, closing_payload = build_all_payloads()
-            fusion_payload = build_fusion_payload(payload)
-            assistant_payload = build_assistant_payload(
-                payload, closing_payload, fusion_payload,
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pool.submit(self._refresh_work).result(timeout=REFRESH_TIMEOUT_SECONDS)
+            return True
+        except FuturesTimeoutError:
+            self._set_refresh_error(
+                f"Live scan timed out after {REFRESH_TIMEOUT_SECONDS}s — retrying on next cycle",
             )
-            payload["loading"] = False
-            closing_payload["loading"] = False
-            assistant_payload["loading"] = False
-            with self._lock:
-                self._data = payload
-                self._closing = closing_payload
-                self._assistant = assistant_payload
             return True
         except Exception as exc:
-            with self._lock:
-                self._data["error"] = str(exc)
-                self._data["loading"] = False
-                self._closing["error"] = str(exc)
-                self._closing["loading"] = False
-                self._assistant["error"] = str(exc)
-                self._assistant["loading"] = False
+            self._set_refresh_error(str(exc))
             return True
         finally:
             self._refresh_in_progress = False
@@ -822,6 +836,31 @@ def _attach_onexbet_urls(
             row["onexbet_url"] = _url_for(str(row.get("event_id", "")), int(row.get("league_id") or 0))
 
 
+def _prefetch_game_details(
+    client: OneXBetClient,
+    game_ids: list[int],
+    *,
+    max_workers: int = 8,
+) -> dict[int, dict]:
+    """Fetch 1xBet GetGameZip payloads in parallel (major scan speedup on Render)."""
+    unique = list(dict.fromkeys(gid for gid in game_ids if gid))
+    if not unique:
+        return {}
+
+    def _fetch(gid: int) -> tuple[int, dict]:
+        try:
+            return gid, client.fetch_game_detail(gid)
+        except Exception:
+            return gid, {}
+
+    details: dict[int, dict] = {}
+    workers = min(max_workers, max(1, len(unique)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for gid, detail in pool.map(_fetch, unique):
+            details[gid] = detail
+    return details
+
+
 def _scan_live_football() -> tuple[
     list[MatchCard],
     list[dict],
@@ -850,6 +889,7 @@ def _scan_live_football() -> tuple[
     closing_window_count = 0
     closing_lock_count = 0
 
+    eligible: list[OneXBetMatch] = []
     for raw in raw_live:
         if is_excluded_raw(raw):
             excluded_count += 1
@@ -864,6 +904,15 @@ def _scan_live_football() -> tuple[
             excluded_count += 1
             continue
 
+        eligible.append(m)
+
+    detail_cache = _prefetch_game_details(
+        ONEXBET_CLIENT, [m.game_id for m in eligible],
+    )
+
+    for m in eligible:
+        game_detail = detail_cache.get(m.game_id) or {}
+
         prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
         soccerpunter_stats = SOCCERPUNTER_PROVIDER.lookup_match(m.home_team, m.away_team)
         fotmob_stats = FOTMOB_PROVIDER.lookup_match(
@@ -871,7 +920,6 @@ def _scan_live_football() -> tuple[
             league=m.league, country=m.country,
         )
         sportsdb_stats = SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
-        game_detail = ONEXBET_CLIENT.fetch_game_detail(m.game_id)
         market_odds_fh = lookup_market_odds(
             ONEXBET_CLIENT, m.game_id, half="fh", cached_detail=game_detail,
         )

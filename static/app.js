@@ -416,7 +416,12 @@ async function fetchData() {
   try {
     const res = await fetch("/api/predictions");
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) {
+      $("matchesGrid").innerHTML = `<div class="empty">Scan error: ${data.error}</div>`;
+      $("statusText").textContent = "Scan error";
+      $("connectionStatus").classList.add("error");
+      return;
+    }
 
     lastData = data;
     if (typeof BetAssistant !== "undefined") BetAssistant.applyOnexbetConfig(data);

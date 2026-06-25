@@ -352,6 +352,13 @@ async function fetchData() {
     $("connectionStatus").classList.remove("error");
     $("statusText").textContent = `${data.fusion_count ?? 0} picks · ${data.bet_count ?? 0} BET`;
 
+    if (data.loading && !(data.matches || []).length && !data.fusion_count) {
+      $("matchesGrid").innerHTML =
+        '<div class="loading">Waiting for live scan to finish — fusion picks appear after the first 1xBet refresh completes.</div>';
+      $("statusText").textContent = "Initial scan in progress…";
+      return;
+    }
+
     renderBaselines(data);
     renderMatches(data.matches);
   } catch (err) {

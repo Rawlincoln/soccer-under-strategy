@@ -1273,7 +1273,11 @@ def build_assistant_payload(
         main_payload, closing_payload, workflow, fusion_payload, config=config,
     )
     if new_alerts:
-        dispatch_new_alerts(new_alerts, config)
+        threading.Thread(
+            target=dispatch_new_alerts,
+            args=(new_alerts, config),
+            daemon=True,
+        ).start()
 
     all_alerts = STORE.load_alerts()
     safe_config = _safe_config(config)

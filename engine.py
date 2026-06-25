@@ -209,6 +209,7 @@ class DataCache:
         }
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._refresh_in_progress = False
 
     def start(self):
         if self._running:
@@ -225,7 +226,11 @@ class DataCache:
             self.refresh()
             time.sleep(REFRESH_SECONDS)
 
-    def refresh(self):
+    def refresh(self) -> bool:
+        """Run one full scan. Returns False if a refresh is already in progress."""
+        if self._refresh_in_progress:
+            return False
+        self._refresh_in_progress = True
         try:
             payload, closing_payload = build_all_payloads()
             fusion_payload = build_fusion_payload(payload)
@@ -239,6 +244,7 @@ class DataCache:
                 self._data = payload
                 self._closing = closing_payload
                 self._assistant = assistant_payload
+            return True
         except Exception as exc:
             with self._lock:
                 self._data["error"] = str(exc)
@@ -247,6 +253,27 @@ class DataCache:
                 self._closing["loading"] = False
                 self._assistant["error"] = str(exc)
                 self._assistant["loading"] = False
+            return True
+        finally:
+            self._refresh_in_progress = False
+
+    def request_refresh(self) -> bool:
+        """Trigger a background refresh without blocking the caller."""
+        if self._refresh_in_progress:
+            return False
+        threading.Thread(target=self.refresh, daemon=True).start()
+        return True
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            data = dict(self._data)
+        return {
+            "loading": data.get("loading", True),
+            "updated_at": data.get("updated_at"),
+            "error": data.get("error"),
+            "match_count": data.get("match_count", 0),
+            "refresh_in_progress": self._refresh_in_progress,
+        }
 
     def get(self) -> dict[str, Any]:
         with self._lock:
@@ -1202,6 +1229,8 @@ def build_fusion_payload(main: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "updated_at": main.get("updated_at"),
+        "loading": main.get("loading", False),
+        "error": main.get("error"),
         "refresh_seconds": main.get("refresh_seconds", REFRESH_SECONDS),
         "onexbet_site": main.get("onexbet_site"),
         "onexbet_app_open_url": main.get("onexbet_app_open_url"),

@@ -443,6 +443,13 @@ async function fetchData() {
     const minC = data.min_confidence ?? MIN_CONF;
     $("statusText").textContent = `≥${minC}% only · ${data.match_count} matches · ${data.bet_signal_count} signals${pbNote}${spNote}${fmNote}${tsdbNote}`;
 
+    if (data.loading && !(data.matches || []).length) {
+      $("matchesGrid").innerHTML =
+        '<div class="loading">Scanning live matches — first load can take 1–3 min on Render while stats indexes build…</div>';
+      $("statusText").textContent = "Initial scan in progress…";
+      return;
+    }
+
     renderBaselines(data.baselines, data, data.prophitbet, data.thesportsdb);
     renderScoredPicks("scoredU15Section", "scoredU15", data.scored_under_15, "Under 1.5 First Half");
     renderScoredPicks("scoredU25Section", "scoredU25", data.scored_under_25, "Under 2.5 First Half");

@@ -57,7 +57,7 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "26")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "27")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -235,8 +235,15 @@ def api_fusion():
 
 @app.route("/api/refresh", methods=["POST"])
 def api_refresh():
-    cache.refresh()
-    return jsonify({"ok": True, "updated_at": cache.get().get("updated_at")})
+    started = cache.request_refresh()
+    snap = cache.status()
+    return jsonify({
+        "ok": True,
+        "started": started,
+        "already_running": not started,
+        "updated_at": snap.get("updated_at"),
+        "loading": snap.get("loading"),
+    })
 
 
 @app.route("/api/basketball")
@@ -421,12 +428,17 @@ def api_export_lock():
 @app.route("/health")
 def health():
     status = get_alerts_status(scanner_running=_scanner_running())
+    cache_status = cache.status()
     return jsonify({
         "ok": True,
         "scanner_running": status["scanner_running"],
         "server_push_ready": status["server_push_ready"],
         "channels_ready": status["channels_ready"],
         "fusion_alerts_enabled": status["fusion_alerts_enabled"],
+        "cache_loading": cache_status.get("loading"),
+        "cache_updated_at": cache_status.get("updated_at"),
+        "cache_error": cache_status.get("error"),
+        "refresh_in_progress": cache_status.get("refresh_in_progress"),
     })
 
 

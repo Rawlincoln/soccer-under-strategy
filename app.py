@@ -40,7 +40,7 @@ basketball_cache = BasketballCache()
 toto_cache = TotoCache()
 _cache_started = False
 _bb_cache_started = False
-_toto_started = False
+_toto_started_types: set[int] = set()
 
 
 def _ensure_cache():
@@ -61,14 +61,14 @@ def _ensure_basketball_cache():
         _bb_cache_started = True
 
 
-def _ensure_toto_cache():
-    global _toto_started
-    if not _toto_started:
-        toto_cache.request_refresh()
-        _toto_started = True
+def _ensure_toto_cache(type_id: int = 1):
+    type_id = int(type_id)
+    if type_id not in _toto_started_types:
+        toto_cache.request_refresh(type_id=type_id)
+        _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "31")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "32")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -197,11 +197,12 @@ def open_onexbet_match():
 
 @app.route("/open/1xbet/toto")
 def open_onexbet_toto():
-    """Landing page: tap → 1xBet Toto 15 in the native app."""
+    """Landing page: tap → 1xBet Toto pool in the native app."""
     config = STORE.load_config()
     site = effective_onexbet_site(config)
     pkg = effective_onexbet_android_package(config)
-    toto_url = onexbet_toto_url(site)
+    variant = request.args.get("slug", "fifteen").strip() or "fifteen"
+    toto_url = onexbet_toto_url(site, variant=variant)
     payload = {"https": toto_url, "match": toto_url, "package": pkg}
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -315,17 +316,33 @@ def api_fusion():
 
 @app.route("/api/toto")
 def api_toto():
-    _ensure_toto_cache()
-    data = toto_cache.get()
+    type_id = int(request.args.get("type_id", 1))
+    _ensure_toto_cache(type_id)
+    data = toto_cache.get(type_id)
     if data.get("loading") and not data.get("matches"):
-        return jsonify({"loading": True, "matches": [], "sets": []})
+        return jsonify({"loading": True, "type_id": type_id, "matches": [], "sets": []})
     return jsonify(data)
 
 
 @app.route("/api/toto/refresh", methods=["POST"])
 def api_toto_refresh():
-    started = toto_cache.request_refresh(force_jackpot=True)
-    return jsonify({"ok": True, "started": started, "already_running": not started})
+    type_id = int(request.args.get("type_id", 1))
+    started = toto_cache.request_refresh(type_id=type_id, force_jackpot=True)
+    return jsonify({
+        "ok": True,
+        "type_id": type_id,
+        "started": started,
+        "already_running": not started,
+    })
+
+
+@app.route("/api/toto/products")
+def api_toto_products():
+    from toto_client import fetch_jackpots_list
+
+    config = STORE.load_config()
+    site = effective_onexbet_site(config)
+    return jsonify({"products": fetch_jackpots_list(site=site)})
 
 
 @app.route("/api/refresh", methods=["POST"])

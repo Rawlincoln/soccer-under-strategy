@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Pro Punter · Toto 1X2</title>
+  <title>Pro Punter · 1xBet Toto & Jackpots</title>
   <link rel="stylesheet" href="/static/style.css?v={{ASSET_VERSION}}" />
   <link rel="stylesheet" href="/static/toto.css?v={{ASSET_VERSION}}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,8 +16,8 @@
       <div class="logo">
         <span class="logo-icon">🎯</span>
         <div>
-          <h1>Pro Punter · Toto 1X2</h1>
-          <p class="subtitle">SportPesa Mega JP 17 · 3 slips (W/D/L) · <a href="/open/1xbet/toto" id="subtitleOnexbetLink">1xBet Toto 15</a> · ProphitBet + SoccerPunter + FotMob</p>
+          <h1>Pro Punter · 1xBet Toto</h1>
+          <p class="subtitle">Live 1xBet jackpot pools · 3 slips (W/D/L) · <a href="/open/1xbet/toto" id="subtitleOnexbetLink">Open in app</a> · ProphitBet + SoccerPunter + FotMob</p>
         </div>
       </div>
     </div>
@@ -25,7 +25,7 @@
       <nav class="nav-links">
         <a href="/">Soccer Live</a>
         <a href="/fusion">Fusion</a>
-        <a href="/toto" class="active">Toto 1X2</a>
+        <a href="/toto" class="active">1xBet Toto</a>
         <a href="/closing">Goal Lock</a>
         <a href="/basketball">Basketball Q3</a>
         <a href="/accumulator">Accumulators</a>
@@ -42,19 +42,21 @@
         <span id="matchCount">0 games</span>
       </div>
       <a class="btn-onexbet-toto" id="btnOnexbetToto" href="/open/1xbet/toto" target="_blank" rel="noopener">
-        1xBet Toto 15
+        Open 1xBet
       </a>
     </div>
   </header>
 
+  <section class="toto-products" id="productTabs" aria-label="Jackpot pools"></section>
+
   <section class="toto-intro">
     <div class="toto-intro-card">
       <strong>W · D · L</strong>
-      <span>Home win · Draw · Away win — same format as SportPesa Mega Jackpot (1X2)</span>
+      <span>Home win · Draw · Away win — 1xBet Toto 1X2 format</span>
     </div>
     <div class="toto-intro-card set1">
       <strong>Set 1 · Bankers</strong>
-      <span>Highest model confidence on each of the 17 fixtures</span>
+      <span>Highest model confidence on each fixture</span>
     </div>
     <div class="toto-intro-card set2">
       <strong>Set 2 · Value</strong>
@@ -65,8 +67,8 @@
       <span>Contrarian mix for jackpot variance</span>
     </div>
     <div class="toto-intro-card onexbet">
-      <strong>1xBet Toto 15</strong>
-      <span id="onexbetTotoNote">Place your slip on 1xBet — separate 15-game football pool (W/D/L)</span>
+      <strong id="onexbetProductTitle">1xBet Toto</strong>
+      <span id="onexbetTotoNote">Place your slip on 1xBet — live pool from toto-api-v2</span>
     </div>
   </section>
 
@@ -80,13 +82,12 @@
       <button class="btn-refresh" id="btnRefresh" title="Re-fetch jackpot list and re-analyse">↻ Refresh</button>
     </div>
     <div class="toto-grid" id="totoGrid">
-      <div class="loading">Loading SportPesa jackpot and running 1X2 analysis…</div>
+      <div class="loading">Loading 1xBet jackpot and running 1X2 analysis…</div>
     </div>
   </section>
 
   <footer class="footer">
-    Jackpot list from public SportPesa fixture feed · Analysis uses historical football-data + SoccerPunter H2H ·
-    Edit <code>data/toto_jackpot.json</code> to override matches manually
+    Fixture list from 1xBet toto-api-v2 · Analysis uses ProphitBet form, SoccerPunter H2H, FotMob xG, and 1xBet pool %
   </footer>
 
   <script src="/static/toto.js?v={{ASSET_VERSION}}"></script>

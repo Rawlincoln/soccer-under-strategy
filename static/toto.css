@@ -4,6 +4,70 @@
   background: rgba(163, 113, 247, 0.12);
 }
 
+.toto-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 12px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.toto-product-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  min-width: 120px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.toto-product-tab:hover {
+  border-color: rgba(63, 185, 80, 0.45);
+}
+
+.toto-product-tab.active {
+  border-color: rgba(35, 134, 54, 0.7);
+  background: rgba(35, 134, 54, 0.12);
+}
+
+.toto-product-tab .tab-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.toto-product-tab .tab-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.toto-product-tab .tab-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.toto-market {
+  font-size: 0.75rem;
+  color: #3fb950;
+  font-family: "JetBrains Mono", monospace;
+  margin: 4px 0 6px;
+}
+
+.toto-league {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 .toto-intro {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

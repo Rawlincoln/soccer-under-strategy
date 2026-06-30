@@ -1,4 +1,4 @@
-"""SportPesa Toto (1X2) predictions using Pro Punter data stack."""
+"""1xBet Toto & jackpot (1X2) predictions using Pro Punter data stack."""
 
 from __future__ import annotations
 
@@ -23,7 +23,15 @@ from onexbet_client import (
     onexbet_toto_telegram_open_url,
     onexbet_toto_url,
 )
-from toto_client import TotoJackpot, TotoMatch, get_jackpot, jackpot_to_dict
+from toto_client import (
+    DEFAULT_TYPE_ID,
+    TotoJackpot,
+    TotoMatch,
+    fetch_jackpots_list,
+    get_jackpot,
+    jackpot_to_dict,
+    product_info,
+)
 
 
 @dataclass
@@ -61,6 +69,7 @@ class TotoMatchAnalysis:
     soccerpunter: Optional[dict[str, Any]] = None
     fotmob: Optional[dict[str, Any]] = None
     sportsdb: Optional[dict[str, Any]] = None
+    market_wdl: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -129,11 +138,30 @@ def _pick_from_ranked(ranked: list[tuple[str, float]], index: int) -> str:
     return ranked[min(index, len(ranked) - 1)][0]
 
 
+def _apply_market_wdl(scores: WDLScores, market: dict[str, float]) -> tuple[WDLScores, list[str]]:
+    """Blend 1xBet pool percentages (BukPercentage) into model scores."""
+    signals: list[str] = []
+    if not market:
+        return scores, signals
+    w = float(market.get("W") or 0)
+    d = float(market.get("D") or 0)
+    l = float(market.get("L") or 0)
+    if w + d + l <= 0:
+        return scores, signals
+    scores.home_win += w * 0.35
+    scores.draw += d * 0.35
+    scores.away_win += l * 0.35
+    top = max(("W", w), ("D", d), ("L", l), key=lambda x: x[1])
+    signals.append(f"1xBet pool: W {w:.0f}% · D {d:.0f}% · L {l:.0f}% (fav {top[0]})")
+    return scores, signals
+
+
 def _compute_wdl(
     home: str,
     away: str,
     league: str = "",
     country: str = "",
+    market_wdl: Optional[dict[str, float]] = None,
 ) -> tuple[WDLScores, list[str], dict[str, bool], dict[str, Any]]:
     home_a = apply_team_alias(home)
     away_a = apply_team_alias(away)
@@ -217,6 +245,9 @@ def _compute_wdl(
     coverage["sportsdb"] = bool(sd)
     extras["sportsdb"] = sd
 
+    scores, mkt_signals = _apply_market_wdl(scores, market_wdl or {})
+    signals.extend(mkt_signals)
+
     scores = _normalize_wdl(scores)
     gap = abs(scores.home_win - scores.away_win)
     if gap < 8:
@@ -233,6 +264,7 @@ def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
         match.away_team,
         league=match.league,
         country=match.country,
+        market_wdl=match.market_wdl,
     )
     ranked = scores.ranked()
     primary = _pick_from_ranked(ranked, 0)
@@ -256,6 +288,7 @@ def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
         soccerpunter=extras.get("soccerpunter"),
         fotmob=extras.get("fotmob"),
         sportsdb=extras.get("sportsdb"),
+        market_wdl=dict(match.market_wdl or {}),
     )
 
 
@@ -299,8 +332,13 @@ def _ensure_analysis_providers() -> None:
     SPORTSDB_PROVIDER.ensure_loaded(background=False)
 
 
-def build_toto_payload(*, force_refresh: bool = False) -> dict[str, Any]:
-    jackpot = get_jackpot(force_refresh=force_refresh)
+def build_toto_payload(
+    *,
+    type_id: int = DEFAULT_TYPE_ID,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    type_id = int(type_id)
+    jackpot = get_jackpot(type_id=type_id, force_refresh=force_refresh)
     _ensure_analysis_providers()
     analyses = [analyze_toto_match(m) for m in jackpot.matches]
     sets = build_prediction_sets(analyses)
@@ -315,11 +353,14 @@ def build_toto_payload(*, force_refresh: bool = False) -> dict[str, Any]:
     config = STORE.load_config()
     onex_site = effective_onexbet_site(config)
     onex_pkg = effective_onexbet_android_package(config)
-    toto_href = onexbet_toto_url(onex_site)
+    pinfo = product_info(type_id)
+    toto_href = pinfo["toto_url"]
     app_base = app_base_url()
+    products = fetch_jackpots_list(site=onex_site)
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
+        "type_id": type_id,
         "jackpot": jackpot_to_dict(jackpot),
         "match_count": len(analyses),
         "sources_hit": sources_hit,
@@ -327,13 +368,17 @@ def build_toto_payload(*, force_refresh: bool = False) -> dict[str, Any]:
         "sets": [asdict(s) for s in sets],
         "error": jackpot.error,
         "loading": False,
+        "products": products,
         "onexbet": {
             "site": onex_site,
+            "type_id": type_id,
             "toto_url": toto_href,
             "toto_open_url": onexbet_toto_telegram_open_url(app_base),
             "android_package": onex_pkg,
-            "product": "Toto 15",
-            "note": "SportPesa Mega JP is 17 games; 1xBet Toto 15 is a separate 15-game pool on 1xBet.",
+            "product": pinfo["label"],
+            "slug": pinfo["slug"],
+            "draw_number": jackpot.draw_number,
+            "note": f"Live {pinfo['label']} draw #{jackpot.draw_number or '—'} from 1xBet toto-api-v2.",
         },
     }
 
@@ -343,38 +388,65 @@ class TotoCache:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._data: dict[str, Any] = {"loading": True, "matches": [], "sets": []}
-        self._refresh_in_progress = False
+        self._data_by_type: dict[int, dict[str, Any]] = {}
+        self._refresh_in_progress: set[int] = set()
+        self._default_type = DEFAULT_TYPE_ID
 
-    def refresh(self, *, force_jackpot: bool = False) -> None:
-        if self._refresh_in_progress:
-            return
-        self._refresh_in_progress = True
+    def _loading_payload(self, type_id: int) -> dict[str, Any]:
+        return {
+            "loading": True,
+            "type_id": type_id,
+            "matches": [],
+            "sets": [],
+            "products": [],
+        }
+
+    def refresh(self, *, type_id: int = DEFAULT_TYPE_ID, force_jackpot: bool = False) -> None:
+        type_id = int(type_id)
+        with self._lock:
+            if type_id in self._refresh_in_progress:
+                return
+            self._refresh_in_progress.add(type_id)
         try:
-            payload = build_toto_payload(force_refresh=force_jackpot)
+            payload = build_toto_payload(type_id=type_id, force_refresh=force_jackpot)
             with self._lock:
-                self._data = payload
+                self._data_by_type[type_id] = payload
         except Exception as exc:
             with self._lock:
-                self._data = {
+                self._data_by_type[type_id] = {
                     "loading": False,
+                    "type_id": type_id,
                     "error": str(exc),
                     "matches": [],
                     "sets": [],
+                    "products": [],
                 }
         finally:
-            self._refresh_in_progress = False
+            with self._lock:
+                self._refresh_in_progress.discard(type_id)
 
-    def request_refresh(self, *, force_jackpot: bool = False) -> bool:
-        if self._refresh_in_progress:
-            return False
+    def request_refresh(
+        self,
+        *,
+        type_id: int = DEFAULT_TYPE_ID,
+        force_jackpot: bool = False,
+    ) -> bool:
+        type_id = int(type_id)
+        with self._lock:
+            if type_id in self._refresh_in_progress:
+                return False
+            self._data_by_type[type_id] = self._loading_payload(type_id)
         threading.Thread(
             target=self.refresh,
-            kwargs={"force_jackpot": force_jackpot},
+            kwargs={"type_id": type_id, "force_jackpot": force_jackpot},
             daemon=True,
         ).start()
         return True
 
-    def get(self) -> dict[str, Any]:
+    def get(self, type_id: int = DEFAULT_TYPE_ID) -> dict[str, Any]:
+        type_id = int(type_id)
         with self._lock:
-            return dict(self._data)
+            data = self._data_by_type.get(type_id)
+            if data:
+                return dict(data)
+            return self._loading_payload(type_id)

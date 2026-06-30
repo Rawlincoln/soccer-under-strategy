@@ -1,0 +1,1 @@
+window.__TOTO_APP__=(function(a,b,c,d,e,f){return {data:{},state:{},once:new Set([]),_errors:{},serverRendered:d,pinia:{global:{appFontSize:a,appTheme:a,appViewType:a,coefIndicationType:a,coefViewId:a,marketDisplaySettings:a,language:"en\

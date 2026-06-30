@@ -1,24 +1,35 @@
 import json
 import requests
 
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://1xbet.co.ke/en/toto/fifteen",
-    "X-Requested-With": "XMLHttpRequest",
-})
-
 site = "https://1xbet.co.ke"
-page = session.get(f"{site}/en/toto/fifteen", timeout=25)
-print("page", page.status_code, "cookies", list(session.cookies.keys()))
+headers = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "application/json",
+    "Referer": f"{site}/en/toto/fifteen",
+}
 
-for path in ["/web-api/toto15", "/web-api/toto/fifteen", "/web-api/toto/active"]:
-    for method in ["get", "post"]:
-        url = site + path
-        fn = getattr(session, method)
-        for payload in [None, {"lng": "en"}, {"lng": "en", "country": 1}, {"type": 15}]:
-            r = fn(url, json=payload, timeout=20) if method == "post" else fn(url, params=payload, timeout=20)
-            if r.status_code not in (204, 404) or (r.text and len(r.text) > 5):
-                print(method.upper(), path, payload, r.status_code, len(r.text), r.text[:250])
+jackpots = requests.get(
+    f"{site}/toto-api-v2/web/v1/jackpots",
+    headers=headers,
+    params={"curISO": "KES", "lng": "en"},
+    timeout=20,
+).json()
+print("jackpots", json.dumps(jackpots, indent=2))
+
+for item in jackpots.get("JackpotsList", []):
+    tid = item["TotoTypeId"]
+    r = requests.get(
+        f"{site}/toto-api-v2/web/v1/toto/{tid}/draws/active",
+        headers=headers,
+        params={"lng": "en", "curISO": "KES"},
+        timeout=20,
+    )
+    if r.status_code != 200:
+        print("type", tid, r.status_code)
+        continue
+    data = r.json()
+    games = sum(len(c.get("GamesList") or []) for c in data.get("ChampsWithGames") or [])
+    print(f"type {tid}: draw {data.get('TiragNumber')} games {games} pool {data.get('Pool')} jp {data.get('Jackpot')}")
+    if games:
+        g = (data["ChampsWithGames"][0]["GamesList"] or [])[0]
+        print("  sample", g.get("Opponent1Name"), "vs", g.get("Opponent2Name"), g.get("BetsPercents"))

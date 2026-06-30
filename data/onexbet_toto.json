@@ -1,0 +1,262 @@
+{
+  "types": {
+    "1": {
+      "source": "https://1xbet.co.ke",
+      "type_id": 1,
+      "product_label": "Toto 15",
+      "title": "1xBet Toto 15",
+      "draw_number": 4233,
+      "prize_kes": 13090870,
+      "pool_kes": 14667752,
+      "stake_min_kes": 80.0,
+      "stake_max_kes": 1600000.0,
+      "stake_kes": 80.0,
+      "match_count": 15,
+      "fetched_at": "2026-06-30T12:12:51.370694+00:00",
+      "closes_at": "2026-06-30T15:00:00+00:00",
+      "error": null,
+      "matches": [
+        {
+          "num": 1,
+          "home_team": "Guangzhou Xingpai",
+          "away_team": "Jinan Quansheng United",
+          "league": "China. Champions League",
+          "country": "",
+          "kickoff": "2026-07-01T08:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 731981696,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 30.0,
+            "D": 22.0,
+            "L": 48.0
+          }
+        },
+        {
+          "num": 2,
+          "home_team": "Vaasan Palloseura",
+          "away_team": "Inter Turku",
+          "league": "Finnish Cup",
+          "country": "",
+          "kickoff": "2026-06-30T15:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732335649,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 23.0,
+            "D": 26.0,
+            "L": 51.0
+          }
+        },
+        {
+          "num": 3,
+          "home_team": "Audax Italiano",
+          "away_team": "Palestino",
+          "league": "Chile Cup",
+          "country": "",
+          "kickoff": "2026-06-30T22:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732649497,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 44.0,
+            "D": 26.0,
+            "L": 30.0
+          }
+        },
+        {
+          "num": 4,
+          "home_team": "Botafogo Ribeirao Preto",
+          "away_team": "CRB Maceio",
+          "league": "Brazil. Campeonato Brasileiro. Serie B",
+          "country": "",
+          "kickoff": "2026-06-30T23:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 731164799,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 44.0,
+            "D": 34.0,
+            "L": 22.0
+          }
+        },
+        {
+          "num": 5,
+          "home_team": "Okzhetpes II",
+          "away_team": "Ansat",
+          "league": "Kazakhstan. League 2",
+          "country": "",
+          "kickoff": "2026-07-01T12:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 731986602,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 23.0,
+            "D": 19.0,
+            "L": 58.0
+          }
+        },
+        {
+          "num": 6,
+          "home_team": "Altay II",
+          "away_team": "Irtysh Pavlodar II",
+          "league": "Kazakhstan. League 2",
+          "country": "",
+          "kickoff": "2026-07-01T12:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 731987061,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 45.0,
+            "D": 22.0,
+            "L": 33.0
+          }
+        },
+        {
+          "num": 7,
+          "home_team": "Tukums 2000",
+          "away_team": "Super Nova",
+          "league": "Latvia. Virsliga",
+          "country": "",
+          "kickoff": "2026-07-01T15:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732318429,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 46.0,
+            "D": 25.0,
+            "L": 29.0
+          }
+        },
+        {
+          "num": 8,
+          "home_team": "Ivory Coast",
+          "away_team": "Norway",
+          "league": "World Cup 2026",
+          "country": "",
+          "kickoff": "2026-06-30T17:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732115082,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 23.0,
+            "D": 23.0,
+            "L": 54.0
+          }
+        },
+        {
+          "num": 9,
+          "home_team": "France",
+          "away_team": "Sweden",
+          "league": "World Cup 2026",
+          "country": "",
+          "kickoff": "2026-06-30T21:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732162032,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 64.0,
+            "D": 31.0,
+            "L": 5.0
+          }
+        },
+        {
+          "num": 10,
+          "home_team": "France",
+          "away_team": "Sweden",
+          "league": "World Cup 2026",
+          "country": "",
+          "kickoff": "2026-06-30T21:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732162033,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 71.0,
+            "D": 24.0,
+            "L": 5.0
+          }
+        },
+        {
+          "num": 11,
+          "home_team": "Mexico",
+          "away_team": "Ecuador",
+          "league": "World Cup 2026",
+          "country": "",
+          "kickoff": "2026-07-01T01:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732401726,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 49.0,
+            "D": 31.0,
+            "L": 20.0
+          }
+        },
+        {
+          "num": 12,
+          "home_team": "Dynamo Barnaul",
+          "away_team": "Orenburg II",
+          "league": "Russian Championship. League 2. Division B. Group 4",
+          "country": "",
+          "kickoff": "2026-07-01T11:30:00+00:00",
+          "status": "scheduled",
+          "game_id": 732703724,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 39.0,
+            "D": 25.0,
+            "L": 36.0
+          }
+        },
+        {
+          "num": 13,
+          "home_team": "Izhevsk",
+          "away_team": "Pobeda Nizhny Novgorod",
+          "league": "Russian Championship. League 2. Division B. Group 4",
+          "country": "",
+          "kickoff": "2026-07-01T14:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732703093,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 24.0,
+            "D": 25.0,
+            "L": 51.0
+          }
+        },
+        {
+          "num": 14,
+          "home_team": "Potkupallo",
+          "away_team": "TaiKi Taipalsaari",
+          "league": "Finland. Vitonen",
+          "country": "",
+          "kickoff": "2026-06-30T16:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732175036,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 36.0,
+            "D": 13.0,
+            "L": 51.0
+          }
+        },
+        {
+          "num": 15,
+          "home_team": "Nurmes",
+          "away_team": "Hurtat",
+          "league": "Finland. Vitonen",
+          "country": "",
+          "kickoff": "2026-06-30T16:00:00+00:00",
+          "status": "scheduled",
+          "game_id": 732175243,
+          "is_cyber": false,
+          "market_wdl": {
+            "W": 40.0,
+            "D": 11.0,
+            "L": 49.0
+          }
+        }
+      ]
+    }
+  }
+}

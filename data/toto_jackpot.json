@@ -1,0 +1,26 @@
+{
+  "source": "betwinner360",
+  "title": "SportPesa Mega Jackpot Pro 17",
+  "prize_kes": 0,
+  "stake_kes": 99,
+  "fetched_at": "2026-06-30T11:30:36.899898+00:00",
+  "matches": [
+    {"num": 1, "home_team": "Räppe", "away_team": "Staffanstorp United", "league": "Sweden. Division 5", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 2, "home_team": "Atvidabergs FF", "away_team": "Rosengård", "league": "Sweden. Division 2", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 3, "home_team": "Arlanda", "away_team": "IF Karlstad", "league": "Sweden. Division 2", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 4, "home_team": "AFC Malmo", "away_team": "Jonkopings Sodra", "league": "Sweden. Superettan", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 5, "home_team": "HJK Helsinki", "away_team": "KuPS", "league": "Finland. Veikkausliiga", "country": "Finland", "kickoff": "", "status": "scheduled"},
+    {"num": 6, "home_team": "United Nordic", "away_team": "Oddevold", "league": "Sweden. Division 1", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 7, "home_team": "Kaspiy", "away_team": "Atyrau", "league": "Kazakhstan. Premier League", "country": "Kazakhstan", "kickoff": "", "status": "scheduled"},
+    {"num": 8, "home_team": "Turku PS", "away_team": "FF Jaro", "league": "Finland. Veikkausliiga", "country": "Finland", "kickoff": "", "status": "scheduled"},
+    {"num": 9, "home_team": "Gnistan", "away_team": "VPS", "league": "Finland. Veikkausliiga", "country": "Finland", "kickoff": "", "status": "scheduled"},
+    {"num": 10, "home_team": "Sogndal", "away_team": "Egersund", "league": "Norway. 1. divisjon", "country": "Norway", "kickoff": "", "status": "scheduled"},
+    {"num": 11, "home_team": "Algeria", "away_team": "Austria", "league": "International. Friendly", "country": "International", "kickoff": "", "status": "scheduled"},
+    {"num": 12, "home_team": "Qingdao Youth Island", "away_team": "Hangzhou Greentown", "league": "China. Super League", "country": "China", "kickoff": "", "status": "scheduled"},
+    {"num": 13, "home_team": "Dalian Zhixing", "away_team": "Shanghai Shenhua", "league": "China. Super League", "country": "China", "kickoff": "", "status": "scheduled"},
+    {"num": 14, "home_team": "Olympic", "away_team": "Eskilsminne", "league": "Sweden. Division 2", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 15, "home_team": "KäPa", "away_team": "JäPS", "league": "Finland. Ykkönen", "country": "Finland", "kickoff": "", "status": "scheduled"},
+    {"num": 16, "home_team": "Karlslund", "away_team": "Fittja", "league": "Sweden. Division 3", "country": "Sweden", "kickoff": "", "status": "scheduled"},
+    {"num": 17, "home_team": "FH hafnarfjordur", "away_team": "IBV Vestmannaeyjar", "league": "Iceland. Besta deild", "country": "Iceland", "kickoff": "", "status": "scheduled"}
+  ]
+}

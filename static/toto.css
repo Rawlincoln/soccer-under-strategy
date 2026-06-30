@@ -1,0 +1,205 @@
+.toto-page .nav-links a.active {
+  color: #a371f7;
+  border-color: #a371f7;
+  background: rgba(163, 113, 247, 0.12);
+}
+
+.toto-intro {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 0 24px 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.toto-intro-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.toto-intro-card strong {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text);
+}
+
+.toto-intro-card.set1 { border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.06); }
+.toto-intro-card.set2 { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
+.toto-intro-card.set3 { border-color: rgba(248, 81, 73, 0.35); background: rgba(248, 81, 73, 0.06); }
+
+.toto-sets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  padding: 0 24px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.toto-set-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.toto-set-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.toto-set-card p {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.toto-slip {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.95rem;
+  word-break: break-all;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.toto-slip-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.toto-pick-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.toto-pick-chip.W { background: rgba(63, 185, 80, 0.2); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.45); }
+.toto-pick-chip.D { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid rgba(210, 153, 34, 0.4); }
+.toto-pick-chip.L { background: rgba(248, 81, 73, 0.12); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.35); }
+
+.toto-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 24px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.toto-match-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.toto-match-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.toto-match-num {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: #a371f7;
+  min-width: 28px;
+}
+
+.toto-teams {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.toto-picks-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toto-pick-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toto-score-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+  background: var(--bg);
+}
+
+.toto-score-bar span { display: block; height: 100%; }
+.toto-score-bar .w { background: var(--green); }
+.toto-score-bar .d { background: #d29922; }
+.toto-score-bar .l { background: #f85149; }
+
+.toto-scores-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.toto-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.toto-src {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.toto-src.ok { border-color: rgba(63, 185, 80, 0.4); color: var(--green); }
+
+.toto-signals {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.btn-copy {
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn-copy:hover { border-color: #a371f7; color: #a371f7; }

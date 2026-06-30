@@ -31,12 +31,15 @@ from onexbet_client import (
     onexbet_match_url,
 )
 from engine import REFRESH_SECONDS, DataCache, build_fusion_payload
+from toto_predictions import TotoCache
 
 app = Flask(__name__, static_folder="static")
 cache = DataCache()
 basketball_cache = BasketballCache()
+toto_cache = TotoCache()
 _cache_started = False
 _bb_cache_started = False
+_toto_started = False
 
 
 def _ensure_cache():
@@ -56,8 +59,15 @@ def _ensure_basketball_cache():
         basketball_cache.start()
         _bb_cache_started = True
 
+
+def _ensure_toto_cache():
+    global _toto_started
+    if not _toto_started:
+        toto_cache.request_refresh()
+        _toto_started = True
+
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "28")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "30")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -102,6 +112,11 @@ def closing_page():
 @app.route("/fusion")
 def fusion_page():
     return _serve_html("fusion.html")
+
+
+@app.route("/toto")
+def toto_page():
+    return _serve_html("toto.html")
 
 
 @app.route("/assistant")
@@ -231,6 +246,21 @@ def api_predictions():
 def api_fusion():
     _ensure_cache()
     return jsonify(build_fusion_payload(cache.get()))
+
+
+@app.route("/api/toto")
+def api_toto():
+    _ensure_toto_cache()
+    data = toto_cache.get()
+    if data.get("loading") and not data.get("matches"):
+        return jsonify({"loading": True, "matches": [], "sets": []})
+    return jsonify(data)
+
+
+@app.route("/api/toto/refresh", methods=["POST"])
+def api_toto_refresh():
+    started = toto_cache.request_refresh(force_jackpot=True)
+    return jsonify({"ok": True, "started": started, "already_running": not started})
 
 
 @app.route("/api/refresh", methods=["POST"])

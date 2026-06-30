@@ -18,7 +18,28 @@ TEAM_ALIASES: dict[str, str] = {
     "ia akranes": "ÍA",
     "stjarnan women": "Stjarnan",
     "fram reykjavik women": "Fram",
+    # SportPesa Toto / Nordic & China bookmaker labels
+    "turku ps": "Inter Turku",
+    "afc malmo": "Malmo FF",
+    "jonkopings sodra": "Jonkopings",
+    "dalian zhixing": "Dalian Yingbo",
+    "qingdao youth island": "Qingdao West Coast",
+    "fh hafnarfjordur": "FH",
+    "ibv vestmannaeyjar": "IBV",
+
+    "ff jaro": "Jaro",
+    "hjk helsinki": "HJK",
+    "hangzhou greentown": "Hangzhou Greentown",
+    "zhejiang greentown": "Hangzhou Greentown",
 }
+
+# National sides in Toto jackpots — skip club-form providers (ProphitBet etc.)
+NATIONAL_TEAMS: frozenset[str] = frozenset({
+    "algeria", "austria", "england", "france", "germany", "spain", "italy",
+    "portugal", "netherlands", "belgium", "brazil", "argentina", "mexico",
+    "usa", "japan", "south korea", "morocco", "nigeria", "senegal", "egypt",
+    "cameroon", "ghana", "kenya", "uganda", "tanzania", "south africa",
+})
 
 # 1xBet country label -> FotMob ccode
 COUNTRY_TO_CCODE: dict[str, str] = {
@@ -179,6 +200,28 @@ def league_context_score(
             score += 0.25
 
     return min(score, 1.0)
+
+
+def is_national_team(name: str) -> bool:
+    """True when the label is a country/national side (not a club)."""
+    if not name:
+        return False
+    return normalize_team_key(name) in NATIONAL_TEAMS
+
+
+def team_match_quality(query: str, matched: str) -> float:
+    """0–1 confidence that a provider matched the intended team name."""
+    if not query or not matched:
+        return 0.0
+    q = normalize_team_key(query)
+    m = normalize_team_key(matched)
+    if q == m:
+        return 1.0
+    if is_national_team(query):
+        return 1.0 if m == q else 0.0
+    if q in m or m in q:
+        return 0.92
+    return SequenceMatcher(None, q, m).ratio()
 
 
 def is_virtual_esoccer_team(name: str) -> bool:

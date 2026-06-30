@@ -34,6 +34,13 @@ def onexbet_live_url(site: Optional[str] = None) -> str:
     return f"{get_onexbet_site(site)}/en/live/football"
 
 
+def onexbet_toto_url(site: Optional[str] = None, *, variant: str = "fifteen") -> str:
+    """User-facing 1xBet Toto page (Toto 15 = fifteen, football 1X2 pool)."""
+    base = get_onexbet_site(site)
+    slug = (variant or "fifteen").strip().lower()
+    return f"{base}/en/toto/{slug}"
+
+
 def onexbet_mobile_url(site: Optional[str] = None) -> str:
     """Official mobile / app page — opens installed 1xBet app on Android phones."""
     return f"{get_onexbet_site(site)}/en/mobile?v=1"
@@ -276,6 +283,12 @@ def onexbet_telegram_open_url(
             params += f"&sport={sport}"
         return f"{base}/open/1xbet?{params}"
     return f"{base}/open/1xbet"
+
+
+def onexbet_toto_telegram_open_url(base_url: Optional[str] = None) -> str:
+    """Pro Punter redirect → 1xBet Toto 15 in the native app."""
+    base = (base_url or app_base_url()).rstrip("/")
+    return f"{base}/open/1xbet/toto"
 
 
 def onexbet_android_intent_url(

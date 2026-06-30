@@ -29,6 +29,7 @@ from onexbet_client import (
     onexbet_app_open_url,
     onexbet_live_url,
     onexbet_match_url,
+    onexbet_toto_url,
 )
 from engine import REFRESH_SECONDS, DataCache, build_fusion_payload
 from toto_predictions import TotoCache
@@ -67,7 +68,7 @@ def _ensure_toto_cache():
         _toto_started = True
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "30")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "31")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -192,6 +193,70 @@ def open_onexbet_match():
 </body>
 </html>"""
     return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))
+
+
+@app.route("/open/1xbet/toto")
+def open_onexbet_toto():
+    """Landing page: tap → 1xBet Toto 15 in the native app."""
+    config = STORE.load_config()
+    site = effective_onexbet_site(config)
+    pkg = effective_onexbet_android_package(config)
+    toto_url = onexbet_toto_url(site)
+    payload = {"https": toto_url, "match": toto_url, "package": pkg}
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open 1xBet Toto</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }}
+    .box {{ text-align: center; max-width: 360px; width: 100%; }}
+    h1 {{ font-size: 1.25rem; margin: 0 0 8px; }}
+    p {{ color: #8b949e; font-size: 0.9rem; line-height: 1.45; margin: 0 0 16px; }}
+    .btn {{ display: block; width: 100%; box-sizing: border-box; margin: 10px 0; padding: 14px 16px;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none; }}
+    .btn-primary {{ background: #238636; color: #fff; }}
+    .btn-secondary {{ background: #21262d; color: #e6edf3; border: 1px solid #30363d; }}
+    .hint {{ background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; margin-bottom: 16px;
+      font-size: 0.85rem; color: #c9d1d9; text-align: left; }}
+    .pkg {{ font-size: 0.75rem; color: #6e7681; margin-top: 12px; word-break: break-all; }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Open 1xBet Toto 15</h1>
+    <p>Tap the green button — opens <strong>Toto 15</strong> (football 1X2 pool) in the <strong>1xBet app</strong>.</p>
+    <p style="font-size:0.8rem;color:#8b949e;margin-top:-8px"><a href="{toto_url}" style="color:#3fb950">{toto_url}</a></p>
+    <div id="inapp-hint" class="hint" hidden>
+      <strong>Using Telegram?</strong> Tap <strong>⋮</strong> → <strong>Open in Chrome</strong>, then tap the green button.
+    </div>
+    <div id="settings-hint" class="hint" hidden>
+      <strong>One-time setup:</strong> Settings → Apps → 1xBet → Open supported links → enable <strong>1xbet.co.ke</strong>.
+    </div>
+    <button type="button" id="open-app" class="btn btn-primary">Open Toto 15 in 1xBet app</button>
+    <button type="button" id="open-chrome" class="btn btn-secondary" hidden>Open in Chrome first</button>
+    <a id="open-web" class="btn btn-secondary" href="{toto_url}">Open Toto in browser</a>
+    <p class="pkg">Package: {pkg or "org.xbet.client.ke_ps"}</p>
+  </div>
+  <script>window.ONEXBET_OPEN = {json.dumps(payload)};</script>
+  <script src="/static/open-1xbet.js?v={ASSET_VERSION}"></script>
+</body>
+</html>"""
+    return _no_cache(Response(html, mimetype="text/html; charset=utf-8"))
+
+
+@app.route("/api/onexbet/toto-link")
+def api_onexbet_toto_link():
+    config = STORE.load_config()
+    site = effective_onexbet_site(config)
+    return jsonify({
+        "site": site,
+        "toto_url": onexbet_toto_url(site),
+        "open_url": f"{request.url_root.rstrip('/')}/open/1xbet/toto",
+        "product": "Toto 15",
+    })
 
 
 @app.route("/api/onexbet/match-link")

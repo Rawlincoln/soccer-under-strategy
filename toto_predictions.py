@@ -17,6 +17,12 @@ from team_aliases import (
     team_match_quality,
 )
 from thesportsdb_stats import SPORTSDB_PROVIDER
+from bet_assistant import STORE, effective_onexbet_android_package, effective_onexbet_site
+from onexbet_client import (
+    app_base_url,
+    onexbet_toto_telegram_open_url,
+    onexbet_toto_url,
+)
 from toto_client import TotoJackpot, TotoMatch, get_jackpot, jackpot_to_dict
 
 
@@ -306,6 +312,12 @@ def build_toto_payload(*, force_refresh: bool = False) -> dict[str, Any]:
         "sportsdb": sum(1 for a in analyses if a.coverage.get("sportsdb")),
     }
 
+    config = STORE.load_config()
+    onex_site = effective_onexbet_site(config)
+    onex_pkg = effective_onexbet_android_package(config)
+    toto_href = onexbet_toto_url(onex_site)
+    app_base = app_base_url()
+
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "jackpot": jackpot_to_dict(jackpot),
@@ -315,6 +327,14 @@ def build_toto_payload(*, force_refresh: bool = False) -> dict[str, Any]:
         "sets": [asdict(s) for s in sets],
         "error": jackpot.error,
         "loading": False,
+        "onexbet": {
+            "site": onex_site,
+            "toto_url": toto_href,
+            "toto_open_url": onexbet_toto_telegram_open_url(app_base),
+            "android_package": onex_pkg,
+            "product": "Toto 15",
+            "note": "SportPesa Mega JP is 17 games; 1xBet Toto 15 is a separate 15-game pool on 1xBet.",
+        },
     }
 
 

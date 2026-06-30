@@ -35,6 +35,45 @@
 .toto-intro-card.set1 { border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.06); }
 .toto-intro-card.set2 { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
 .toto-intro-card.set3 { border-color: rgba(248, 81, 73, 0.35); background: rgba(248, 81, 73, 0.06); }
+.toto-intro-card.onexbet {
+  border-color: rgba(35, 134, 54, 0.45);
+  background: rgba(35, 134, 54, 0.08);
+}
+
+.toto-page .btn-onexbet-toto {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #238636;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(63, 185, 80, 0.5);
+  white-space: nowrap;
+}
+.toto-page .btn-onexbet-toto:hover {
+  background: #2ea043;
+}
+
+.toto-page .subtitle a {
+  color: #3fb950;
+  text-decoration: none;
+}
+.toto-page .subtitle a:hover {
+  text-decoration: underline;
+}
+
+.baseline-onexbet {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.baseline-onexbet:hover {
+  border-color: rgba(63, 185, 80, 0.5);
+}
 
 .toto-sets {
   display: grid;

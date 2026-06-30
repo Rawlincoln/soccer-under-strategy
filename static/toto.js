@@ -22,9 +22,26 @@ function pickChip(letter, title) {
   return `<span class="toto-pick-chip ${letter}" title="${title || label}">${letter}</span>`;
 }
 
+function bindOnexbetLinks(onex) {
+  if (!onex) return;
+  const href = onex.toto_open_url || onex.toto_url || "/open/1xbet/toto";
+  const btn = $("btnOnexbetToto");
+  if (btn) {
+    btn.href = href;
+    btn.title = `Open ${onex.product || "Toto 15"} on ${onex.site || "1xBet"}`;
+  }
+  const sub = $("subtitleOnexbetLink");
+  if (sub) sub.href = href;
+  const note = $("onexbetTotoNote");
+  if (note && onex.note) {
+    note.textContent = `${onex.note} Tap the green button to open the app.`;
+  }
+}
+
 function renderBaselines(data) {
   const jp = data.jackpot || {};
   const src = data.sources_hit || {};
+  const onex = data.onexbet || {};
   $("baselines").innerHTML = `
     <div class="baseline-card"><div class="label">Jackpot</div><div class="value">${jp.title || "Mega JP 17"}</div></div>
     <div class="baseline-card"><div class="label">Prize</div><div class="value green">${fmtPrize(jp.prize_kes)}</div></div>
@@ -34,7 +51,12 @@ function renderBaselines(data) {
     <div class="baseline-card"><div class="label">FotMob</div><div class="value">${src.fotmob || 0}/${data.match_count || 0}</div></div>
     <div class="baseline-card"><div class="label">SportsDB</div><div class="value">${src.sportsdb || 0}/${data.match_count || 0}</div></div>
     <div class="baseline-card"><div class="label">Stake</div><div class="value">KES ${jp.stake_kes || 99}</div></div>
+    <a class="baseline-card baseline-onexbet" href="${onex.toto_open_url || "/open/1xbet/toto"}" target="_blank" rel="noopener">
+      <div class="label">1xBet</div>
+      <div class="value green">${onex.product || "Toto 15"} →</div>
+    </a>
   `;
+  bindOnexbetLinks(onex);
 }
 
 function renderSets(sets) {
@@ -118,6 +140,7 @@ async function fetchData() {
     if (data.error && !data.matches?.length) throw new Error(data.error);
 
     lastData = data;
+    bindOnexbetLinks(data.onexbet);
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
     $("matchCount").textContent = `${data.match_count || 0} games`;
     $("connectionStatus").classList.add("live");

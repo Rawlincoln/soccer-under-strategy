@@ -366,10 +366,13 @@ def get_jackpot(
     type_id: int = DEFAULT_TYPE_ID,
     force_refresh: bool = False,
     site: Optional[str] = None,
+    allow_stale: bool = False,
 ) -> TotoJackpot:
     type_id = int(type_id)
+    local = _load_local(type_id)
     if not force_refresh:
-        local = _load_local(type_id)
+        if allow_stale and local and local.matches:
+            return local
         if local and local.matches:
             try:
                 age_h = (
@@ -380,7 +383,13 @@ def get_jackpot(
                     return local
             except ValueError:
                 return local
-    return fetch_active_draw(type_id, site=site)
+    fetched = fetch_active_draw(type_id, site=site)
+    if fetched.matches:
+        return fetched
+    if local and local.matches:
+        local.error = fetched.error or local.error or "Using saved fixture list"
+        return local
+    return fetched
 
 
 def jackpot_to_dict(jackpot: TotoJackpot) -> dict[str, Any]:

@@ -518,7 +518,7 @@ class TotoCache:
     def _seed_fast_payload(self, type_id: int) -> bool:
         """Instant pool-based picks from saved 1xBet fixtures (no provider load)."""
         try:
-            jackpot = get_jackpot(type_id=type_id, force_refresh=False)
+            jackpot = get_jackpot(type_id=type_id, force_refresh=False, allow_stale=True)
             if not jackpot.matches:
                 return False
             analyses = [analyze_market_match(m) for m in jackpot.matches]

@@ -68,7 +68,7 @@ def _ensure_toto_cache(type_id: int = 1):
         _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "32")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "33")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -319,8 +319,14 @@ def api_toto():
     type_id = int(request.args.get("type_id", 1))
     _ensure_toto_cache(type_id)
     data = toto_cache.get(type_id)
-    if data.get("loading") and not data.get("matches"):
-        return jsonify({"loading": True, "type_id": type_id, "matches": [], "sets": []})
+    if data.get("loading") and not data.get("matches") and not data.get("sets"):
+        return jsonify({
+            "loading": True,
+            "type_id": type_id,
+            "matches": [],
+            "sets": [],
+            "products": data.get("products") or [],
+        })
     return jsonify(data)
 
 
@@ -560,6 +566,7 @@ def api_alerts_status():
 
 
 _ensure_cache()
+_ensure_toto_cache(1)
 
 if __name__ == "__main__":
     _ensure_cache()

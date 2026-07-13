@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from fotmob_stats import FOTMOB_PROVIDER
@@ -25,13 +28,16 @@ from onexbet_client import (
 )
 from toto_client import (
     DEFAULT_TYPE_ID,
-    TotoJackpot,
     TotoMatch,
     fetch_jackpots_list,
     get_jackpot,
     jackpot_to_dict,
     product_info,
 )
+
+ROOT = Path(__file__).parent
+ANALYSIS_CACHE_FILE = ROOT / "data" / "toto_analysis_cache.json"
+PRODUCTS_CACHE_TTL_SEC = 1800
 
 
 @dataclass
@@ -258,6 +264,41 @@ def _compute_wdl(
     return scores, signals, coverage, extras
 
 
+def analyze_market_match(match: TotoMatch) -> TotoMatchAnalysis:
+    """Fast W/D/L picks from 1xBet pool percentages only."""
+    mkt = dict(match.market_wdl or {})
+    scores = WDLScores(
+        home_win=float(mkt.get("W") or 33),
+        draw=float(mkt.get("D") or 34),
+        away_win=float(mkt.get("L") or 33),
+    )
+    scores = _normalize_wdl(scores)
+    ranked = scores.ranked()
+    signals: list[str] = []
+    if mkt:
+        signals.append(
+            f"1xBet pool: W {mkt.get('W', 0):.0f}% · D {mkt.get('D', 0):.0f}% · L {mkt.get('L', 0):.0f}%"
+        )
+    primary = _pick_from_ranked(ranked, 0)
+    value = _pick_from_ranked(ranked, 1 if ranked[0][1] - ranked[1][1] < 14 else 0)
+    upset = _pick_from_ranked(ranked, 2 if ranked[0][1] - ranked[2][1] < 20 else 1)
+    return TotoMatchAnalysis(
+        num=match.num,
+        home_team=match.home_team,
+        away_team=match.away_team,
+        league=match.league,
+        kickoff=match.kickoff,
+        pick_primary=primary,
+        pick_value=value,
+        pick_upset=upset,
+        confidence_primary=ranked[0][1] if ranked else 33.0,
+        scores=scores.as_dict(),
+        signals=signals,
+        coverage={},
+        market_wdl=mkt,
+    )
+
+
 def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
     scores, signals, coverage, extras = _compute_wdl(
         match.home_team,
@@ -292,7 +333,11 @@ def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
     )
 
 
-def build_prediction_sets(analyses: list[TotoMatchAnalysis]) -> list[TotoPredictionSet]:
+def build_prediction_sets(
+    analyses: list[TotoMatchAnalysis],
+    *,
+    fast: bool = False,
+) -> list[TotoPredictionSet]:
     primary = [a.pick_primary for a in analyses]
     value = [a.pick_value for a in analyses]
     upset = [a.pick_upset for a in analyses]
@@ -300,25 +345,34 @@ def build_prediction_sets(analyses: list[TotoMatchAnalysis]) -> list[TotoPredict
     def slip(picks: list[str]) -> str:
         return "-".join(picks)
 
+    if fast:
+        banker_desc = "1xBet pool favourite per match (instant — full model loading)"
+        value_desc = "Second-best 1xBet pool outcome per match"
+        upset_desc = "Contrarian 1xBet pool pick per match"
+    else:
+        banker_desc = "Highest model confidence per match (ProphitBet form + SoccerPunter H2H + FotMob)"
+        value_desc = "Second-best outcome when top pick is not clear — more draws and tight games"
+        upset_desc = "Contrarian/longshot mix for jackpot variance — targets close odds and underdogs"
+
     return [
         TotoPredictionSet(
             id="bankers",
             label="Set 1 · Bankers",
-            description="Highest model confidence per match (ProphitBet form + SoccerPunter H2H + FotMob)",
+            description=banker_desc,
             picks=primary,
             slip=slip(primary),
         ),
         TotoPredictionSet(
             id="value",
             label="Set 2 · Value",
-            description="Second-best outcome when top pick is not clear — more draws and tight games",
+            description=value_desc,
             picks=value,
             slip=slip(value),
         ),
         TotoPredictionSet(
             id="upset",
             label="Set 3 · Upset hunter",
-            description="Contrarian/longshot mix for jackpot variance — targets close odds and underdogs",
+            description=upset_desc,
             picks=upset,
             slip=slip(upset),
         ),
@@ -326,53 +380,54 @@ def build_prediction_sets(analyses: list[TotoMatchAnalysis]) -> list[TotoPredict
 
 
 def _ensure_analysis_providers() -> None:
-    PROPHIT_PROVIDER.ensure_loaded(background=False)
-    SOCCERPUNTER_PROVIDER.ensure_loaded(background=False)
-    FOTMOB_PROVIDER.ensure_loaded(background=False)
-    SPORTSDB_PROVIDER.ensure_loaded(background=False)
+    PROPHIT_PROVIDER.ensure_loaded(background=True)
+    SOCCERPUNTER_PROVIDER.ensure_loaded(background=True)
+    FOTMOB_PROVIDER.ensure_loaded(background=True)
+    SPORTSDB_PROVIDER.ensure_loaded(background=True)
 
 
-def build_toto_payload(
-    *,
-    type_id: int = DEFAULT_TYPE_ID,
-    force_refresh: bool = False,
-) -> dict[str, Any]:
-    type_id = int(type_id)
-    jackpot = get_jackpot(type_id=type_id, force_refresh=force_refresh)
-    _ensure_analysis_providers()
-    analyses = [analyze_toto_match(m) for m in jackpot.matches]
-    sets = build_prediction_sets(analyses)
-
-    sources_hit = {
+def _sources_hit(analyses: list[TotoMatchAnalysis]) -> dict[str, int]:
+    return {
         "prophitbet": sum(1 for a in analyses if a.coverage.get("prophitbet")),
         "soccerpunter": sum(1 for a in analyses if a.coverage.get("soccerpunter")),
         "fotmob": sum(1 for a in analyses if a.coverage.get("fotmob")),
         "sportsdb": sum(1 for a in analyses if a.coverage.get("sportsdb")),
     }
 
+
+def _assemble_payload(
+    *,
+    type_id: int,
+    jackpot,
+    analyses: list[TotoMatchAnalysis],
+    products: list[dict[str, Any]],
+    fast: bool = False,
+    refreshing: bool = False,
+) -> dict[str, Any]:
+    sets = build_prediction_sets(analyses, fast=fast)
     config = STORE.load_config()
     onex_site = effective_onexbet_site(config)
     onex_pkg = effective_onexbet_android_package(config)
     pinfo = product_info(type_id)
-    toto_href = pinfo["toto_url"]
     app_base = app_base_url()
-    products = fetch_jackpots_list(site=onex_site)
 
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "type_id": type_id,
         "jackpot": jackpot_to_dict(jackpot),
         "match_count": len(analyses),
-        "sources_hit": sources_hit,
+        "sources_hit": _sources_hit(analyses),
         "matches": [asdict(a) for a in analyses],
         "sets": [asdict(s) for s in sets],
-        "error": jackpot.error,
+        "error": jackpot.error if not analyses else None,
         "loading": False,
+        "refreshing": refreshing,
+        "analysis_mode": "fast" if fast else "full",
         "products": products,
         "onexbet": {
             "site": onex_site,
             "type_id": type_id,
-            "toto_url": toto_href,
+            "toto_url": pinfo["toto_url"],
             "toto_open_url": onexbet_toto_telegram_open_url(app_base),
             "android_package": onex_pkg,
             "product": pinfo["label"],
@@ -383,6 +438,68 @@ def build_toto_payload(
     }
 
 
+def _load_analysis_cache(type_id: int) -> Optional[dict[str, Any]]:
+    if not ANALYSIS_CACHE_FILE.exists():
+        return None
+    try:
+        raw = json.loads(ANALYSIS_CACHE_FILE.read_text(encoding="utf-8"))
+        entry = (raw.get("types") or {}).get(str(type_id))
+        if not entry or not entry.get("matches"):
+            return None
+        entry = dict(entry)
+        entry["loading"] = False
+        entry["refreshing"] = False
+        return entry
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return None
+
+
+def _save_analysis_cache(type_id: int, payload: dict[str, Any]) -> None:
+    try:
+        ANALYSIS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        cache = {"types": {}}
+        if ANALYSIS_CACHE_FILE.exists():
+            cache = json.loads(ANALYSIS_CACHE_FILE.read_text(encoding="utf-8"))
+        cache.setdefault("types", {})[str(type_id)] = payload
+        ANALYSIS_CACHE_FILE.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def build_toto_payload(
+    *,
+    type_id: int = DEFAULT_TYPE_ID,
+    force_refresh: bool = False,
+    products: Optional[list[dict[str, Any]]] = None,
+) -> dict[str, Any]:
+    type_id = int(type_id)
+    jackpot = get_jackpot(type_id=type_id, force_refresh=force_refresh)
+    if not jackpot.matches:
+        config = STORE.load_config()
+        onex_site = effective_onexbet_site(config)
+        prods = products if products is not None else fetch_jackpots_list(site=onex_site)
+        return _assemble_payload(
+            type_id=type_id,
+            jackpot=jackpot,
+            analyses=[],
+            products=prods,
+            fast=True,
+        )
+
+    _ensure_analysis_providers()
+    analyses = [analyze_toto_match(m) for m in jackpot.matches]
+    config = STORE.load_config()
+    onex_site = effective_onexbet_site(config)
+    prods = products if products is not None else []
+    return _assemble_payload(
+        type_id=type_id,
+        jackpot=jackpot,
+        analyses=analyses,
+        products=prods,
+        fast=False,
+    )
+
+
 class TotoCache:
     """On-demand Toto analysis cache (separate from live under-goals scan)."""
 
@@ -390,7 +507,34 @@ class TotoCache:
         self._lock = threading.Lock()
         self._data_by_type: dict[int, dict[str, Any]] = {}
         self._refresh_in_progress: set[int] = set()
+        self._products_cache: tuple[float, list[dict[str, Any]]] = (0.0, [])
         self._default_type = DEFAULT_TYPE_ID
+        cached = _load_analysis_cache(DEFAULT_TYPE_ID)
+        if cached:
+            self._data_by_type[DEFAULT_TYPE_ID] = cached
+        else:
+            self._seed_fast_payload(DEFAULT_TYPE_ID)
+
+    def _seed_fast_payload(self, type_id: int) -> bool:
+        """Instant pool-based picks from saved 1xBet fixtures (no provider load)."""
+        try:
+            jackpot = get_jackpot(type_id=type_id, force_refresh=False)
+            if not jackpot.matches:
+                return False
+            analyses = [analyze_market_match(m) for m in jackpot.matches]
+            payload = _assemble_payload(
+                type_id=type_id,
+                jackpot=jackpot,
+                analyses=analyses,
+                products=[],
+                fast=True,
+                refreshing=True,
+            )
+            with self._lock:
+                self._data_by_type[type_id] = payload
+            return True
+        except Exception:
+            return False
 
     def _loading_payload(self, type_id: int) -> dict[str, Any]:
         return {
@@ -399,7 +543,18 @@ class TotoCache:
             "matches": [],
             "sets": [],
             "products": [],
+            "analysis_mode": "pending",
         }
+
+    def _get_products(self, site: str) -> list[dict[str, Any]]:
+        now = time.time()
+        cached_at, cached = self._products_cache
+        if cached and now - cached_at < PRODUCTS_CACHE_TTL_SEC:
+            return cached
+        products = fetch_jackpots_list(site=site)
+        with self._lock:
+            self._products_cache = (now, products)
+        return products
 
     def refresh(self, *, type_id: int = DEFAULT_TYPE_ID, force_jackpot: bool = False) -> None:
         type_id = int(type_id)
@@ -408,19 +563,58 @@ class TotoCache:
                 return
             self._refresh_in_progress.add(type_id)
         try:
-            payload = build_toto_payload(type_id=type_id, force_refresh=force_jackpot)
+            config = STORE.load_config()
+            onex_site = effective_onexbet_site(config)
+            products = self._get_products(onex_site)
+            jackpot = get_jackpot(type_id=type_id, force_refresh=force_jackpot)
+
+            if jackpot.matches:
+                fast_analyses = [analyze_market_match(m) for m in jackpot.matches]
+                fast_payload = _assemble_payload(
+                    type_id=type_id,
+                    jackpot=jackpot,
+                    analyses=fast_analyses,
+                    products=products,
+                    fast=True,
+                    refreshing=True,
+                )
+                with self._lock:
+                    self._data_by_type[type_id] = fast_payload
+
+            payload = build_toto_payload(
+                type_id=type_id,
+                force_refresh=False,
+                products=products,
+            )
+            payload["refreshing"] = False
+            payload["products"] = products
             with self._lock:
                 self._data_by_type[type_id] = payload
+            _save_analysis_cache(type_id, payload)
         except Exception as exc:
             with self._lock:
-                self._data_by_type[type_id] = {
-                    "loading": False,
-                    "type_id": type_id,
-                    "error": str(exc),
-                    "matches": [],
-                    "sets": [],
-                    "products": [],
-                }
+                existing = self._data_by_type.get(type_id)
+                if existing and existing.get("matches"):
+                    existing["error"] = f"Full analysis failed ({exc}); showing available picks"
+                    existing["refreshing"] = False
+                    self._data_by_type[type_id] = existing
+                    return
+            fallback = _load_analysis_cache(type_id)
+            with self._lock:
+                if fallback:
+                    fallback["error"] = f"Refresh failed ({exc}); showing saved analysis"
+                    fallback["refreshing"] = False
+                    self._data_by_type[type_id] = fallback
+                else:
+                    self._data_by_type[type_id] = {
+                        "loading": False,
+                        "type_id": type_id,
+                        "error": str(exc),
+                        "matches": [],
+                        "sets": [],
+                        "products": [],
+                        "analysis_mode": "error",
+                    }
         finally:
             with self._lock:
                 self._refresh_in_progress.discard(type_id)
@@ -435,7 +629,16 @@ class TotoCache:
         with self._lock:
             if type_id in self._refresh_in_progress:
                 return False
-            self._data_by_type[type_id] = self._loading_payload(type_id)
+            existing = self._data_by_type.get(type_id)
+            if existing and existing.get("matches"):
+                existing["refreshing"] = True
+            elif not existing:
+                disk = _load_analysis_cache(type_id)
+                if disk:
+                    disk["refreshing"] = True
+                    self._data_by_type[type_id] = disk
+                else:
+                    self._data_by_type[type_id] = self._loading_payload(type_id)
         threading.Thread(
             target=self.refresh,
             kwargs={"type_id": type_id, "force_jackpot": force_jackpot},
@@ -449,4 +652,12 @@ class TotoCache:
             data = self._data_by_type.get(type_id)
             if data:
                 return dict(data)
-            return self._loading_payload(type_id)
+        disk = _load_analysis_cache(type_id)
+        if disk:
+            return disk
+        if self._seed_fast_payload(type_id):
+            with self._lock:
+                data = self._data_by_type.get(type_id)
+                if data:
+                    return dict(data)
+        return self._loading_payload(type_id)

@@ -189,7 +189,7 @@ async function fetchData() {
   try {
     const res = await fetch(`/api/toto?type_id=${activeTypeId}`);
     const data = await res.json();
-    if (data.error && !data.matches?.length) throw new Error(data.error);
+    if (data.error && !data.matches?.length && !data.sets?.length) throw new Error(data.error);
 
     lastData = data;
     if (data.type_id) activeTypeId = data.type_id;
@@ -200,13 +200,15 @@ async function fetchData() {
     $("connectionStatus").classList.add("live");
     $("connectionStatus").classList.remove("error");
 
-    if (data.loading) {
-      $("statusText").textContent = "Analysing jackpot…";
-      $("totoGrid").innerHTML = '<div class="loading">Running 1X2 analysis on all pool games (may take 1–2 min first time)…</div>';
+    if (data.loading && !data.sets?.length) {
+      $("statusText").textContent = "Loading 1xBet pool…";
+      $("totoGrid").innerHTML = '<div class="loading">Fetching 1xBet jackpot pool…</div>';
       return;
     }
 
-    $("statusText").textContent = `${data.onexbet?.product || "Toto"} · 3 slips · ${data.match_count || 0} games`;
+    const mode = data.analysis_mode === "fast" ? "pool picks" : "full model";
+    const refreshing = data.refreshing ? " · deepening analysis…" : "";
+    $("statusText").textContent = `${data.onexbet?.product || "Toto"} · ${mode} · 3 slips · ${data.match_count || 0} games${refreshing}`;
     renderBaselines(data);
     renderSets(data.sets);
     renderMatches(data.matches);

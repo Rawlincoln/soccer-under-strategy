@@ -41,13 +41,13 @@ from onexbet_client import (
 from prophitbet_stats import PROPHIT_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
 from market_odds import lookup_market_odds
-from pressure_ou_model import analyze_pressure_ou, pressure_confidence_adjust
+from pressure_ou_model import pressure_confidence_adjust, pressure_from_summary
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
 from thesportsdb_stats import SPORTSDB_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
 REFRESH_SECONDS = 30
-REFRESH_TIMEOUT_SECONDS = 240
+REFRESH_TIMEOUT_SECONDS = 180
 ONEXBET_CLIENT = OneXBetClient()
 
 LEAGUE_BASELINES = {
@@ -219,8 +219,22 @@ class DataCache:
         if self._running:
             return
         self._running = True
+        threading.Thread(target=self._bootstrap_fast_refresh, daemon=True).start()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+
+    def _bootstrap_fast_refresh(self) -> None:
+        """Serve 1xBet-only picks quickly so the UI is not stuck on loading."""
+        try:
+            payload, closing_payload = build_all_payloads(fast=True)
+            payload["loading"] = False
+            closing_payload["loading"] = False
+            with self._lock:
+                if not self._data.get("updated_at"):
+                    self._data = payload
+                    self._closing = closing_payload
+        except Exception:
+            pass
 
     def stop(self):
         self._running = False
@@ -431,10 +445,7 @@ def score_period_under(
             stats, prophit_stats, total_goals, minute, baseline[bl_key], half=half,
         ))
 
-    pressure = analyze_pressure_ou(
-        prophit_stats, stats, half, total_goals,
-        combined.get("market_odds_summary"), minute,
-    )
+    pressure = pressure_from_summary((combined or {}).get("pressure_summary"))
 
     signals: list[str] = list(combined.get("fusion_signals") or [])
     total_score = combined["breakdown"]["total"]
@@ -872,7 +883,81 @@ def _prefetch_game_details(
     return details
 
 
-def _scan_live_football() -> tuple[
+def _match_halves(m: OneXBetMatch) -> list[str]:
+    halves: list[str] = []
+    if m.is_first_half and m.minute < 43:
+        halves.append("fh")
+    if m.is_second_half and m.minute < 90:
+        halves.append("sh")
+    return halves
+
+
+def _prefetch_period_stats(
+    client: OneXBetClient,
+    matches: list[OneXBetMatch],
+) -> dict[tuple[int, str], dict[str, int]]:
+    """Parallel fetch of FH/SH subgame stats (major scan speedup)."""
+    jobs: list[tuple[OneXBetMatch, str]] = []
+    for m in matches:
+        if m.is_half_time:
+            continue
+        if not m.is_first_half and not m.is_second_half:
+            continue
+        if m.is_second_half and m.minute >= 90:
+            continue
+        for half in _match_halves(m):
+            jobs.append((m, half))
+
+    if not jobs:
+        return {}
+
+    def _fetch(job: tuple[OneXBetMatch, str]) -> tuple[tuple[int, str], dict[str, int]]:
+        match, half = job
+        return (match.game_id, half), client.fetch_period_subgame_stats(match, half)
+
+    out: dict[tuple[int, str], dict[str, int]] = {}
+    workers = min(10, max(1, len(jobs)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for key, stats in pool.map(_fetch, jobs):
+            out[key] = stats
+    return out
+
+
+def _append_pick_signals(
+    card: MatchCard,
+    preds: list[Prediction],
+    p_goals: int,
+    bet_signals: list[dict],
+    scored_under_15: list[dict],
+    scored_under_25: list[dict],
+) -> None:
+    card_dict = asdict(card)
+    scored = p_goals >= 1
+    for p in preds:
+        if not _qualifies_60(p):
+            continue
+        pd = _pred_to_dict(p)
+        pd["minute"] = card.minute
+        pd["half"] = card.half
+        pd["period_score"] = card.period_score
+        pd["full_score"] = card.full_score
+        pd["is_half_time"] = card.is_half_time
+        pd["period_minute"] = card.period_minute
+        pd["event_id"] = card.event_id
+        pd["league_id"] = card.league_id
+        pd["match"] = f"{card.home_team} vs {card.away_team}"
+        pd["home_team"] = card.home_team
+        pd["away_team"] = card.away_team
+        if p.recommendation in ("BET", "WATCH"):
+            bet_signals.append(pd)
+        if scored and p.recommendation in ("BET", "WATCH"):
+            if "Under 1.5" in p.market and card.under_15_alive:
+                scored_under_15.append({**card_dict, "pick": pd})
+            if "Under 2.5" in p.market and card.under_25_alive:
+                scored_under_25.append({**card_dict, "pick": pd})
+
+
+def _scan_live_football(fast: bool = False) -> tuple[
     list[MatchCard],
     list[dict],
     list[dict],
@@ -887,9 +972,10 @@ def _scan_live_football() -> tuple[
     scored_under_25: list[dict] = []
 
     PROPHIT_PROVIDER.ensure_loaded(background=True)
-    SOCCERPUNTER_PROVIDER.ensure_loaded(background=True)
-    FOTMOB_PROVIDER.ensure_loaded(background=True)
-    SPORTSDB_PROVIDER.ensure_loaded(background=True)
+    if not fast:
+        SOCCERPUNTER_PROVIDER.ensure_loaded(background=True)
+        FOTMOB_PROVIDER.ensure_loaded(background=True)
+        SPORTSDB_PROVIDER.ensure_loaded(background=True)
 
     raw_live = ONEXBET_CLIENT.fetch_live_football()
     total_live = len(raw_live)
@@ -923,22 +1009,25 @@ def _scan_live_football() -> tuple[
     detail_cache = _prefetch_game_details(
         ONEXBET_CLIENT, [m.game_id for m in eligible],
     )
+    period_stats_cache = {} if fast else _prefetch_period_stats(ONEXBET_CLIENT, eligible)
 
     for m in eligible:
         game_detail = detail_cache.get(m.game_id) or {}
 
         prophit_stats = PROPHIT_PROVIDER.lookup_match(m.home_team, m.away_team)
-        soccerpunter_stats = SOCCERPUNTER_PROVIDER.lookup_match(m.home_team, m.away_team)
-        fotmob_stats = FOTMOB_PROVIDER.lookup_match(
-            m.home_team, m.away_team, half="fh",
-            league=m.league, country=m.country,
+        soccerpunter_stats = None if fast else SOCCERPUNTER_PROVIDER.lookup_match(
+            m.home_team, m.away_team,
         )
-        sportsdb_stats = SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
+        sportsdb_stats = None if fast else SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
         market_odds_fh = lookup_market_odds(
             ONEXBET_CLIENT, m.game_id, half="fh", cached_detail=game_detail,
         )
 
         if m.is_half_time:
+            fotmob_stats = None if fast else FOTMOB_PROVIDER.lookup_match(
+                m.home_team, m.away_team, half="fh",
+                league=m.league, country=m.country,
+            )
             cards.append(_build_half_time_card(
                 m, prophit_stats, soccerpunter_stats, fotmob_stats,
                 sportsdb_stats, market_odds_fh,
@@ -950,17 +1039,15 @@ def _scan_live_football() -> tuple[
             continue
         if m.is_second_half and m.minute >= 90:
             continue
-        halves: list[str] = []
-        if m.is_first_half and m.minute < 43:
-            halves.append("fh")
-        if m.is_second_half and m.minute < 90:
-            halves.append("sh")
 
-        for half in halves:
-            period_stats = ONEXBET_CLIENT.fetch_period_subgame_stats(m, half)
+        for half in _match_halves(m):
+            if fast:
+                period_stats = m.stats
+            else:
+                period_stats = period_stats_cache.get((m.game_id, half)) or m.stats
             if has_red_cards(period_stats):
                 continue
-            fm_half = FOTMOB_PROVIDER.lookup_match(
+            fm_half = None if fast else FOTMOB_PROVIDER.lookup_match(
                 m.home_team, m.away_team, half=half,
                 league=m.league, country=m.country,
             )
@@ -984,7 +1071,7 @@ def _scan_live_football() -> tuple[
             p_goals = m.fh_goals if half == "fh" else m.sh_goals
             status = "1H" if half == "fh" else "2H"
 
-            if is_closing_window(m.minute, half):
+            if not fast and is_closing_window(m.minute, half):
                 closing_window_count += 1
                 closing = build_closing_card(
                     event_id=str(m.game_id),
@@ -1026,31 +1113,9 @@ def _scan_live_football() -> tuple[
             else:
                 sh_count += 1
 
-            card_dict = asdict(card)
-            scored = p_goals >= 1
-            for p in preds:
-                if not _qualifies_60(p):
-                    continue
-                pd = _pred_to_dict(p)
-                pd["minute"] = card.minute
-                pd["half"] = card.half
-                pd["period_score"] = card.period_score
-                pd["full_score"] = card.full_score
-                pd["is_half_time"] = card.is_half_time
-                pd["period_minute"] = card.period_minute
-                pd["event_id"] = card.event_id
-                pd["league_id"] = card.league_id
-                pd["match"] = f"{card.home_team} vs {card.away_team}"
-                pd["home_team"] = card.home_team
-                pd["away_team"] = card.away_team
-                if p.recommendation in ("BET", "WATCH"):
-                    bet_signals.append(pd)
-
-                if scored and p.recommendation in ("BET", "WATCH"):
-                    if "Under 1.5" in p.market and card.under_15_alive:
-                        scored_under_15.append({**card_dict, "pick": pd})
-                    if "Under 2.5" in p.market and card.under_25_alive:
-                        scored_under_25.append({**card_dict, "pick": pd})
+            _append_pick_signals(
+                card, preds, p_goals, bet_signals, scored_under_15, scored_under_25,
+            )
 
     cards.sort(key=lambda c: (
         0 if (c.combined_analysis or {}).get("verdict") == "STRONG BET" else 1,
@@ -1153,8 +1218,10 @@ def build_closing_payload() -> dict[str, Any]:
     }
 
 
-def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
-    cards, closing_cards, bet_signals, scored_under_15, scored_under_25, counts = _scan_live_football()
+def build_all_payloads(fast: bool = False) -> tuple[dict[str, Any], dict[str, Any]]:
+    cards, closing_cards, bet_signals, scored_under_15, scored_under_25, counts = _scan_live_football(
+        fast=fast,
+    )
     updated = datetime.now(timezone.utc).isoformat()
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
@@ -1195,6 +1262,7 @@ def build_all_payloads() -> tuple[dict[str, Any], dict[str, Any]]:
         "fotmob": FOTMOB_PROVIDER.status(),
         "thesportsdb": SPORTSDB_PROVIDER.status(),
         "min_confidence": MIN_CONFIDENCE,
+        "analysis_mode": "fast" if fast else "full",
         "error": None,
     }
     closing = {

@@ -463,6 +463,10 @@ async function fetchData() {
       return;
     }
 
+    if (data.analysis_mode === "fast") {
+      $("statusText").textContent = `${$("statusText").textContent} · fast scan (full fusion loading…)`;
+    }
+
     renderBaselines(data.baselines, data, data.prophitbet, data.thesportsdb);
     renderScoredPicks("scoredU15Section", "scoredU15", data.scored_under_15, "Under 1.5 First Half");
     renderScoredPicks("scoredU25Section", "scoredU25", data.scored_under_25, "Under 2.5 First Half");

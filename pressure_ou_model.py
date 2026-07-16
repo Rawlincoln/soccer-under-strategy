@@ -11,7 +11,7 @@ to estimate Over 2.5 probability, then blends with market implied odds to find v
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Optional
 
 # Logistic: y_hat = alpha + beta_gap * gap_sum + beta_market * r_market
@@ -332,6 +332,19 @@ def pressure_ou_score(
         prophit_stats, live_stats, half, period_goals, market_odds, minute,
     )
     return r.score, r.signals, asdict(r)
+
+
+def pressure_from_summary(summary: Optional[dict[str, Any]]) -> PressureOUResult:
+    """Rebuild PressureOUResult from combined_analysis.pressure_summary."""
+    if not summary:
+        return PressureOUResult()
+    defaults = PressureOUResult()
+    kwargs: dict[str, Any] = {}
+    for f in fields(PressureOUResult):
+        val = summary.get(f.name, getattr(defaults, f.name))
+        if val is not None:
+            kwargs[f.name] = val
+    return PressureOUResult(**kwargs)
 
 
 def pressure_confidence_adjust(

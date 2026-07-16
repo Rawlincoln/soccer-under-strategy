@@ -207,9 +207,9 @@
   font-family: "JetBrains Mono", monospace;
 }
 
-.toto-pick-chip.W { background: rgba(63, 185, 80, 0.2); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.45); }
-.toto-pick-chip.D { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid rgba(210, 153, 34, 0.4); }
-.toto-pick-chip.L { background: rgba(248, 81, 73, 0.12); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.35); }
+.toto-pick-chip.W1 { background: rgba(63, 185, 80, 0.2); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.45); min-width: 32px; }
+.toto-pick-chip.X { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid rgba(210, 153, 34, 0.4); }
+.toto-pick-chip.W2 { background: rgba(248, 81, 73, 0.12); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.35); min-width: 32px; }
 
 .toto-grid {
   display: flex;
@@ -271,9 +271,9 @@
 }
 
 .toto-score-bar span { display: block; height: 100%; }
-.toto-score-bar .w { background: var(--green); }
-.toto-score-bar .d { background: #d29922; }
-.toto-score-bar .l { background: #f85149; }
+.toto-score-bar .w1 { background: var(--green); }
+.toto-score-bar .x { background: #d29922; }
+.toto-score-bar .w2 { background: #f85149; }
 
 .toto-scores-text {
   font-size: 0.78rem;

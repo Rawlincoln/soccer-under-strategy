@@ -28,11 +28,15 @@ from onexbet_client import (
 )
 from toto_client import (
     DEFAULT_TYPE_ID,
+    PICK_AWAY,
+    PICK_DRAW,
+    PICK_HOME,
     TotoMatch,
     fetch_jackpots_list,
     filter_playable_matches,
     get_jackpot,
     jackpot_to_dict,
+    normalize_market_wdl,
     product_info,
 )
 
@@ -49,9 +53,9 @@ class WDLScores:
 
     def as_dict(self) -> dict[str, float]:
         return {
-            "W": round(self.home_win, 1),
-            "D": round(self.draw, 1),
-            "L": round(self.away_win, 1),
+            PICK_HOME: round(self.home_win, 1),
+            PICK_DRAW: round(self.draw, 1),
+            PICK_AWAY: round(self.away_win, 1),
         }
 
     def ranked(self) -> list[tuple[str, float]]:
@@ -65,9 +69,9 @@ class TotoMatchAnalysis:
     away_team: str
     league: str = ""
     kickoff: str = ""
-    pick_primary: str = "W"
-    pick_value: str = "D"
-    pick_upset: str = "L"
+    pick_primary: str = PICK_HOME
+    pick_value: str = PICK_DRAW
+    pick_upset: str = PICK_AWAY
     confidence_primary: float = 0.0
     scores: dict[str, float] = field(default_factory=dict)
     signals: list[str] = field(default_factory=list)
@@ -141,7 +145,7 @@ def _soccerpunter_quick(home: str, away: str) -> Optional[dict[str, Any]]:
 
 def _pick_from_ranked(ranked: list[tuple[str, float]], index: int) -> str:
     if not ranked:
-        return "D"
+        return PICK_DRAW
     return ranked[min(index, len(ranked) - 1)][0]
 
 
@@ -150,16 +154,17 @@ def _apply_market_wdl(scores: WDLScores, market: dict[str, float]) -> tuple[WDLS
     signals: list[str] = []
     if not market:
         return scores, signals
-    w = float(market.get("W") or 0)
-    d = float(market.get("D") or 0)
-    l = float(market.get("L") or 0)
+    mkt = normalize_market_wdl(market)
+    w = mkt.get(PICK_HOME, 0)
+    d = mkt.get(PICK_DRAW, 0)
+    l = mkt.get(PICK_AWAY, 0)
     if w + d + l <= 0:
         return scores, signals
     scores.home_win += w * 0.35
     scores.draw += d * 0.35
     scores.away_win += l * 0.35
-    top = max(("W", w), ("D", d), ("L", l), key=lambda x: x[1])
-    signals.append(f"1xBet pool: W {w:.0f}% · D {d:.0f}% · L {l:.0f}% (fav {top[0]})")
+    top = max((PICK_HOME, w), (PICK_DRAW, d), (PICK_AWAY, l), key=lambda x: x[1])
+    signals.append(f"1xBet pool: W1 {w:.0f}% · X {d:.0f}% · W2 {l:.0f}% (fav {top[0]})")
     return scores, signals
 
 
@@ -267,18 +272,18 @@ def _compute_wdl(
 
 def analyze_market_match(match: TotoMatch) -> TotoMatchAnalysis:
     """Fast W/D/L picks from 1xBet pool percentages only."""
-    mkt = dict(match.market_wdl or {})
+    mkt = normalize_market_wdl(match.market_wdl or {})
     scores = WDLScores(
-        home_win=float(mkt.get("W") or 33),
-        draw=float(mkt.get("D") or 34),
-        away_win=float(mkt.get("L") or 33),
+        home_win=float(mkt.get(PICK_HOME) or 33),
+        draw=float(mkt.get(PICK_DRAW) or 34),
+        away_win=float(mkt.get(PICK_AWAY) or 33),
     )
     scores = _normalize_wdl(scores)
     ranked = scores.ranked()
     signals: list[str] = []
     if mkt:
         signals.append(
-            f"1xBet pool: W {mkt.get('W', 0):.0f}% · D {mkt.get('D', 0):.0f}% · L {mkt.get('L', 0):.0f}%"
+            f"1xBet pool: W1 {mkt.get(PICK_HOME, 0):.0f}% · X {mkt.get(PICK_DRAW, 0):.0f}% · W2 {mkt.get(PICK_AWAY, 0):.0f}%"
         )
     primary = _pick_from_ranked(ranked, 0)
     value = _pick_from_ranked(ranked, 1 if ranked[0][1] - ranked[1][1] < 14 else 0)
@@ -330,7 +335,7 @@ def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
         soccerpunter=extras.get("soccerpunter"),
         fotmob=extras.get("fotmob"),
         sportsdb=extras.get("sportsdb"),
-        market_wdl=dict(match.market_wdl or {}),
+        market_wdl=normalize_market_wdl(match.market_wdl or {}),
     )
 
 

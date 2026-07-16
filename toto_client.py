@@ -39,7 +39,28 @@ PRODUCTS: dict[int, dict[str, Any]] = {
     12: {"label": "Basketball", "slug": "basketball", "market": "1x2", "icon": "🏀"},
 }
 
-OUTCOME_WDL = {1: "W", 2: "D", 3: "L"}
+PICK_HOME = "W1"
+PICK_DRAW = "X"
+PICK_AWAY = "W2"
+OUTCOME_PICK = {1: PICK_HOME, 2: PICK_DRAW, 3: PICK_AWAY}
+LEGACY_PICK = {"W": PICK_HOME, "D": PICK_DRAW, "L": PICK_AWAY}
+
+
+def normalize_pick(pick: str) -> str:
+    p = (pick or "").strip().upper()
+    if p in OUTCOME_PICK.values():
+        return p
+    return LEGACY_PICK.get(p, PICK_DRAW)
+
+
+def normalize_market_wdl(market: dict[str, float]) -> dict[str, float]:
+    if not market:
+        return {}
+    return {
+        PICK_HOME: float(market.get(PICK_HOME) or market.get("W") or 0),
+        PICK_DRAW: float(market.get(PICK_DRAW) or market.get("X") or market.get("D") or 0),
+        PICK_AWAY: float(market.get(PICK_AWAY) or market.get("W2") or market.get("L") or 0),
+    }
 
 
 @dataclass
@@ -103,7 +124,7 @@ def _api_base(site: str) -> str:
 def _parse_market_wdl(bets_percents: list[dict]) -> dict[str, float]:
     out: dict[str, float] = {}
     for bp in bets_percents or []:
-        key = OUTCOME_WDL.get(int(bp.get("Outcome") or 0))
+        key = OUTCOME_PICK.get(int(bp.get("Outcome") or 0))
         if key:
             out[key] = float(bp.get("BukPercentage") or 0)
     return out

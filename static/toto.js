@@ -19,9 +19,22 @@ function fmtPrize(kes) {
   return `KES ${kes.toLocaleString()}`;
 }
 
-function pickChip(letter, title) {
-  const label = letter === "W" ? "Home" : letter === "D" ? "Draw" : "Away";
-  return `<span class="toto-pick-chip ${letter}" title="${title || label}">${letter}</span>`;
+function normalizePick(pick) {
+  const map = { W: "W1", D: "X", L: "W2" };
+  return map[pick] || pick || "X";
+}
+
+function pickLabel(pick) {
+  const p = normalizePick(pick);
+  if (p === "W1") return "Home win";
+  if (p === "X") return "Draw";
+  if (p === "W2") return "Away win";
+  return p;
+}
+
+function pickChip(pick, title) {
+  const letter = normalizePick(pick);
+  return `<span class="toto-pick-chip ${letter}" title="${title || pickLabel(letter)}">${letter}</span>`;
 }
 
 function openTotoUrl(onex) {
@@ -130,19 +143,24 @@ function renderSets(sets) {
   });
 }
 
+function marketPct(mkt, key, legacy) {
+  return mkt?.[key] ?? mkt?.[legacy] ?? 0;
+}
+
 function marketLine(mkt) {
-  if (!mkt || (!mkt.W && !mkt.D && !mkt.L)) return "";
-  const w = mkt.W || 0;
-  const d = mkt.D || 0;
-  const l = mkt.L || 0;
-  return `<div class="toto-market">1xBet pool: W ${w}% · D ${d}% · L ${l}%</div>`;
+  if (!mkt) return "";
+  const w1 = marketPct(mkt, "W1", "W");
+  const x = marketPct(mkt, "X", "D");
+  const w2 = marketPct(mkt, "W2", "L");
+  if (!w1 && !x && !w2) return "";
+  return `<div class="toto-market">1xBet pool: W1 ${w1}% · X ${x}% · W2 ${w2}%</div>`;
 }
 
 function renderMatch(m) {
   const sc = m.scores || {};
-  const w = sc.W || 33;
-  const d = sc.D || 34;
-  const l = sc.L || 33;
+  const w1 = marketPct(sc, "W1", "W") || 33;
+  const x = marketPct(sc, "X", "D") || 34;
+  const w2 = marketPct(sc, "W2", "L") || 33;
   const cov = m.coverage || {};
   const src = (name, ok) => `<span class="toto-src ${ok ? "ok" : ""}">${name}${ok ? " ✓" : ""}</span>`;
   const league = m.league ? `<span class="toto-league">${m.league}</span>` : "";
@@ -161,11 +179,11 @@ function renderMatch(m) {
       </div>
       ${marketLine(m.market_wdl)}
       <div class="toto-score-bar">
-        <span class="w" style="width:${w}%"></span>
-        <span class="d" style="width:${d}%"></span>
-        <span class="l" style="width:${l}%"></span>
+        <span class="w1" style="width:${w1}%"></span>
+        <span class="x" style="width:${x}%"></span>
+        <span class="w2" style="width:${w2}%"></span>
       </div>
-      <div class="toto-scores-text">Model W ${w}% · D ${d}% · L ${l}% · top ${(m.confidence_primary || 0).toFixed(0)}%</div>
+      <div class="toto-scores-text">Model W1 ${w1}% · X ${x}% · W2 ${w2}% · top ${(m.confidence_primary || 0).toFixed(0)}%</div>
       <div class="toto-coverage">
         ${src("ProphitBet", cov.prophitbet)}
         ${src("SoccerPunter", cov.soccerpunter)}

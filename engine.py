@@ -240,6 +240,7 @@ class DataCache:
         self._running = False
 
     def _loop(self):
+        time.sleep(8)
         while self._running:
             self.refresh()
             time.sleep(REFRESH_SECONDS)

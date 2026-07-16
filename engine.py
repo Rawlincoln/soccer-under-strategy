@@ -224,10 +224,11 @@ class DataCache:
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
-    def wait_for_bootstrap(self, timeout: float = 45.0) -> bool:
+    def wait_for_bootstrap(self, timeout: float = 25.0) -> bool:
         """Block until the fast scan has populated the cache (or timeout)."""
-        if self._data.get("updated_at"):
-            return True
+        with self._lock:
+            if self._data.get("updated_at"):
+                return True
         return self._bootstrap_done.wait(timeout=timeout)
 
     def _bootstrap_fast_refresh(self) -> None:

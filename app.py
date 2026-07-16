@@ -68,7 +68,7 @@ def _ensure_toto_cache(type_id: int = 1):
         _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "39")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "40")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -307,7 +307,7 @@ def api_predictions():
     _ensure_cache()
     snap = cache.get()
     if snap.get("loading") and not snap.get("updated_at"):
-        cache.wait_for_bootstrap(timeout=50.0)
+        cache.wait_for_bootstrap(timeout=25.0)
     return jsonify(cache.get())
 
 
@@ -548,6 +548,7 @@ def api_export_lock():
 
 @app.route("/health")
 def health():
+    _ensure_cache()
     status = get_alerts_status(scanner_running=_scanner_running())
     cache_status = cache.status()
     return jsonify({
@@ -567,9 +568,6 @@ def health():
 def api_alerts_status():
     return jsonify(get_alerts_status(scanner_running=_scanner_running()))
 
-
-_ensure_cache()
-_ensure_toto_cache(1)
 
 if __name__ == "__main__":
     _ensure_cache()

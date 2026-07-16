@@ -4,12 +4,12 @@ services:
     name: soccer-under-strategy
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300 --graceful-timeout 30
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: "3.13.0"
+        value: "3.12.8"
       # Set these once in Render dashboard — they survive redeploys (no re-entering keys)
       - key: TELEGRAM_BOT_TOKEN
         sync: false

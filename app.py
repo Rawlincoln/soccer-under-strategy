@@ -68,7 +68,7 @@ def _ensure_toto_cache(type_id: int = 1):
         _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "33")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "34")
 
 
 def _no_cache(resp: Response) -> Response:

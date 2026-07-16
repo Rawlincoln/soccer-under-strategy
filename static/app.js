@@ -416,11 +416,14 @@ async function fetchData() {
   try {
     const res = await fetch("/api/predictions");
     const data = await res.json();
-    if (data.error) {
+    if (data.error && !lastData?.matches?.length) {
       $("matchesGrid").innerHTML = `<div class="empty">Scan error: ${data.error}</div>`;
       $("statusText").textContent = "Scan error";
       $("connectionStatus").classList.add("error");
       return;
+    }
+    if (data.error && lastData?.matches?.length) {
+      $("statusText").textContent = `Stale data · ${data.error}`;
     }
 
     lastData = data;

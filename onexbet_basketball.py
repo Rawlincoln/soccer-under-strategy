@@ -39,7 +39,10 @@ class OneXBetBasketballMatch:
     quarters: dict[int, QuarterScore] = field(default_factory=dict)
     quarter_minutes: int = 10
     q3_elapsed_min: float = 0.0
+    h2_elapsed_min: float = 0.0
     game_elapsed_min: float = 0.0
+    is_second_half: bool = False
+    is_finished: bool = False
     is_third_quarter: bool = False
     is_q3_break: bool = False
     league_id: int = 0
@@ -64,6 +67,14 @@ class OneXBetBasketballMatch:
     @property
     def h1_total(self) -> int:
         return self.q1_total + self.q2_total
+
+    @property
+    def q4_total(self) -> int:
+        return self.quarters.get(4, QuarterScore()).total
+
+    @property
+    def h2_total(self) -> int:
+        return self.q3_total + self.q4_total
 
 
 def parse_quarter_scores(ps: list[dict]) -> dict[int, QuarterScore]:
@@ -92,15 +103,35 @@ def infer_quarter_minutes(league: str) -> int:
     return 10
 
 
-def is_active_third_quarter(period: int, period_name: str, quarters: dict[int, QuarterScore]) -> bool:
+def is_basketball_finished(period: int, period_name: str) -> bool:
     pn = (period_name or "").lower().strip()
-    if period != 3:
+    if any(k in pn for k in ("finished", "ended", "full time", "full-time", "after ot", "final")):
+        return True
+    return period >= 5
+
+
+def is_second_half_eligible(
+    period: int,
+    period_name: str,
+    quarters: dict[int, QuarterScore],
+) -> bool:
+    """Eligible after 1st half (Q1+Q2) is complete — 2nd half in progress (Q3/Q4)."""
+    if is_basketball_finished(period, period_name):
+        return False
+    pn = (period_name or "").lower().strip()
+    if period < 3:
         return False
     if "break" in pn:
         return False
-    if "3rd" in pn:
-        return True
-    return 3 in quarters and quarters[3].total > 0
+    q1 = quarters.get(1, QuarterScore()).total
+    q2 = quarters.get(2, QuarterScore()).total
+    if q1 + q2 <= 0:
+        return False
+    return period in (3, 4)
+
+
+def is_active_third_quarter(period: int, period_name: str, quarters: dict[int, QuarterScore]) -> bool:
+    return is_second_half_eligible(period, period_name, quarters) and period == 3
 
 
 def parse_basketball_clock(
@@ -109,23 +140,30 @@ def parse_basketball_clock(
     timer_sec: int,
     quarter_minutes: int,
     quarters: dict[int, QuarterScore],
-) -> tuple[float, float]:
-    """Return (game_elapsed_min, q3_elapsed_min)."""
+) -> tuple[float, float, float]:
+    """Return (game_elapsed_min, h2_elapsed_min, q3_elapsed_min)."""
     elapsed = max(int(timer_sec or 0), 0) / 60.0
     pn = (period_name or "").lower()
 
     if period < 3:
-        return elapsed, 0.0
+        return elapsed, 0.0, 0.0
 
     if period == 3:
         if "break" in pn:
-            return elapsed, 0.0
-        q3_elapsed = max(elapsed - 2 * quarter_minutes, 0.0)
-        if 3 in quarters and quarters[3].total > 0 and q3_elapsed < 0.5:
-            q3_elapsed = max(quarters[3].total / 4.0, 0.5)
-        return elapsed, q3_elapsed
+            return elapsed, 0.0, 0.0
+        h2_elapsed = max(elapsed - 2 * quarter_minutes, 0.0)
+        if 3 in quarters and quarters[3].total > 0 and h2_elapsed < 0.5:
+            h2_elapsed = max(quarters[3].total / 4.0, 0.5)
+        return elapsed, h2_elapsed, h2_elapsed
 
-    return elapsed, float(quarter_minutes)
+    if period >= 4:
+        h2_elapsed = max(elapsed - 2 * quarter_minutes, 0.0)
+        if h2_elapsed < 0.5 and quarters.get(3, QuarterScore()).total > 0:
+            h2_elapsed = max(quarter_minutes * 0.5, 0.5)
+        q3_elapsed = min(float(quarter_minutes), h2_elapsed)
+        return elapsed, h2_elapsed, q3_elapsed
+
+    return elapsed, 0.0, 0.0
 
 
 def _safe_float(val: Any, default: float = 0.0) -> float:
@@ -251,11 +289,13 @@ class OneXBetBasketballClient:
         period = int(sc.get("CP") or 0)
         period_name = sc.get("CPS") or ""
         timer_sec = int(sc.get("TS") or 0)
-        game_elapsed, q3_elapsed = parse_basketball_clock(
+        game_elapsed, h2_elapsed, q3_elapsed = parse_basketball_clock(
             period, period_name, timer_sec, quarter_minutes, quarters,
         )
 
         pn_lower = period_name.lower()
+        finished = is_basketball_finished(period, period_name)
+        second_half = is_second_half_eligible(period, period_name, quarters)
         return OneXBetBasketballMatch(
             game_id=int(raw["I"]),
             home_team=raw.get("O1", ""),
@@ -270,8 +310,11 @@ class OneXBetBasketballClient:
             quarters=quarters,
             quarter_minutes=quarter_minutes,
             q3_elapsed_min=round(q3_elapsed, 1),
+            h2_elapsed_min=round(h2_elapsed, 1),
             game_elapsed_min=round(game_elapsed, 1),
-            is_third_quarter=is_active_third_quarter(period, period_name, quarters),
+            is_second_half=second_half,
+            is_finished=finished,
+            is_third_quarter=second_half and period == 3,
             is_q3_break=period == 3 and "break" in pn_lower,
             league_id=int(raw.get("LI") or (detail or {}).get("LI") or 0),
             raw=raw,

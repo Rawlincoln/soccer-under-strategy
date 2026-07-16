@@ -31,6 +31,7 @@ from filters import has_red_cards, is_excluded_match, is_excluded_raw
 from onexbet_client import (
     OneXBetClient,
     OneXBetMatch,
+    is_match_finished,
     onexbet_app_open_url,
     onexbet_live_url,
     onexbet_match_url,
@@ -896,6 +897,9 @@ def _scan_live_football() -> tuple[
             continue
 
         m = ONEXBET_CLIENT.parse_match(raw)
+        if is_match_finished(m.period, m.period_name, m.minute):
+            excluded_count += 1
+            continue
         if is_excluded_match(m.home_team, m.away_team, m.league, m.country):
             excluded_count += 1
             continue
@@ -934,10 +938,12 @@ def _scan_live_football() -> tuple[
 
         if not m.is_first_half and not m.is_second_half:
             continue
+        if m.is_second_half and m.minute >= 90:
+            continue
         halves: list[str] = []
-        if m.is_first_half:
+        if m.is_first_half and m.minute < 43:
             halves.append("fh")
-        if m.is_second_half:
+        if m.is_second_half and m.minute < 90:
             halves.append("sh")
 
         for half in halves:
@@ -948,6 +954,8 @@ def _scan_live_football() -> tuple[
                 m.home_team, m.away_team, half=half,
                 league=m.league, country=m.country,
             )
+            if fm_half and fm_half.get("is_finished"):
+                continue
             odds_half = lookup_market_odds(
                 ONEXBET_CLIENT, m.game_id, half=half, cached_detail=game_detail,
             )

@@ -176,13 +176,17 @@ function renderMatch(m) {
     </div>`;
 }
 
-function renderMatches(matches) {
+function renderMatches(matches, skippedFinished) {
   const grid = $("totoGrid");
-  if (!matches || !matches.length) {
-    grid.innerHTML = '<div class="empty">No active games in this pool. Try another product or click Refresh.</div>';
+  const playable = (matches || []).filter((m) => !m.is_finished && m.status !== "finished");
+  if (!playable.length) {
+    grid.innerHTML = '<div class="empty">No upcoming games in this pool. Finished results were excluded — try Refresh or another product.</div>';
     return;
   }
-  grid.innerHTML = matches.map(renderMatch).join("");
+  const note = skippedFinished > 0
+    ? `<div class="toto-skipped-note">${skippedFinished} finished game(s) excluded from picks</div>`
+    : "";
+  grid.innerHTML = note + playable.map(renderMatch).join("");
 }
 
 async function fetchData() {
@@ -211,7 +215,7 @@ async function fetchData() {
     $("statusText").textContent = `${data.onexbet?.product || "Toto"} · ${mode} · 3 slips · ${data.match_count || 0} games${refreshing}`;
     renderBaselines(data);
     renderSets(data.sets);
-    renderMatches(data.matches);
+    renderMatches(data.matches, data.skipped_finished || 0);
   } catch (err) {
     $("connectionStatus").classList.add("error");
     $("statusText").textContent = "Toto error";

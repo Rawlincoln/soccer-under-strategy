@@ -117,8 +117,8 @@ def _history_lock_score(
             score = 84.0
             signals.append(f"ProphitBet: low recent goals ({goals:.0f} in window)")
     if soccerpunter_stats:
-        u225 = float(soccerpunter_stats.get("under_225_pct") or 0)
-        h2h = float(soccerpunter_stats.get("h2h_avg_goals") or 0)
+        u225 = float(soccerpunter_stats.get("combined_under_225_pct") or soccerpunter_stats.get("under_225_pct") or 0)
+        h2h = float(soccerpunter_stats.get("h2h_avg_total_goals") or soccerpunter_stats.get("h2h_avg_goals") or 0)
         if u225 >= 70 or h2h <= 2.2:
             score = max(score, 90.0)
             signals.append(f"SoccerPunter H2H: low scoring (avg {h2h:.1f}, U2.25 {u225:.0f}%)")

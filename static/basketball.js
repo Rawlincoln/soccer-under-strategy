@@ -31,7 +31,7 @@ function renderBaselines(data) {
   const minPct = data.min_definite_pct ?? 70;
   $("baselines").innerHTML = `
     <div class="baseline-card"><div class="label">Live basketball</div><div class="value orange">${data.total_live ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">3rd quarter</div><div class="value orange">${data.match_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">2nd half</div><div class="value orange">${data.match_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">≥${minPct}% definite</div><div class="value orange">${data.definite_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Cyber excluded</div><div class="value">${data.excluded_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">70%+ signals</div><div class="value orange">${data.bet_signal_count ?? 0}</div></div>
@@ -67,7 +67,7 @@ function renderMatchCard(m) {
   const definite = m.definite_pick;
   const hasBet = !!definite || (m.predictions || []).some((p) => p.is_definite);
   const qChips = Object.entries(m.quarters || {}).map(([q, val]) => {
-    const active = q === "Q3" ? " active" : "";
+    const active = q === "Q3" || q === "Q4" ? " active" : "";
     return `<span class="bb-q-chip${active}">${q}: ${val}</span>`;
   }).join("");
 
@@ -107,7 +107,7 @@ function renderMatchCard(m) {
       </div>
       <div class="bb-score-row">
         <span class="bb-score">${m.score}</span>
-        <span class="bb-total">${m.total_points} pts · 3Q sum ${qs.three_q_total ?? "—"} · proj ${pace.proj_final ?? "—"}</span>
+        <span class="bb-total">${m.total_points} pts · H1 ${qs.h1_total ?? "—"} H2 ${qs.h2_total ?? "—"} · proj ${pace.proj_final ?? "—"}</span>
       </div>
       ${definiteBanner}
       <div class="bb-quarters">${qChips}</div>
@@ -115,11 +115,11 @@ function renderMatchCard(m) {
         <div class="bb-stats-row head"><span>Quarter</span><span>Live</span><span>Hist</span><span>vs Hist</span></div>
         <div class="bb-stats-row"><span>Q1</span><span>${qs.q1 ?? "—"}</span><span>${hist.hist_q1 ?? "—"}</span><span>${vsHist(qs.q1_vs_hist)}</span></div>
         <div class="bb-stats-row"><span>Q2</span><span>${qs.q2 ?? "—"}</span><span>${hist.hist_q2 ?? "—"}</span><span>${vsHist(qs.q2_vs_hist)}</span></div>
-        <div class="bb-stats-row active"><span>Q3</span><span>${qs.q3_so_far ?? "—"} → ${qs.q3_pace_to_full ?? "—"}</span><span>${hist.hist_q3 ?? "—"}</span><span>${vsHist(qs.q3_vs_hist)}</span></div>
-        <div class="bb-stats-row sum"><span>3Q total</span><span>${qs.three_q_total ?? "—"}</span><span>${hist.hist_expected_now ?? "—"}</span><span>${vsHist(qs.three_q_vs_hist)}</span></div>
+        <div class="bb-stats-row active"><span>H2</span><span>${qs.h2_total ?? "—"} → ${qs.q3_pace_to_full ?? "—"}</span><span>${hist.hist_q3 ?? "—"}</span><span>${vsHist(qs.q3_vs_hist)}</span></div>
+        <div class="bb-stats-row sum"><span>Game</span><span>${qs.three_q_total ?? "—"}</span><span>${hist.hist_expected_now ?? "—"}</span><span>${vsHist(qs.three_q_vs_hist)}</span></div>
       </div>
       <div class="bb-pace-grid">
-        <div class="bb-pace-item"><div class="num">${qs.three_q_ppm ?? "—"}</div><div class="lbl">3Q ppm</div></div>
+        <div class="bb-pace-item"><div class="num">${qs.h2_ppm ?? qs.three_q_ppm ?? "—"}</div><div class="lbl">H2 ppm</div></div>
         <div class="bb-pace-item"><div class="num">${qs.trajectory ?? "—"}</div><div class="lbl">Trend</div></div>
         <div class="bb-pace-item"><div class="num">${pace.proj_historical ?? "—"}</div><div class="lbl">Hist proj</div></div>
         <div class="bb-pace-item"><div class="num">${hist.hist_bias ?? "—"}</div><div class="lbl">Hist lean</div></div>
@@ -131,7 +131,7 @@ function renderMatchCard(m) {
 function renderMatches(matches) {
   const grid = $("matchesGrid");
   if (!matches?.length) {
-    grid.innerHTML = '<div class="empty">No live 3rd-quarter games right now. Check back during match play.</div>';
+    grid.innerHTML = '<div class="empty">No live 2nd-half games right now (H1 must be complete). Check back during match play.</div>';
     return;
   }
   grid.innerHTML = matches.map(renderMatchCard).join("");
@@ -149,7 +149,7 @@ async function fetchData() {
     refreshSeconds = data.refresh_seconds || 30;
     $("refreshInterval").textContent = refreshSeconds;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
-    $("matchCount").textContent = `${data.match_count ?? 0} Q3 games`;
+    $("matchCount").textContent = `${data.match_count ?? 0} H2 games`;
     $("liveTotal").textContent = `${data.total_live ?? 0} live (${data.excluded_count ?? 0} cyber out)`;
 
     $("connectionStatus").classList.add("live");

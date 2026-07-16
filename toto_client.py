@@ -53,6 +53,8 @@ class TotoMatch:
     status: str = "scheduled"
     game_id: int = 0
     is_cyber: bool = False
+    is_finished: bool = False
+    is_live: bool = False
     market_wdl: dict[str, float] = field(default_factory=dict)
 
 
@@ -107,6 +109,44 @@ def _parse_market_wdl(bets_percents: list[dict]) -> dict[str, float]:
     return out
 
 
+def _game_status(g: dict) -> str:
+    if g.get("IsFinished"):
+        return "finished"
+    if g.get("IsLive"):
+        return "live"
+    return "scheduled"
+
+
+def _is_playable_game(g: dict) -> bool:
+    if g.get("IsFinished"):
+        return False
+    return True
+
+
+def _kickoff_stale_finished(kickoff: str, *, hours: float = 3.0) -> bool:
+    if not kickoff:
+        return False
+    try:
+        dt = datetime.fromisoformat(kickoff.replace("Z", "+00:00"))
+        age_h = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+        return age_h > hours
+    except ValueError:
+        return False
+
+
+def filter_playable_matches(matches: list[TotoMatch]) -> list[TotoMatch]:
+    playable: list[TotoMatch] = []
+    for m in matches:
+        if m.is_finished or m.status == "finished":
+            continue
+        if m.status == "scheduled" and _kickoff_stale_finished(m.kickoff):
+            continue
+        playable.append(m)
+    for i, m in enumerate(playable):
+        m.num = i + 1
+    return playable
+
+
 def _parse_kickoff(ts: Any) -> str:
     try:
         sec = int(ts or 0)
@@ -139,6 +179,8 @@ def _draw_to_jackpot(
     matches: list[TotoMatch] = []
 
     for league, g in _flatten_games(draw):
+        if not _is_playable_game(g):
+            continue
         home = str(g.get("Opponent1Name") or "").strip()
         away = str(g.get("Opponent2Name") or "").strip()
         if not home or not away:
@@ -150,11 +192,15 @@ def _draw_to_jackpot(
                 away_team=away,
                 league=league,
                 kickoff=_parse_kickoff(g.get("StartDate")),
+                status=_game_status(g),
                 game_id=int(g.get("BukGameId") or 0),
                 is_cyber=bool(g.get("IsCyber")),
+                is_finished=bool(g.get("IsFinished")),
+                is_live=bool(g.get("IsLive")),
                 market_wdl=_parse_market_wdl(g.get("BetsPercents") or []),
             )
         )
+    matches = filter_playable_matches(matches)
 
     prize = int(draw.get("Jackpot") or 0)
     pool = int(draw.get("Pool") or 0)
@@ -211,10 +257,13 @@ def _load_local(type_id: int) -> Optional[TotoJackpot]:
                 status=m.get("status", "scheduled"),
                 game_id=int(m.get("game_id") or 0),
                 is_cyber=bool(m.get("is_cyber")),
+                is_finished=bool(m.get("is_finished")),
+                is_live=bool(m.get("is_live")),
                 market_wdl=dict(m.get("market_wdl") or {}),
             )
             for i, m in enumerate(raw.get("matches") or [])
         ]
+        matches = filter_playable_matches(matches)
         return TotoJackpot(
             source=raw.get("source", "1xbet"),
             type_id=int(raw.get("type_id") or type_id),
@@ -280,8 +329,10 @@ def fetch_jackpots_list(
                 continue
             draw = dr.json()
             games = sum(
-                len(c.get("GamesList") or [])
+                1
                 for c in draw.get("ChampsWithGames") or []
+                for g in c.get("GamesList") or []
+                if _is_playable_game(g)
             )
             if games > 0:
                 entry["active"] = True

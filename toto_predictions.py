@@ -30,6 +30,7 @@ from toto_client import (
     DEFAULT_TYPE_ID,
     TotoMatch,
     fetch_jackpots_list,
+    filter_playable_matches,
     get_jackpot,
     jackpot_to_dict,
     product_info,
@@ -403,6 +404,7 @@ def _assemble_payload(
     products: list[dict[str, Any]],
     fast: bool = False,
     refreshing: bool = False,
+    skipped_finished: int = 0,
 ) -> dict[str, Any]:
     sets = build_prediction_sets(analyses, fast=fast)
     config = STORE.load_config()
@@ -414,6 +416,7 @@ def _assemble_payload(
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "type_id": type_id,
+        "skipped_finished": skipped_finished,
         "jackpot": jackpot_to_dict(jackpot),
         "match_count": len(analyses),
         "sources_hit": _sources_hit(analyses),
@@ -466,6 +469,14 @@ def _save_analysis_cache(type_id: int, payload: dict[str, Any]) -> None:
         pass
 
 
+def _playable_jackpot(jackpot) -> tuple[Any, int]:
+    original = len(jackpot.matches)
+    playable = filter_playable_matches(list(jackpot.matches))
+    jackpot.matches = playable
+    jackpot.match_count = len(playable)
+    return jackpot, original - len(playable)
+
+
 def build_toto_payload(
     *,
     type_id: int = DEFAULT_TYPE_ID,
@@ -474,6 +485,7 @@ def build_toto_payload(
 ) -> dict[str, Any]:
     type_id = int(type_id)
     jackpot = get_jackpot(type_id=type_id, force_refresh=force_refresh)
+    jackpot, skipped_finished = _playable_jackpot(jackpot)
     if not jackpot.matches:
         config = STORE.load_config()
         onex_site = effective_onexbet_site(config)
@@ -484,6 +496,7 @@ def build_toto_payload(
             analyses=[],
             products=prods,
             fast=True,
+            skipped_finished=skipped_finished,
         )
 
     _ensure_analysis_providers()
@@ -497,6 +510,7 @@ def build_toto_payload(
         analyses=analyses,
         products=prods,
         fast=False,
+        skipped_finished=skipped_finished,
     )
 
 
@@ -519,6 +533,7 @@ class TotoCache:
         """Instant pool-based picks from saved 1xBet fixtures (no provider load)."""
         try:
             jackpot = get_jackpot(type_id=type_id, force_refresh=False, allow_stale=True)
+            jackpot, skipped = _playable_jackpot(jackpot)
             if not jackpot.matches:
                 return False
             analyses = [analyze_market_match(m) for m in jackpot.matches]
@@ -529,6 +544,7 @@ class TotoCache:
                 products=[],
                 fast=True,
                 refreshing=True,
+                skipped_finished=skipped,
             )
             with self._lock:
                 self._data_by_type[type_id] = payload
@@ -567,6 +583,7 @@ class TotoCache:
             onex_site = effective_onexbet_site(config)
             products = self._get_products(onex_site)
             jackpot = get_jackpot(type_id=type_id, force_refresh=force_jackpot)
+            jackpot, skipped = _playable_jackpot(jackpot)
 
             if jackpot.matches:
                 fast_analyses = [analyze_market_match(m) for m in jackpot.matches]
@@ -577,6 +594,7 @@ class TotoCache:
                     products=products,
                     fast=True,
                     refreshing=True,
+                    skipped_finished=skipped,
                 )
                 with self._lock:
                     self._data_by_type[type_id] = fast_payload
@@ -588,6 +606,7 @@ class TotoCache:
             )
             payload["refreshing"] = False
             payload["products"] = products
+            payload["skipped_finished"] = payload.get("skipped_finished", 0)
             with self._lock:
                 self._data_by_type[type_id] = payload
             _save_analysis_cache(type_id, payload)

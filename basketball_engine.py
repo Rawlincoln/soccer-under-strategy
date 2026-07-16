@@ -1,6 +1,6 @@
 """
-Live basketball Q3 totals engine.
-Uses Q1+Q2+Q3 quarter scoring stats blended with historical league curves.
+Live basketball 2nd-half full-game totals engine.
+Uses completed 1st half (Q1+Q2) + live 2nd half (Q3+Q4) blended with historical curves.
 """
 
 from __future__ import annotations
@@ -136,26 +136,32 @@ def _interp_cumulative_share(game_pct: float, shares: list[float]) -> float:
 
 
 def compute_quarter_stats(match: OneXBetBasketballMatch, profile: dict[str, Any]) -> dict[str, Any]:
-    """Build scoring stats from Q1, Q2, and in-progress Q3."""
+    """Build scoring stats from completed H1 (Q1+Q2) and live H2 (Q3+Q4)."""
     q_len = match.quarter_minutes
     hist_q = profile["quarters"]
     q1 = match.q1_total
     q2 = match.q2_total
     q3 = match.q3_total
+    q4 = match.q4_total
     h1 = q1 + q2
-    three_q = h1 + q3
+    h2_so_far = q3 + q4
+    game_pts = h1 + h2_so_far
 
-    q3_elapsed = max(match.q3_elapsed_min, 0.5)
-    minutes_played = 2 * q_len + q3_elapsed
+    h2_elapsed = max(match.h2_elapsed_min or match.q3_elapsed_min, 0.5)
+    minutes_played = 2 * q_len + h2_elapsed
     total_game_min = 4 * q_len
     game_pct = minutes_played / total_game_min
 
-    q3_pace_to_full = q3 + (q3 / q3_elapsed) * max(q_len - q3_elapsed, 0)
-    three_q_at_q3_end = q1 + q2 + q3_pace_to_full
+    h2_pace_to_full = h2_so_far + (h2_so_far / h2_elapsed) * max(2 * q_len - h2_elapsed, 0)
+    projected_at_h2_end = h1 + h2_pace_to_full
+    q3_pace_to_full = q3 + (q3 / max(match.q3_elapsed_min, 0.5)) * max(q_len - max(match.q3_elapsed_min, 0.5), 0) if q3 else 0.0
+    three_q_at_q3_end = h1 + q3_pace_to_full
 
     h1_ppm = h1 / (2 * q_len)
-    q3_ppm = q3 / q3_elapsed
-    three_q_ppm = three_q / minutes_played
+    h2_ppm = h2_so_far / h2_elapsed
+    q3_ppm = q3 / max(match.q3_elapsed_min, 0.5) if q3 else h2_ppm
+    three_q_ppm = game_pts / minutes_played
+    three_q = game_pts
 
     q1_vs_hist = q1 - hist_q[0]
     q2_vs_hist = q2 - hist_q[1]
@@ -164,8 +170,8 @@ def compute_quarter_stats(match: OneXBetBasketballMatch, profile: dict[str, Any]
     three_q_vs_hist = three_q - _interp_cumulative_share(game_pct, profile["cumulative_share"]) * profile["avg_game"]
 
     q2_delta = q2 - q1
-    q3_delta = q3_pace_to_full - q2
-    trend = q3_delta - q2_delta
+    h2_delta = h2_pace_to_full - h1
+    trend = h2_delta - (q2 - q1)
 
     if trend >= 4:
         trajectory = "accelerating"
@@ -189,9 +195,11 @@ def compute_quarter_stats(match: OneXBetBasketballMatch, profile: dict[str, Any]
         "q1": q1,
         "q2": q2,
         "q3_so_far": q3,
+        "q4_so_far": q4,
         "h1_total": h1,
+        "h2_total": h2_so_far,
         "three_q_total": three_q,
-        "three_q_at_q3_end": round(three_q_at_q3_end, 1),
+        "three_q_at_q3_end": round(projected_at_h2_end, 1),
         "game_pct": round(game_pct * 100, 1),
         "minutes_played": round(minutes_played, 1),
         "q1_vs_hist": round(q1_vs_hist, 1),
@@ -206,9 +214,10 @@ def compute_quarter_stats(match: OneXBetBasketballMatch, profile: dict[str, Any]
         "quarters_below_hist": quarters_below_hist,
         "quarters_above_hist": quarters_above_hist,
         "h1_ppm": round(h1_ppm, 2),
+        "h2_ppm": round(h2_ppm, 2),
         "q3_ppm": round(q3_ppm, 2),
         "three_q_ppm": round(three_q_ppm, 2),
-        "q3_pace_to_full": round(q3_pace_to_full, 1),
+        "q3_pace_to_full": round(h2_pace_to_full, 1),
     }
 
 
@@ -525,10 +534,10 @@ def analyze_q3_match(
     sigma = _estimate_sigma(match, profile, qstats, hist_bias)
 
     signals_base: list[str] = [
-        f"Q1 {qstats['q1']} · Q2 {qstats['q2']} · Q3 {qstats['q3_so_far']} "
-        f"({qstats['three_q_total']} through 3Q)",
-        f"3Q pace {qstats['three_q_ppm']:.2f} ppm · historical expected now {hist['hist_expected_now']:.0f}",
-        f"Projected final {proj_final:.0f} ±{sigma:.1f} pts from Q1-Q2-Q3 + history",
+        f"H1 {qstats['h1_total']} · H2 {qstats['h2_total']} "
+        f"(Q1 {qstats['q1']} Q2 {qstats['q2']} Q3 {qstats['q3_so_far']} Q4 {qstats.get('q4_so_far', 0)})",
+        f"2nd-half pace {qstats.get('h2_ppm', qstats['three_q_ppm']):.2f} ppm · hist expected {hist['hist_expected_now']:.0f}",
+        f"Projected final {proj_final:.0f} ±{sigma:.1f} pts from H1+H2 + history",
     ] + hist_signals
 
     definite_picks = _find_definite_picks(
@@ -585,49 +594,15 @@ def analyze_q3_match(
                 ],
             ))
 
-    q3_odds = odds.get("q3_quarter") or {}
-    q3_line = q3_odds.get("line")
-    if q3_line:
-        proj_q3 = pace["proj_q3"]
-        q3_edge = proj_q3 - q3_line
-        if q3_edge >= 3:
-            pick, rec = "OVER", "BET"
-            conf = min(90.0, 56 + q3_edge * 3)
-        elif q3_edge <= -3:
-            pick, rec = "UNDER", "BET"
-            conf = min(90.0, 56 + abs(q3_edge) * 3)
-        elif q3_edge >= 1.5:
-            pick, rec = "OVER", "WATCH"
-            conf = 50 + q3_edge * 2.5
-        elif q3_edge <= -1.5:
-            pick, rec = "UNDER", "WATCH"
-            conf = 50 + abs(q3_edge) * 2.5
-        else:
-            pick, rec = "NEAR LINE", "WAIT"
-            conf = 42.0
-
-        predictions.append(TotalPrediction(
-            market="Q3 Quarter Total",
-            line=q3_line,
-            pick=pick,
-            confidence=round(conf, 1),
-            projected=round(proj_q3, 1),
-            edge=round(q3_edge, 1),
-            recommendation=rec,
-            signals=[
-                f"Q3 projected {proj_q3:.0f} from Q1-Q2-Q3 pace vs line {q3_line}",
-                f"Historical Q3 avg {hist['hist_q3']:.0f} · live Q3 {qstats['q3_so_far']} in {match.q3_elapsed_min:.0f} min",
-                f"Q3 vs hist pace {qstats['q3_vs_hist']:+.0f}",
-            ],
-        ))
-
     return predictions, pace, history_summary, qstats, definite_picks, sigma
 
 
-def _q3_clock_label(match: OneXBetBasketballMatch) -> str:
-    if match.q3_elapsed_min <= 0:
-        return "Q3 start"
-    return f"Q3 {match.q3_elapsed_min:.0f}'"
+def _half_clock_label(match: OneXBetBasketballMatch) -> str:
+    if match.period >= 4:
+        return f"Q4 · H2 {match.h2_elapsed_min:.0f}'"
+    if match.h2_elapsed_min <= 0:
+        return "2nd half start"
+    return f"Q3 · H2 {match.h2_elapsed_min:.0f}'"
 
 
 def _quarters_display(match: OneXBetBasketballMatch) -> dict[str, Any]:
@@ -641,7 +616,7 @@ def build_basketball_payload() -> dict[str, Any]:
     raw_live = CLIENT.fetch_live_basketball()
     total_live = len(raw_live)
     excluded = 0
-    q3_excluded_period = 0
+    h2_excluded_period = 0
     cards: list[BasketballCard] = []
 
     for raw in raw_live:
@@ -650,8 +625,8 @@ def build_basketball_payload() -> dict[str, Any]:
             continue
 
         match = CLIENT.parse_match(raw)
-        if not match.is_third_quarter:
-            q3_excluded_period += 1
+        if match.is_finished or not match.is_second_half:
+            h2_excluded_period += 1
             continue
 
         try:
@@ -677,7 +652,7 @@ def build_basketball_payload() -> dict[str, Any]:
             score=f"{match.home_score} - {match.away_score}",
             total_points=match.total_points,
             period_name=match.period_name,
-            q3_clock=_q3_clock_label(match),
+            q3_clock=_half_clock_label(match),
             quarters=_quarters_display(match),
             quarter_stats={**qstats, "proj_sigma": round(sigma, 1)},
             pace=pace,
@@ -731,12 +706,13 @@ def build_basketball_payload() -> dict[str, Any]:
         "onexbet_app_open_url": onexbet_app_open_url(site),
         "onexbet_android_package": effective_onexbet_android_package(),
         "sport": "basketball",
-        "filter": f"3rd quarter · definite picks ≥{MIN_DEFINITE_PCT:.0f}%",
+        "filter": f"2nd half (H1 complete) · full-game totals ≥{MIN_DEFINITE_PCT:.0f}%",
         "min_definite_pct": MIN_DEFINITE_PCT,
         "definite_count": sum(1 for c in cards if c.definite_pick),
         "total_live": total_live,
         "excluded_count": excluded,
-        "non_q3_count": q3_excluded_period,
+        "non_q3_count": h2_excluded_period,
+        "non_h2_count": h2_excluded_period,
         "match_count": len(cards),
         "bet_signal_count": len(bet_signals),
         "matches": [asdict(c) for c in cards],

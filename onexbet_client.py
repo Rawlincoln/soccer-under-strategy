@@ -422,7 +422,7 @@ def parse_match_clock(
     elapsed_sec = max(int(timer_sec or 0), 0)
 
     if period == 1:
-        match_min = elapsed_sec // 60
+        match_min = min(elapsed_sec // 60, 45)
         return match_min, match_min
 
     if period == 2:
@@ -437,6 +437,18 @@ def parse_match_clock(
         return match_min, max(0, match_min - 45)
 
     return 0, 0
+
+
+def is_match_finished(period: int, period_name: str, minute: int) -> bool:
+    """True when the match has ended or is past playable live minutes."""
+    pn = (period_name or "").lower().strip()
+    if any(k in pn for k in ("finished", "full time", "full-time", "ended", "after pen", "aet", "penalties")):
+        return True
+    if period >= 3:
+        return True
+    if period == 2 and minute >= 90:
+        return True
+    return False
 
 
 def detect_half_time(period: int, period_name: str) -> bool:

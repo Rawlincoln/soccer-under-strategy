@@ -214,6 +214,7 @@ class DataCache:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._refresh_in_progress = False
+        self._bootstrap_done = threading.Event()
 
     def start(self):
         if self._running:
@@ -222,6 +223,12 @@ class DataCache:
         threading.Thread(target=self._bootstrap_fast_refresh, daemon=True).start()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
+
+    def wait_for_bootstrap(self, timeout: float = 45.0) -> bool:
+        """Block until the fast scan has populated the cache (or timeout)."""
+        if self._data.get("updated_at"):
+            return True
+        return self._bootstrap_done.wait(timeout=timeout)
 
     def _bootstrap_fast_refresh(self) -> None:
         """Serve 1xBet-only picks quickly so the UI is not stuck on loading."""
@@ -233,8 +240,12 @@ class DataCache:
                 if not self._data.get("updated_at"):
                     self._data = payload
                     self._closing = closing_payload
-        except Exception:
-            pass
+        except Exception as exc:
+            with self._lock:
+                self._data["loading"] = False
+                self._data["error"] = f"Fast scan failed: {exc}"
+        finally:
+            self._bootstrap_done.set()
 
     def stop(self):
         self._running = False

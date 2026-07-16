@@ -68,7 +68,7 @@ def _ensure_toto_cache(type_id: int = 1):
         _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "38")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "39")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -305,6 +305,9 @@ def static_files(filename):
 @app.route("/api/predictions")
 def api_predictions():
     _ensure_cache()
+    snap = cache.get()
+    if snap.get("loading") and not snap.get("updated_at"):
+        cache.wait_for_bootstrap(timeout=50.0)
     return jsonify(cache.get())
 
 

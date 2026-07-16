@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from fotmob_stats import fotmob_live_agreement, fotmob_tempo_profile
 from market_odds import market_odds_score
+from pressure_ou_model import pressure_ou_score
 from thesportsdb_stats import sportsdb_live_agreement
 
 HALF_CONFIG = {
@@ -39,6 +40,7 @@ class ScoreBreakdown:
     fotmob_verify: float = 0.0
     external_verify: float = 0.0
     market_odds: float = 0.0
+    pressure_model: float = 0.0
     live_tempo: float = 0.0
     time_context: float = 0.0
     agreement: float = 0.0
@@ -66,6 +68,7 @@ class CombinedAnalysis:
     fotmob_summary: dict[str, Any] = field(default_factory=dict)
     sportsdb_summary: dict[str, Any] = field(default_factory=dict)
     market_odds_summary: dict[str, Any] = field(default_factory=dict)
+    pressure_summary: dict[str, Any] = field(default_factory=dict)
 
 
 def _period_elapsed(minute: int, half: str) -> int:
@@ -405,6 +408,9 @@ def build_combined_analysis(
         live_stats.total_shots, live_stats.shots_on_target, sportsdb_stats,
     )
     mkt_score, mkt_signals = market_odds_score(market_odds, half, total_goals)
+    prs_score, prs_signals, prs_summary = pressure_ou_score(
+        prophit_stats, live_stats, half, total_goals, market_odds, minute,
+    )
     time_score, time_signals = _time_context_score(total_goals, minute, half)
     agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile, sp_prof)
 
@@ -418,12 +424,13 @@ def build_combined_analysis(
         fotmob_verify=round(fotmob_total, 1),
         external_verify=external_total,
         market_odds=round(mkt_score, 1),
+        pressure_model=round(prs_score, 1),
         live_tempo=round(live_score, 1),
         time_context=round(time_score, 1),
         agreement=round(agree_score, 1),
         total=round(
             hist_score + sp_score + fotmob_total + external_total + mkt_score
-            + live_score + time_score + agree_score,
+            + prs_score + live_score + time_score + agree_score,
             1,
         ),
     )
@@ -435,6 +442,10 @@ def build_combined_analysis(
         confidence = round(max(confidence - 8, 20), 1)
     if mkt_score <= -4:
         confidence = round(max(confidence - 10, 20), 1)
+    if prs_score <= -6:
+        confidence = round(max(confidence - 8, 20), 1)
+    elif prs_score >= 10:
+        confidence = round(min(confidence + 4, 96), 1)
 
     best_market, best_rec = _pick_best_market(total_goals, confidence, minute, half)
     if agreement == "CONFLICT" and best_rec == "BET":
@@ -442,7 +453,7 @@ def build_combined_analysis(
 
     fusion_signals = (
         list(agree_signals) + list(fm_signals) + list(sd_signals)
-        + list(mkt_signals) + list(time_signals)
+        + list(mkt_signals) + list(prs_signals) + list(time_signals)
     )
     elapsed = _period_elapsed(minute, half)
     if live_profile in ("very_slow", "slow"):
@@ -481,6 +492,12 @@ def build_combined_analysis(
             f"Market: {market_odds.get('under_15_implied_pct')}% implied U1.5 "
             f"@ {market_odds.get('under_15_odds', '—')} ({market_odds.get('source', '1xbet')})"
         )
+    if prs_summary.get("p_under_15"):
+        fusion_signals.append(
+            f"GAP pressure: {prs_summary.get('p_under_15')}% U1.5 "
+            f"({prs_summary.get('profile', 'balanced').replace('_', ' ')}, "
+            f"fair U {prs_summary.get('fair_under_odds') or '—'})"
+        )
 
     return CombinedAnalysis(
         verdict=_verdict(confidence, agreement, best_rec),
@@ -502,6 +519,7 @@ def build_combined_analysis(
         fotmob_summary=fm_summary,
         sportsdb_summary=sportsdb_stats or {},
         market_odds_summary=market_odds or {},
+        pressure_summary=prs_summary,
     )
 
 

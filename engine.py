@@ -41,6 +41,7 @@ from onexbet_client import (
 from prophitbet_stats import PROPHIT_PROVIDER
 from fotmob_stats import FOTMOB_PROVIDER
 from market_odds import lookup_market_odds
+from pressure_ou_model import analyze_pressure_ou, pressure_confidence_adjust
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
 from thesportsdb_stats import SPORTSDB_PROVIDER
 
@@ -430,6 +431,11 @@ def score_period_under(
             stats, prophit_stats, total_goals, minute, baseline[bl_key], half=half,
         ))
 
+    pressure = analyze_pressure_ou(
+        prophit_stats, stats, half, total_goals,
+        combined.get("market_odds_summary"), minute,
+    )
+
     signals: list[str] = list(combined.get("fusion_signals") or [])
     total_score = combined["breakdown"]["total"]
     base_conf = combined["confidence"]
@@ -456,7 +462,9 @@ def score_period_under(
     u25_key = f"Under 2.5 {half_label}"
 
     if total_goals == 0:
-        u05_conf = _conf(base_conf + (9 if half == "fh" else 7))
+        u05_conf = _conf(pressure_confidence_adjust(
+            base_conf + (9 if half == "fh" else 7), pressure, "under_05",
+        ))
         u05_rec = _rec(u05_conf, 68, entry_end - 2)
         results[u05_key] = Prediction(
             match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
@@ -473,10 +481,10 @@ def score_period_under(
         )
 
     if total_goals == 0:
-        u15_conf = _conf(base_conf)
+        u15_conf = _conf(pressure_confidence_adjust(base_conf, pressure, "under_15"))
         u15_rec = _rec(u15_conf, 64, entry_start)
     elif total_goals == 1:
-        u15_conf = _conf(base_conf + 11)
+        u15_conf = _conf(pressure_confidence_adjust(base_conf + 11, pressure, "under_15"))
         if shots_pm < 0.52 and sot_pm < 0.22:
             u15_conf = _conf(u15_conf + 5)
             signals.append(f"1 {half_label} goal but tempo still low — under 1.5 holds")
@@ -497,10 +505,12 @@ def score_period_under(
     )
 
     if total_goals <= 1:
-        u25_conf = _conf(base_conf + (17 if half == "fh" else 14))
+        u25_conf = _conf(pressure_confidence_adjust(
+            base_conf + (17 if half == "fh" else 14), pressure, "under_25",
+        ))
         u25_rec = _rec(u25_conf, 70, entry_start)
     elif total_goals == 2:
-        u25_conf = _conf(base_conf + 7)
+        u25_conf = _conf(pressure_confidence_adjust(base_conf + 7, pressure, "under_25"))
         slow_min = 72 if half == "sh" else 30
         if shots_pm < 0.52 and minute >= slow_min:
             u25_conf = _conf(u25_conf + 9)

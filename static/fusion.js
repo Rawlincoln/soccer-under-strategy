@@ -154,6 +154,7 @@ function renderFusionAnalysis(m) {
   const fm = f.fotmob_summary || {};
   const sd = f.sportsdb_summary || m.sportsdb_stats || {};
   const mkt = f.market_odds_summary || m.market_odds || {};
+  const prs = f.pressure_summary || {};
   const bd = f.breakdown || {};
 
   const sdLine = sd.total_shots
@@ -164,6 +165,9 @@ function renderFusionAnalysis(m) {
     : mkt.under_05_implied_pct
       ? `<div class="market-odds-line">Market: ${mkt.under_05_implied_pct}% U0.5 @ ${mkt.under_05_odds ?? "—"}</div>`
       : "";
+  const prsLine = prs.p_under_15
+    ? `<div class="pressure-model-line">GAP: ${prs.p_under_15}% U1.5 · fair ${prs.fair_under_odds ?? "—"}${prs.under_edge_pct >= 4 ? ` · <strong>+${prs.under_edge_pct}pp edge</strong>` : ""}</div>`
+    : "";
 
   return `
     <div class="fusion-panel ${fusionClass(f.verdict)}">
@@ -207,7 +211,7 @@ function renderFusionAnalysis(m) {
         </div>
         <div class="fusion-col fusion-col-market">
           <div class="fusion-col-title">External + Market</div>
-          ${sdLine}${mktLine || '<div class="fusion-profile">No cross-check data yet</div>'}
+          ${sdLine}${prsLine}${mktLine || '<div class="fusion-profile">No cross-check data yet</div>'}
           ${mkt.market_lean && mkt.market_lean !== "neutral" ? `<div class="fusion-profile market-lean-${mkt.market_lean}">${mkt.market_lean.replace(/_/g, " ")} lean</div>` : ""}
         </div>
       </div>
@@ -217,6 +221,7 @@ function renderFusionAnalysis(m) {
         <span>FM ${bd.fotmob_verify ?? 0}</span>
         <span>Ext ${bd.external_verify ?? 0}</span>
         <span>Mkt ${bd.market_odds ?? 0}</span>
+        <span>GAP ${bd.pressure_model ?? 0}</span>
         <span>Live ${bd.live_tempo ?? 0}</span>
         <span>Time ${bd.time_context ?? 0}</span>
         <span>Agree ${bd.agreement > 0 ? "+" : ""}${bd.agreement ?? 0}</span>

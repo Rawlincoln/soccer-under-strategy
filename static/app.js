@@ -164,6 +164,7 @@ function renderFusionAnalysis(m) {
   const sd = f.sportsdb_summary || m.sportsdb_stats || {};
   const mkt = f.market_odds_summary || m.market_odds || {};
   const prs = f.pressure_summary || {};
+  const sv = f.shots_volume_summary || {};
   const bd = f.breakdown || {};
 
   const sdLine = sd.total_shots
@@ -176,6 +177,9 @@ function renderFusionAnalysis(m) {
       : "";
   const prsLine = prs.p_under_15
     ? `<div class="pressure-model-line">GAP: ${prs.p_under_15}% U1.5 · fair ${prs.fair_under_odds ?? "—"}${prs.under_edge_pct >= 4 ? ` · <strong>+${prs.under_edge_pct}pp edge</strong>` : ""}</div>`
+    : "";
+  const svLine = (sv.combined > 0 || sv.projected_90 > 0)
+    ? `<div class="shots-volume-line">Shots: ${sv.home_shots ?? 0}-${sv.away_shots ?? 0} (Σ${sv.combined ?? 0}${sv.projected_90 ? ` · ~${Math.round(sv.projected_90)}/90` : ""}) · band 18–28${sv.in_combined_band || sv.in_split_band ? " ✓" : ""}${sv.preferred_market === "under_15" ? " · U1.5" : sv.preferred_market === "under_25" ? " · U2.5" : ""}</div>`
     : "";
 
   return `
@@ -219,7 +223,7 @@ function renderFusionAnalysis(m) {
         </div>
         <div class="fusion-col fusion-col-market">
           <div class="fusion-col-title">External + Market</div>
-          ${sdLine}${prsLine}${mktLine || '<div class="fusion-profile">No cross-check data yet</div>'}
+          ${sdLine}${svLine}${prsLine}${mktLine || '<div class="fusion-profile">No cross-check data yet</div>'}
           ${mkt.market_lean && mkt.market_lean !== "neutral" ? `<div class="fusion-profile market-lean-${mkt.market_lean}">${mkt.market_lean.replace(/_/g, " ")} lean</div>` : ""}
         </div>
       </div>
@@ -230,6 +234,7 @@ function renderFusionAnalysis(m) {
         <span>Ext ${bd.external_verify ?? 0}</span>
         <span>Mkt ${bd.market_odds ?? 0}</span>
         <span>GAP ${bd.pressure_model ?? 0}</span>
+        <span>Shots ${bd.shots_volume ?? 0}</span>
         <span>Live ${bd.live_tempo ?? 0}</span>
         <span>Time ${bd.time_context ?? 0}</span>
         <span>Agree ${bd.agreement > 0 ? "+" : ""}${bd.agreement ?? 0}</span>

@@ -503,20 +503,21 @@ class OneXBetClient:
             "Referer": "https://1xbet.com/en/live/football",
         })
 
-    def _get(self, endpoint: str, params: dict) -> dict:
+    def _get(self, endpoint: str, params: dict, timeout: float = 25, retries: int = 3) -> dict:
         url = f"{self.base_url}/{endpoint}"
-        for attempt in range(3):
+        attempts = max(1, retries)
+        for attempt in range(attempts):
             try:
-                r = self.session.get(url, params=params, timeout=25)
+                r = self.session.get(url, params=params, timeout=timeout)
                 r.raise_for_status()
                 data = r.json()
                 if not data.get("Success", True) and data.get("Error"):
                     raise RuntimeError(data.get("Error"))
                 return data
             except requests.RequestException:
-                if attempt == 2:
+                if attempt == attempts - 1:
                     raise
-                time.sleep(1.5)
+                time.sleep(0.6)
         return {}
 
     def fetch_live_football(self, count: int = 500) -> list[dict]:
@@ -530,16 +531,21 @@ class OneXBetClient:
         })
         return data.get("Value") or []
 
-    def fetch_game_detail(self, game_id: int) -> dict:
-        data = self._get("GetGameZip", {
-            "id": game_id,
-            "lng": "en",
-            "cfview": 0,
-            "isSubGames": "true",
-            "GroupEvents": "true",
-            "countevents": 500,
-            "grMode": 2,
-        })
+    def fetch_game_detail(self, game_id: int, timeout: float = 12, retries: int = 2) -> dict:
+        data = self._get(
+            "GetGameZip",
+            {
+                "id": game_id,
+                "lng": "en",
+                "cfview": 0,
+                "isSubGames": "true",
+                "GroupEvents": "true",
+                "countevents": 500,
+                "grMode": 2,
+            },
+            timeout=timeout,
+            retries=retries,
+        )
         return data.get("Value") or {}
 
     def parse_match(self, raw: dict, detail: Optional[dict] = None) -> OneXBetMatch:
@@ -621,12 +627,14 @@ class OneXBetClient:
     def _parse_stats(self, st: Any) -> dict[str, int]:
         return parse_match_stats(st)
 
-    def fetch_period_subgame_stats(self, match: OneXBetMatch, half: str) -> dict[str, int]:
+    def fetch_period_subgame_stats(
+        self, match: OneXBetMatch, half: str, timeout: float = 12,
+    ) -> dict[str, int]:
         subgame_id = match.fh_subgame_id if half == "fh" else match.sh_subgame_id
         if not subgame_id:
             return match.stats
         try:
-            detail = self.fetch_game_detail(subgame_id)
+            detail = self.fetch_game_detail(subgame_id, timeout=timeout, retries=1)
             sc = detail.get("SC") or {}
             parsed = self._parse_stats(sc.get("ST"))
             return parsed if parsed else match.stats

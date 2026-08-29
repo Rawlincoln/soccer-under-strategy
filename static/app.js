@@ -428,14 +428,15 @@ async function fetchData() {
   try {
     const res = await fetch("/api/predictions");
     const data = await res.json();
-    if (data.error && !lastData?.matches?.length) {
+    const incomingMatches = data.matches || [];
+    if (data.error && !incomingMatches.length && !lastData?.matches?.length) {
       $("matchesGrid").innerHTML = `<div class="empty">Scan error: ${data.error}</div>`;
       $("statusText").textContent = "Scan error";
       $("connectionStatus").classList.add("error");
       return;
     }
-    if (data.error && lastData?.matches?.length) {
-      $("statusText").textContent = `Stale data · ${data.error}`;
+    if ((data.error || data.scan_warning) && (incomingMatches.length || lastData?.matches?.length)) {
+      $("statusText").textContent = `Live · ${data.scan_warning || data.error}`;
     }
 
     lastData = data;

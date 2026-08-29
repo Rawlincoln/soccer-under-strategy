@@ -73,7 +73,10 @@ def extract_onexbet_period_odds(
             sub_id = sg.get("I")
             break
 
-    target = client.fetch_game_detail(int(sub_id)) if sub_id else detail
+    # Prefer cached payload — extra GetGameZip per match is what times out the live scan.
+    target = detail
+    if sub_id and not _extract_ge_totals(detail.get("GE") or []):
+        target = client.fetch_game_detail(int(sub_id), timeout=8, retries=1)
     lines = _extract_ge_totals(target.get("GE") or [])
 
     def _under(line: float) -> float:

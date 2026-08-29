@@ -48,7 +48,8 @@ from thesportsdb_stats import SPORTSDB_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
 REFRESH_SECONDS = 30
-REFRESH_TIMEOUT_SECONDS = 180
+REFRESH_TIMEOUT_SECONDS = 50
+FULL_SCAN_TIMEOUT_SECONDS = 90
 ONEXBET_CLIENT = OneXBetClient()
 
 LEAGUE_BASELINES = {
@@ -215,7 +216,9 @@ class DataCache:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._refresh_in_progress = False
+        self._full_refresh_in_progress = False
         self._bootstrap_done = threading.Event()
+        self._cycles = 0
 
     def start(self):
         if self._running:
@@ -253,18 +256,24 @@ class DataCache:
         self._running = False
 
     def _loop(self):
-        time.sleep(8)
+        time.sleep(3)
         while self._running:
-            self.refresh()
+            self.refresh(fast=True)
+            self._cycles += 1
+            if self._cycles % 3 == 0:
+                threading.Thread(
+                    target=self.refresh, kwargs={"fast": False}, daemon=True,
+                ).start()
             time.sleep(REFRESH_SECONDS)
 
-    def _refresh_work(self) -> None:
-        payload, closing_payload = build_all_payloads()
+    def _refresh_work(self, fast: bool = True) -> None:
+        payload, closing_payload = build_all_payloads(fast=fast)
         fusion_payload = build_fusion_payload(payload)
         assistant_payload = build_assistant_payload(
             payload, closing_payload, fusion_payload,
         )
         payload["loading"] = False
+        payload["error"] = None
         closing_payload["loading"] = False
         assistant_payload["loading"] = False
         with self._lock:
@@ -273,33 +282,50 @@ class DataCache:
             self._assistant = assistant_payload
 
     def _set_refresh_error(self, message: str) -> None:
+        """Keep last good matches — never blank the dashboard on a timeout."""
         with self._lock:
-            self._data["error"] = message
+            has_matches = bool(self._data.get("matches"))
             self._data["loading"] = False
-            self._closing["error"] = message
             self._closing["loading"] = False
-            self._assistant["error"] = message
             self._assistant["loading"] = False
+            if has_matches:
+                self._data["scan_warning"] = message
+                self._data["error"] = None
+            else:
+                self._data["error"] = message
+            self._closing["error"] = None if has_matches else message
+            self._assistant["error"] = None if has_matches else message
 
-    def refresh(self) -> bool:
-        """Run one full scan. Returns False if a refresh is already in progress."""
-        if self._refresh_in_progress:
-            return False
-        self._refresh_in_progress = True
+    def refresh(self, fast: bool = True) -> bool:
+        """Run one scan. Fast path is the default so Render stays under timeout."""
+        if fast:
+            if self._refresh_in_progress:
+                return False
+            self._refresh_in_progress = True
+            timeout = REFRESH_TIMEOUT_SECONDS
+        else:
+            if self._full_refresh_in_progress:
+                return False
+            self._full_refresh_in_progress = True
+            timeout = FULL_SCAN_TIMEOUT_SECONDS
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
-                pool.submit(self._refresh_work).result(timeout=REFRESH_TIMEOUT_SECONDS)
+                pool.submit(self._refresh_work, fast).result(timeout=timeout)
             return True
         except FuturesTimeoutError:
+            label = "Fast" if fast else "Full"
             self._set_refresh_error(
-                f"Live scan timed out after {REFRESH_TIMEOUT_SECONDS}s — retrying on next cycle",
+                f"{label} scan timed out after {timeout}s — retrying on next cycle",
             )
             return True
         except Exception as exc:
             self._set_refresh_error(str(exc))
             return True
         finally:
-            self._refresh_in_progress = False
+            if fast:
+                self._refresh_in_progress = False
+            else:
+                self._full_refresh_in_progress = False
 
     def request_refresh(self) -> bool:
         """Trigger a background refresh without blocking the caller."""
@@ -911,7 +937,7 @@ def _prefetch_game_details(
 
     def _fetch(gid: int) -> tuple[int, dict]:
         try:
-            return gid, client.fetch_game_detail(gid)
+            return gid, client.fetch_game_detail(gid, timeout=8, retries=1)
         except Exception:
             return gid, {}
 
@@ -953,7 +979,7 @@ def _prefetch_period_stats(
 
     def _fetch(job: tuple[OneXBetMatch, str]) -> tuple[tuple[int, str], dict[str, int]]:
         match, half = job
-        return (match.game_id, half), client.fetch_period_subgame_stats(match, half)
+        return (match.game_id, half), client.fetch_period_subgame_stats(match, half, timeout=8)
 
     out: dict[tuple[int, str], dict[str, int]] = {}
     workers = min(10, max(1, len(jobs)))
@@ -1046,10 +1072,12 @@ def _scan_live_football(fast: bool = False) -> tuple[
 
         eligible.append(m)
 
-    detail_cache = _prefetch_game_details(
-        ONEXBET_CLIENT, [m.game_id for m in eligible],
+    # Fast path: list payload only — extra GetGameZip/FotMob calls are what hits 180s.
+    detail_ids = [] if fast else [m.game_id for m in eligible[:18]]
+    detail_cache = _prefetch_game_details(ONEXBET_CLIENT, detail_ids)
+    period_stats_cache = {} if fast else _prefetch_period_stats(
+        ONEXBET_CLIENT, eligible[:18],
     )
-    period_stats_cache = {} if fast else _prefetch_period_stats(ONEXBET_CLIENT, eligible)
 
     for m in eligible:
         game_detail = detail_cache.get(m.game_id) or {}
@@ -1058,16 +1086,15 @@ def _scan_live_football(fast: bool = False) -> tuple[
         soccerpunter_stats = None if fast else SOCCERPUNTER_PROVIDER.lookup_match(
             m.home_team, m.away_team,
         )
-        sportsdb_stats = None if fast else SPORTSDB_PROVIDER.lookup_match(m.home_team, m.away_team)
-        market_odds_fh = lookup_market_odds(
-            ONEXBET_CLIENT, m.game_id, half="fh", cached_detail=game_detail,
-        )
+        sportsdb_stats = None
+        market_odds_fh = None
+        if not fast and game_detail:
+            market_odds_fh = lookup_market_odds(
+                ONEXBET_CLIENT, m.game_id, half="fh", cached_detail=game_detail,
+            )
 
         if m.is_half_time:
-            fotmob_stats = None if fast else FOTMOB_PROVIDER.lookup_match(
-                m.home_team, m.away_team, half="fh",
-                league=m.league, country=m.country,
-            )
+            fotmob_stats = None
             cards.append(_build_half_time_card(
                 m, prophit_stats, soccerpunter_stats, fotmob_stats,
                 sportsdb_stats, market_odds_fh,
@@ -1087,15 +1114,12 @@ def _scan_live_football(fast: bool = False) -> tuple[
                 period_stats = period_stats_cache.get((m.game_id, half)) or m.stats
             if has_red_cards(period_stats):
                 continue
-            fm_half = None if fast else FOTMOB_PROVIDER.lookup_match(
-                m.home_team, m.away_team, half=half,
-                league=m.league, country=m.country,
-            )
-            if fm_half and fm_half.get("is_finished"):
-                continue
-            odds_half = lookup_market_odds(
-                ONEXBET_CLIENT, m.game_id, half=half, cached_detail=game_detail,
-            )
+            fm_half = None
+            odds_half = None
+            if not fast and game_detail:
+                odds_half = lookup_market_odds(
+                    ONEXBET_CLIENT, m.game_id, half=half, cached_detail=game_detail,
+                )
             preds, combined = analyze_onexbet_match(
                 m, half=half, prophit_stats=prophit_stats,
                 soccerpunter_stats=soccerpunter_stats, fotmob_stats=fm_half,

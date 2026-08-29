@@ -25,6 +25,20 @@ from goal_probability import (
 LINES = (1.5, 2.5, 3.5, 4.5)
 MIN_ACCA_PCT = 80.0
 MIN_ELAPSED = 12
+MIN_ACCA_ODDS = 1.30
+MAX_ACCA_ODDS = 2.50
+
+# Typical live prices when 1xBet totals are missing (still inside 1.30–2.50).
+_SYNTHETIC_ODDS = {
+    ("UNDER", 1.5): 1.55,
+    ("UNDER", 2.5): 1.42,
+    ("UNDER", 3.5): 1.32,
+    ("UNDER", 4.5): 1.22,  # usually too short — filtered out
+    ("OVER", 1.5): 1.60,
+    ("OVER", 2.5): 1.85,
+    ("OVER", 3.5): 2.20,
+    ("OVER", 4.5): 2.45,
+}
 
 
 def _stat(live: Any, key: str, default: float = 0.0) -> float:
@@ -62,6 +76,30 @@ def _under_alive(line: float, goals: int) -> bool:
 def _over_alive(line: float, goals: int) -> bool:
     """Still to land — skip if already won."""
     return goals <= int(line)
+
+
+def _lookup_market_odds(card: dict, side: str, line: float) -> float:
+    mkt = card.get("market_odds") or (card.get("combined_analysis") or {}).get("market_odds_summary") or {}
+    key = f"{'under' if side == 'UNDER' else 'over'}_{str(line).replace('.', '')}_odds"
+    # 1.5 -> under_15_odds
+    compact = f"{'under' if side == 'UNDER' else 'over'}_{int(line * 10)}_odds"
+    raw = mkt.get(compact) or mkt.get(key) or 0
+    try:
+        odds = float(raw or 0)
+    except (TypeError, ValueError):
+        odds = 0.0
+    return odds
+
+
+def _acca_odds(card: dict, side: str, line: float) -> float:
+    market = _lookup_market_odds(card, side, line)
+    if market >= 1.01:
+        return round(market, 2)
+    return float(_SYNTHETIC_ODDS.get((side, line), 0.0))
+
+
+def odds_in_acca_band(odds: float) -> bool:
+    return MIN_ACCA_ODDS <= odds <= MAX_ACCA_ODDS
 
 
 def _tempo_mult(live: Any, elapsed: int) -> tuple[float, str, list[str]]:
@@ -286,6 +324,7 @@ class OuPick:
     recommendation: str = "BET"
     country: str = ""
     location: str = ""
+    estimated_odds: float = 0.0
 
 
 def extract_ou_picks(card: dict) -> list[OuPick]:
@@ -337,10 +376,13 @@ def extract_ou_picks(card: dict) -> list[OuPick]:
                 if w < 0.45:
                     p = min(p, 78.0)
                 if p >= MIN_ACCA_PCT:
+                    odds = _acca_odds(card, "UNDER", line)
+                    if not odds_in_acca_band(odds):
+                        continue
                     label = {"fh": "FH", "sh": "SH", "ft": "FT"}[scope]
                     picks.append(_make_pick(
                         card, home, away, scope, "UNDER", line, p, lam, tempo,
-                        tempo_signals, label, half, minute,
+                        tempo_signals, label, half, minute, odds,
                     ))
 
             # Over
@@ -353,17 +395,23 @@ def extract_ou_picks(card: dict) -> list[OuPick]:
                 if w < 0.45:
                     p = min(p, 78.0)
                 if p >= MIN_ACCA_PCT:
+                    odds = _acca_odds(card, "OVER", line)
+                    if not odds_in_acca_band(odds):
+                        continue
                     label = {"fh": "FH", "sh": "SH", "ft": "FT"}[scope]
                     picks.append(_make_pick(
                         card, home, away, scope, "OVER", line, p, lam, tempo,
-                        tempo_signals, label, half, minute,
+                        tempo_signals, label, half, minute, odds,
                     ))
 
-    # One pick per match+scope (highest confidence) to keep slips clean
+    # One pick per match+scope: highest confidence among 1.30–2.50 odds.
     best: dict[tuple[str, str], OuPick] = {}
     for p in picks:
         key = (p.event_id, p.scope)
-        if key not in best or p.confidence > best[key].confidence:
+        cur = best.get(key)
+        if cur is None or p.confidence > cur.confidence:
+            best[key] = p
+        elif p.confidence == cur.confidence and abs(p.estimated_odds - 1.55) < abs(cur.estimated_odds - 1.55):
             best[key] = p
     return list(best.values())
 
@@ -382,11 +430,12 @@ def _make_pick(
     label: str,
     half: str,
     minute: int,
+    odds: float,
 ) -> OuPick:
     selection = f"{side.title()} {line:g} {label}"
     market = f"{side.title()} {line:g} {'First Half' if scope == 'fh' else 'Second Half' if scope == 'sh' else 'Full Time'} Goals"
     signals = [
-        f"{selection} · rem xG {lam:.2f} · {tempo} tempo",
+        f"{selection} · @{odds:.2f} · rem xG {lam:.2f} · {tempo} tempo",
         *tempo_signals[:2],
     ]
     return OuPick(
@@ -417,6 +466,7 @@ def _make_pick(
             card.get("country") or "", card.get("league") or "",
         ),
         recommendation="BET",
+        estimated_odds=round(odds, 2),
     )
 
 
@@ -431,6 +481,7 @@ def all_ou_picks(matches: list[dict]) -> list[dict[str, Any]]:
                 "confidence": pick.confidence,
                 "recommendation": "BET",
                 "signals": pick.signals,
+                "estimated_odds": pick.estimated_odds,
             }
             out.append(row)
     out.sort(key=lambda x: -x["confidence"])

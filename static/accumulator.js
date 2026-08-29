@@ -133,7 +133,7 @@ function renderPicks60(data) {
         <div class="pick-60-stat"><div class="num">${item.full_score || "—"}</div><div class="lbl">FT</div></div>
         <div class="pick-60-stat"><div class="num">${item.tempo || "—"}</div><div class="lbl">Tempo</div></div>
       </div>
-      <div class="pick-60-meta">${item.side || ""} ${item.line ?? ""} · rem xG ${item.remaining_xg ?? "—"}</div>
+      <div class="pick-60-meta">${item.side || ""} ${item.line ?? ""} · @${Number(item.estimated_odds || 0).toFixed(2)} · rem xG ${item.remaining_xg ?? "—"}</div>
     </div>
   `).join("");
   if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);

@@ -32,6 +32,10 @@ class MarketOddsSnapshot:
     under_25_odds: float = 0.0
     over_15_odds: float = 0.0
     over_25_odds: float = 0.0
+    over_35_odds: float = 0.0
+    over_45_odds: float = 0.0
+    under_35_odds: float = 0.0
+    under_45_odds: float = 0.0
     under_05_implied_pct: float = 0.0
     under_15_implied_pct: float = 0.0
     under_25_implied_pct: float = 0.0
@@ -87,7 +91,9 @@ def extract_onexbet_period_odds(
 
     u05, u15, u25 = _under(0.5), _under(1.5), _under(2.5)
     o15, o25 = _over(1.5), _over(2.5)
-    if not any((u05, u15, u25)):
+    u35, o35 = _under(3.5), _over(3.5)
+    u45, o45 = _under(4.5), _over(4.5)
+    if not any((u05, u15, u25, u35, u45, o15, o25)):
         return None
 
     u15_imp = implied_probability(u15) if u15 else 0.0
@@ -115,6 +121,10 @@ def extract_onexbet_period_odds(
         under_25_odds=round(u25, 3) if u25 else 0.0,
         over_15_odds=round(o15, 3) if o15 else 0.0,
         over_25_odds=round(o25, 3) if o25 else 0.0,
+        over_35_odds=round(o35, 3) if o35 else 0.0,
+        over_45_odds=round(o45, 3) if o45 else 0.0,
+        under_35_odds=round(u35, 3) if u35 else 0.0,
+        under_45_odds=round(u45, 3) if u45 else 0.0,
         under_05_implied_pct=implied_probability(u05) if u05 else 0.0,
         under_15_implied_pct=u15_imp,
         under_25_implied_pct=implied_probability(u25) if u25 else 0.0,

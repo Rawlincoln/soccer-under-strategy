@@ -3,8 +3,9 @@ Shots-volume heuristic for Under 1.5 / Under 2.5.
 
 Reference profile (full match):
   - Combined total shots: 18–28 (both teams)
-  - Leading side: often 10–14 shots
-  - Trailing side: often 6–10 shots
+  - Winning team (by score): often 10–14 shots
+  - Losing team: often 6–10 shots
+  Level games fall back to shot-count split.
 
 Low, balanced volume supports unders; high volume or one-sided barrage leans over.
 Live games: project to 90' from elapsed time; period markets also check half-scaled bands.
@@ -94,12 +95,23 @@ def analyze_shots_volume(
     proj_total = _project(combined, elapsed_full)
     result.projected_90 = round(proj_total, 1)
 
+    home_goals = int(getattr(live_stats, "home_goals", 0) or 0)
+    away_goals = int(getattr(live_stats, "away_goals", 0) or 0)
+    # Winner/loser by score; if level, use whoever has more shots
     if home + away > 0:
-        hi = max(home, away)
-        lo = min(home, away)
-        result.projected_leader = round(_project(hi, elapsed_full), 1)
-        result.projected_trailer = round(_project(lo, elapsed_full), 1)
+        if home_goals > away_goals:
+            win_shots, lose_shots = home, away
+            split_label = "winner/loser"
+        elif away_goals > home_goals:
+            win_shots, lose_shots = away, home
+            split_label = "winner/loser"
+        else:
+            win_shots, lose_shots = max(home, away), min(home, away)
+            split_label = "level (shot split)"
+        result.projected_leader = round(_project(win_shots, elapsed_full), 1)
+        result.projected_trailer = round(_project(lose_shots, elapsed_full), 1)
     else:
+        split_label = ""
         result.projected_leader = 0.0
         result.projected_trailer = 0.0
 
@@ -140,7 +152,7 @@ def analyze_shots_volume(
             f"Shots volume: high ~{proj_total:.0f} proj/90 (>34) — over risk"
         )
 
-    # --- Leader/trailer split (10–14 vs 6–10) ---
+    # --- Winner 10–14 / loser 6–10 ---
     if result.projected_leader > 0:
         lead = result.projected_leader
         trail = result.projected_trailer
@@ -151,7 +163,7 @@ def analyze_shots_volume(
             u25 += 6
             signals.append(
                 f"Classic under split: ~{lead:.0f}–{trail:.0f} "
-                f"(leader 10–14, trailer 6–10)"
+                f"(winner 10–14, loser 6–10, {split_label})"
             )
         elif lead <= LEADER_MAX and trail <= TRAILER_MAX and (lead + trail) <= COMBINED_MAX:
             result.in_split_band = True
@@ -159,23 +171,29 @@ def analyze_shots_volume(
             u15 += 2
             u25 += 3
             signals.append(
-                f"Balanced low split: ~{lead:.0f}–{trail:.0f} (under-friendly)"
+                f"Balanced low split: ~{lead:.0f}–{trail:.0f} "
+                f"(winner/loser, under-friendly)"
             )
         elif lead >= 18 and trail <= 6:
             score -= 4
             u15 -= 3
             signals.append(
-                f"One-sided barrage: ~{lead:.0f}–{trail:.0f} — cautious on U1.5"
+                f"Winner barrage: ~{lead:.0f}–{trail:.0f} — cautious on U1.5"
             )
         elif lead >= 16:
             score -= 3
             u15 -= 2
-            signals.append(f"High leader volume: ~{lead:.0f} shots proj — goal threat")
+            signals.append(f"High winner volume: ~{lead:.0f} shots proj — goal threat")
 
     # --- Period-level bands (scaled half of full-match rules) ---
     period_total = combined  # period stats when engine feeds period subgame
     if home + away > 0:
-        p_hi, p_lo = max(home, away), min(home, away)
+        if home_goals > away_goals:
+            p_hi, p_lo = home, away
+        elif away_goals > home_goals:
+            p_hi, p_lo = away, home
+        else:
+            p_hi, p_lo = max(home, away), min(home, away)
     else:
         p_hi = p_lo = 0
 
@@ -207,7 +225,7 @@ def analyze_shots_volume(
             u15 += 2
             u25 += 3
             signals.append(
-                f"Period split under-style: ~{p_hi_proj:.0f}–{p_lo_proj:.0f} "
+                f"Period winner/loser shots: ~{p_hi_proj:.0f}–{p_lo_proj:.0f} "
                 f"({PERIOD_LEADER_MIN}–{PERIOD_LEADER_MAX} vs "
                 f"{PERIOD_TRAILER_MIN}–{PERIOD_TRAILER_MAX})"
             )

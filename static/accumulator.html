@@ -17,7 +17,7 @@
         <span class="logo-icon">🎯</span>
         <div>
           <h1>Pro Punter</h1>
-          <p class="subtitle">O/U 1.5–4.5 · ≥80% · odds 1.30–2.50 · 1H / 2H / FT · 6–12 slips</p>
+          <p class="subtitle">O/U 1.5–4.5 · ≥80% · core 1.30–2.50 · shorts &amp; longshots in their own sections</p>
         </div>
       </div>
     </div>
@@ -53,8 +53,8 @@
   </section>
 
   <section class="picks-60-section">
-    <h2 class="section-title">80%+ Over / Under — live pool</h2>
-    <p class="picks-60-note">≥80% confidence and decimal odds between 1.30 and 2.50. Under 1.5 only at 0-0; Under 2.5 at 0-0 or 1-0. Short prices under 1.30 are excluded.</p>
+    <h2 class="section-title">Core pool · 1.30–2.50 @ ≥80%</h2>
+    <p class="picks-60-note">Main book. Under 1.5 only at 0-0; Under 2.5 at 0-0 or 1-0.</p>
     <div class="picks-60-grid" id="picks60Grid">
       <div class="loading">Loading predictions…</div>
     </div>
@@ -64,8 +64,22 @@
     <div class="loading">Building accumulator slips…</div>
   </section>
 
+  <section class="picks-60-section acca-alt-section">
+    <h2 class="section-title">Short prices · under 1.30 @ ≥80%</h2>
+    <p class="picks-60-note">Bankers / tight lines. More legs per slip. Still need a one-goal cushion.</p>
+    <div class="picks-60-grid" id="picksShortGrid"></div>
+  </section>
+  <section class="acca-container acca-alt" id="accaShortContainer"></section>
+
+  <section class="picks-60-section acca-alt-section">
+    <h2 class="section-title">Longshots · over 2.50 @ ≥80%</h2>
+    <p class="picks-60-note">Bigger prices, 3-fold slips only. Model still wants ≥80%.</p>
+    <div class="picks-60-grid" id="picksLongGrid"></div>
+  </section>
+  <section class="acca-container acca-alt" id="accaLongContainer"></section>
+
   <footer class="footer">
-    6–12 slips · 3–5 legs · ≥80% · each leg @ 1.30–2.50 · O/U 1.5–4.5 (1H, 2H or FT) ·
+    Core 1.30–2.50 · shorts &lt;1.30 · longshots &gt;2.50 · ≥80% · O/U 1.5–4.5 ·
     refreshes every <span id="refreshInterval">30</span>s
   </footer>
 

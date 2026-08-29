@@ -52,6 +52,7 @@ class AccaLeg:
     remaining_xg: float = 0.0
     country: str = ""
     location: str = ""
+    odds_band: str = "core"
 
 
 @dataclass
@@ -99,56 +100,63 @@ def _signature(legs: list[dict]) -> tuple[str, ...]:
     ))
 
 
-def _build_themes(picks: list[dict]) -> list[tuple[str, list[dict]]]:
-    themes: list[tuple[str, callable, int]] = [
-        ("Safest 3-fold", lambda p: True, 3),
-        ("Safest 4-fold", lambda p: True, 4),
-        ("Banker 5-fold", lambda p: True, 5),
-        ("Under 3-fold", lambda p: p.get("side") == "UNDER", 3),
-        ("Under 4-fold", lambda p: p.get("side") == "UNDER", 4),
-        ("Over 3-fold", lambda p: p.get("side") == "OVER", 3),
-        ("1H 3-fold", lambda p: p.get("scope") == "fh", 3),
-        ("2H 3-fold", lambda p: p.get("scope") == "sh", 3),
-        ("FT 3-fold", lambda p: p.get("scope") == "ft", 3),
-        ("FT 4-fold", lambda p: p.get("scope") == "ft", 4),
-        ("Slow unders", lambda p: p.get("side") == "UNDER" and p.get("tempo") == "slow", 3),
-        ("Fast overs", lambda p: p.get("side") == "OVER" and p.get("tempo") == "fast", 3),
-        ("U2.5+ unders", lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 2.5, 3),
-        ("U3.5 / U4.5", lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 3.5, 3),
-        ("O1.5 / O2.5", lambda p: p.get("side") == "OVER" and float(p.get("line") or 0) <= 2.5, 3),
+def _build_themes(
+    picks: list[dict],
+    *,
+    prefix: str = "",
+    min_legs: int = MIN_LEGS,
+    max_legs: int = MAX_LEGS,
+    max_accas: int = MAX_ACCAS,
+) -> list[tuple[str, list[dict]]]:
+    def _name(label: str) -> str:
+        return f"{prefix}{label}" if prefix else label
+
+    themes: list[tuple[str, Any, int]] = [
+        (_name("Safest 3-fold"), lambda p: True, min(3, max_legs)),
+        (_name("Safest 4-fold"), lambda p: True, min(4, max_legs)),
+        (_name("Banker"), lambda p: True, max_legs),
+        (_name("Under fold"), lambda p: p.get("side") == "UNDER", min(4, max_legs)),
+        (_name("Over fold"), lambda p: p.get("side") == "OVER", min(3, max_legs)),
+        (_name("1H fold"), lambda p: p.get("scope") == "fh", min_legs),
+        (_name("2H fold"), lambda p: p.get("scope") == "sh", min_legs),
+        (_name("FT fold"), lambda p: p.get("scope") == "ft", min_legs),
+        (_name("Slow unders"), lambda p: p.get("side") == "UNDER" and p.get("tempo") == "slow", min_legs),
+        (_name("Fast overs"), lambda p: p.get("side") == "OVER" and p.get("tempo") == "fast", min_legs),
+        (_name("U2.5+"), lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 2.5, min_legs),
+        (_name("U3.5 / U4.5"), lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 3.5, min_legs),
     ]
 
     slips: list[tuple[str, list[dict]]] = []
     used_sigs: set[tuple[str, ...]] = set()
 
     for name, pred, n_legs in themes:
+        n_legs = max(min_legs, min(n_legs, max_legs))
         pool = [p for p in picks if pred(p)]
         legs = _unique_events(pool, n_legs)
-        if len(legs) < MIN_LEGS:
+        if len(legs) < min_legs:
             continue
         sig = _signature(legs)
         if sig in used_sigs:
             continue
         used_sigs.add(sig)
         slips.append((name, legs))
-        if len(slips) >= MAX_ACCAS:
+        if len(slips) >= max_accas:
             return slips
 
-    # Extra staggered 3-folds from the ranked list so we can reach 6–12
     ranked = _unique_events(picks, 40)
-    for start in range(0, max(0, len(ranked) - MIN_LEGS + 1), 2):
-        if len(slips) >= MAX_ACCAS:
+    for start in range(0, max(0, len(ranked) - min_legs + 1), 2):
+        if len(slips) >= max_accas:
             break
-        chunk = ranked[start:start + MIN_LEGS]
-        if len(chunk) < MIN_LEGS:
+        chunk = ranked[start:start + min_legs]
+        if len(chunk) < min_legs:
             break
         sig = _signature(chunk)
         if sig in used_sigs:
             continue
         used_sigs.add(sig)
-        slips.append((f"Mix {len(slips) + 1}", chunk))
+        slips.append((_name(f"Mix {len(slips) + 1}"), chunk))
 
-    return slips[:MAX_ACCAS]
+    return slips[:max_accas]
 
 
 def _make_leg(entry: dict) -> AccaLeg:
@@ -186,6 +194,7 @@ def _make_leg(entry: dict) -> AccaLeg:
         scope=entry.get("scope") or "",
         tempo=entry.get("tempo") or "",
         remaining_xg=float(entry.get("remaining_xg") or 0),
+        odds_band=entry.get("odds_band") or "core",
         country=entry.get("country") or card.get("country") or "",
         location=entry.get("location")
         or card.get("location")
@@ -204,12 +213,9 @@ def _risk_level(avg_conf: float, legs: int) -> str:
     return "HIGH"
 
 
-def build_accumulators(matches: list[dict]) -> dict[str, Any]:
-    picks = all_ou_picks(matches)
-    themed = _build_themes(picks)
-
+def _pack_accas(themed: list[tuple[str, list[dict]]], start_id: int = 1) -> list[Accumulator]:
     accumulators: list[Accumulator] = []
-    for i, (name, slip) in enumerate(themed, start=1):
+    for i, (name, slip) in enumerate(themed, start=start_id):
         acca_legs = [_make_leg(e) for e in slip]
         odds_list = [leg.estimated_odds for leg in acca_legs]
         prob_list = [leg.confidence / 100 for leg in acca_legs]
@@ -228,19 +234,42 @@ def build_accumulators(matches: list[dict]) -> dict[str, Any]:
             potential_return_10=round(10 * combined_odds, 2),
             risk_level=_risk_level(avg_conf, len(acca_legs)),
         ))
+    return accumulators
+
+
+def build_accumulators(matches: list[dict]) -> dict[str, Any]:
+    core = all_ou_picks(matches, band="core")
+    short = all_ou_picks(matches, band="short")
+    long = all_ou_picks(matches, band="long")
+
+    core_accas = _pack_accas(_build_themes(core, max_accas=MAX_ACCAS))
+    short_accas = _pack_accas(
+        _build_themes(short, prefix="Short · ", min_legs=4, max_legs=8, max_accas=8),
+        start_id=100,
+    )
+    long_accas = _pack_accas(
+        _build_themes(long, prefix="Long · ", min_legs=3, max_legs=3, max_accas=8),
+        start_id=200,
+    )
 
     return {
-        "qualified_picks": len({(p["event_id"], p["scope"]) for p in picks}),
-        "qualified_picks_60": picks,
-        "qualified_picks_60_count": len(picks),
+        "qualified_picks": len({(p["event_id"], p["scope"]) for p in core}),
+        "qualified_picks_60": core,
+        "qualified_picks_60_count": len(core),
+        "short_picks": short,
+        "short_picks_count": len(short),
+        "long_picks": long,
+        "long_picks_count": len(long),
         "min_confidence": MIN_ACCA_PCT,
         "min_odds": 1.30,
         "max_odds": 2.50,
-        "accumulator_count": len(accumulators),
+        "accumulator_count": len(core_accas),
         "min_legs": MIN_LEGS,
         "max_legs": MAX_LEGS,
         "min_accas": MIN_ACCAS,
         "max_accas": MAX_ACCAS,
-        "accumulators": [asdict(a) for a in accumulators],
-        "insufficient_picks": len(picks) > 0 and len(picks) < MIN_LEGS,
+        "accumulators": [asdict(a) for a in core_accas],
+        "short_accumulators": [asdict(a) for a in short_accas],
+        "long_accumulators": [asdict(a) for a in long_accas],
+        "insufficient_picks": len(core) > 0 and len(core) < MIN_LEGS,
     }

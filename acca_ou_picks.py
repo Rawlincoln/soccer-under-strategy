@@ -37,7 +37,7 @@ _SYNTHETIC_ODDS = {
     ("OVER", 1.5): 1.60,
     ("OVER", 2.5): 1.85,
     ("OVER", 3.5): 2.20,
-    ("OVER", 4.5): 2.45,
+    ("OVER", 4.5): 2.70,
 }
 
 
@@ -100,6 +100,14 @@ def _acca_odds(card: dict, side: str, line: float) -> float:
 
 def odds_in_acca_band(odds: float) -> bool:
     return MIN_ACCA_ODDS <= odds <= MAX_ACCA_ODDS
+
+
+def odds_band_for(odds: float) -> str:
+    if odds < MIN_ACCA_ODDS:
+        return "short"
+    if odds > MAX_ACCA_ODDS:
+        return "long"
+    return "core"
 
 
 def _tempo_mult(live: Any, elapsed: int) -> tuple[float, str, list[str]]:
@@ -325,6 +333,7 @@ class OuPick:
     country: str = ""
     location: str = ""
     estimated_odds: float = 0.0
+    odds_band: str = "core"
 
 
 def extract_ou_picks(card: dict) -> list[OuPick]:
@@ -377,7 +386,7 @@ def extract_ou_picks(card: dict) -> list[OuPick]:
                     p = min(p, 78.0)
                 if p >= MIN_ACCA_PCT:
                     odds = _acca_odds(card, "UNDER", line)
-                    if not odds_in_acca_band(odds):
+                    if odds < 1.01:
                         continue
                     label = {"fh": "FH", "sh": "SH", "ft": "FT"}[scope]
                     picks.append(_make_pick(
@@ -396,7 +405,7 @@ def extract_ou_picks(card: dict) -> list[OuPick]:
                     p = min(p, 78.0)
                 if p >= MIN_ACCA_PCT:
                     odds = _acca_odds(card, "OVER", line)
-                    if not odds_in_acca_band(odds):
+                    if odds < 1.01:
                         continue
                     label = {"fh": "FH", "sh": "SH", "ft": "FT"}[scope]
                     picks.append(_make_pick(
@@ -404,10 +413,10 @@ def extract_ou_picks(card: dict) -> list[OuPick]:
                         tempo_signals, label, half, minute, odds,
                     ))
 
-    # One pick per match+scope: highest confidence among 1.30–2.50 odds.
-    best: dict[tuple[str, str], OuPick] = {}
+    # One pick per match + scope + odds band (so shorts/core/longs can all exist).
+    best: dict[tuple[str, str, str], OuPick] = {}
     for p in picks:
-        key = (p.event_id, p.scope)
+        key = (p.event_id, p.scope, p.odds_band)
         cur = best.get(key)
         if cur is None or p.confidence > cur.confidence:
             best[key] = p
@@ -467,13 +476,16 @@ def _make_pick(
         ),
         recommendation="BET",
         estimated_odds=round(odds, 2),
+        odds_band=odds_band_for(odds),
     )
 
 
-def all_ou_picks(matches: list[dict]) -> list[dict[str, Any]]:
+def all_ou_picks(matches: list[dict], band: str | None = None) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for card in matches:
         for pick in extract_ou_picks(card):
+            if band and pick.odds_band != band:
+                continue
             row = asdict(pick)
             row["card"] = card
             row["pick"] = {

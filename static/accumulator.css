@@ -66,6 +66,12 @@
   z-index: 1;
 }
 
+.acca-container .acca-title {
+  grid-column: 1 / -1;
+}
+
+.acca-alt-section { margin-top: 12px; }
+
 .acca-slip {
   background: var(--surface);
   border: 1px solid var(--border);

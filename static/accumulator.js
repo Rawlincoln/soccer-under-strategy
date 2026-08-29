@@ -87,25 +87,25 @@ function riskClass(level) {
 }
 
 function renderSummary(data) {
-  const accas = data.accumulators || [];
-  const totalLegs = accas.reduce((s, a) => s + a.leg_count, 0);
-  const minConf = data.min_confidence ?? 60;
+  const shortN = (data.short_accumulators || []).length;
+  const longN = (data.long_accumulators || []).length;
   $("accaSummary").innerHTML = `
-    <div class="baseline-card"><div class="label">80%+ O/U picks</div><div class="value green">${data.qualified_picks_60_count ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Unique matches</div><div class="value">${data.qualified_picks ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Accumulator slips</div><div class="value green">${data.accumulator_count ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Total acca legs</div><div class="value">${totalLegs}</div></div>
+    <div class="baseline-card"><div class="label">Core 1.30–2.50</div><div class="value green">${data.qualified_picks_60_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Short &lt;1.30</div><div class="value">${data.short_picks_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Longshots &gt;2.50</div><div class="value">${data.long_picks_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Slips</div><div class="value green">${data.accumulator_count ?? 0} · ${shortN} · ${longN}</div></div>
   `;
-  $("accaCount").textContent = `${data.accumulator_count ?? 0} acca${data.accumulator_count !== 1 ? "s" : ""}`;
+  $("accaCount").textContent = `${(data.accumulator_count ?? 0) + shortN + longN} accas`;
 }
 
-function renderPicks60(data) {
-  const grid = $("picks60Grid");
-  const picks = data.qualified_picks_60 || [];
+function renderPicks60(data, gridId = "picks60Grid", picksKey = "qualified_picks_60", emptyMsg = "") {
+  const grid = $(gridId);
+  if (!grid) return;
+  const picks = data[picksKey] || [];
   const minConf = data.min_confidence ?? 60;
 
   if (!picks.length) {
-    grid.innerHTML = `<div class="insufficient-msg">No live picks at ${minConf}%+ confidence right now.</div>`;
+    grid.innerHTML = `<div class="insufficient-msg">${emptyMsg || `No live picks at ${minConf}%+ in this band.`}</div>`;
     return;
   }
 
@@ -214,32 +214,21 @@ function renderAcca(acca, stake) {
   `;
 }
 
-function renderAccas(data) {
-  const container = $("accaContainer");
+function renderAccas(data, containerId = "accaContainer", accasKey = "accumulators", title = "") {
+  const container = $(containerId);
+  if (!container) return;
   const stake = parseFloat($("stakeInput").value) || 10;
-  const accas = data.accumulators || [];
+  const accas = data[accasKey] || [];
   const minConf = data.min_confidence ?? 60;
-
-  if (data.insufficient_picks) {
-    container.innerHTML = `
-      <div class="insufficient-msg">
-        <strong>Not enough picks for an accumulator</strong>
-        Found ${data.qualified_picks} match(es) at ${minConf}%+ — need at least ${data.min_legs} for a slip.
-        See the 60%+ predictions list above.
-      </div>`;
-    return;
-  }
+  const heading = title || `Core slips · 1.30–2.50 · ≥${minConf}%`;
 
   if (!accas.length) {
-    container.innerHTML = `
-      <div class="insufficient-msg">
-        <strong>No accumulator slips available</strong>
-        No live matches currently qualify at ${minConf}%+. The page will update automatically.
-      </div>`;
+    container.innerHTML = `<h2 class="section-title acca-title">${heading}</h2>
+      <div class="insufficient-msg">No slips in this band yet — waiting for ≥${minConf}% picks with matching odds.</div>`;
     return;
   }
 
-  container.innerHTML = `<h2 class="section-title acca-title">Accumulator slips (≥${minConf}% O/U · 6–12 slips)</h2>` +
+  container.innerHTML = `<h2 class="section-title acca-title">${heading} (${accas.length})</h2>` +
     accas.map((a) => renderAcca(a, stake)).join("");
   if (typeof BetAssistant !== "undefined") {
     BetAssistant.bindActions(container);
@@ -257,11 +246,15 @@ async function fetchData() {
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
     $("connectionStatus").classList.add("live");
-    $("statusText").textContent = `${data.qualified_picks_60_count ?? 0} picks ≥80% · ${data.accumulator_count ?? 0} accas`;
+    $("statusText").textContent = `${data.qualified_picks_60_count ?? 0} core · ${data.short_picks_count ?? 0} short · ${data.long_picks_count ?? 0} long`;
 
     renderSummary(data);
     renderPicks60(data);
+    renderPicks60(data, "picksShortGrid", "short_picks", "No short-price (≥80%, odds under 1.30) picks right now.");
+    renderPicks60(data, "picksLongGrid", "long_picks", "No longshot (≥80%, odds over 2.50) picks right now.");
     renderAccas(data);
+    renderAccas(data, "accaShortContainer", "short_accumulators", "Short-price slips · odds under 1.30");
+    renderAccas(data, "accaLongContainer", "long_accumulators", "Longshot slips · odds over 2.50");
   } catch (err) {
     $("connectionStatus").classList.add("error");
     $("statusText").textContent = "Connection error";
@@ -270,7 +263,10 @@ async function fetchData() {
 }
 
 $("stakeInput").addEventListener("input", () => {
-  if (lastData) renderAccas(lastData);
+  if (!lastData) return;
+  renderAccas(lastData);
+  renderAccas(lastData, "accaShortContainer", "short_accumulators", "Short-price slips · odds under 1.30");
+  renderAccas(lastData, "accaLongContainer", "long_accumulators", "Longshot slips · odds over 2.50");
 });
 
 $("btnRefresh").addEventListener("click", async () => {

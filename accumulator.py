@@ -1,6 +1,6 @@
 """
-Build accumulator (parlay) slips from live FH/SH under predictions.
-Rules: 3–10 legs per acca; min 60% confidence; multiple accas if >10 picks.
+Build 6–12 Over/Under accumulator slips from live FH / SH / FT picks.
+Legs must be ≥80% and the under/over line must still be alive.
 """
 
 from __future__ import annotations
@@ -8,8 +8,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from acca_ou_picks import MIN_ACCA_PCT, all_ou_picks
+
 MIN_LEGS = 3
-MAX_LEGS = 10
+MAX_LEGS = 5
+MIN_ACCAS = 6
+MAX_ACCAS = 12
+# Live soccer page still imports this for the 60% card filter.
 MIN_CONFIDENCE = 60
 
 
@@ -39,6 +44,11 @@ class AccaLeg:
     is_half_time: bool = False
     league_id: int = 0
     onexbet_url: str = ""
+    side: str = ""
+    line: float = 0.0
+    scope: str = ""
+    tempo: str = ""
+    remaining_xg: float = 0.0
 
 
 @dataclass
@@ -52,249 +62,154 @@ class Accumulator:
     avg_confidence: float
     potential_return_10: float
     risk_level: str
+    theme: str = ""
 
 
 def _confidence_to_odds(confidence: float) -> float:
     return round(max(1.04, min(4.0, 100 / max(confidence, 40))), 2)
 
 
-def _period_goals(card: dict) -> int:
-    return card.get("period_goals", card.get("fh_goals", 0))
+def _product(values: list[float]) -> float:
+    result = 1.0
+    for v in values:
+        result *= v
+    return result
 
 
-def _leg_score(pick: dict, card: dict) -> float:
-    rec = pick.get("recommendation", "")
-    conf = pick.get("confidence", 0)
-    bonus = 0
-    if rec == "BET":
-        bonus = 25
-    elif rec == "WATCH" and conf >= 65:
-        bonus = 10
-    elif rec == "WATCH":
-        bonus = 3
-    if card.get("scored_filter"):
-        bonus += 5
-    if card.get("in_entry_window"):
-        bonus += 8
-    fusion = card.get("combined_analysis") or {}
-    if fusion.get("agreement") == "CONFIRMED":
-        bonus += 8
-    elif fusion.get("agreement") == "ALIGNED":
-        bonus += 4
-    elif fusion.get("agreement") == "CONFLICT":
-        bonus -= 12
-    if fusion.get("verdict") == "STRONG BET":
-        bonus += 6
-    pb = card.get("prophit_stats") or {}
-    if pb.get("combined_under_15_fh_pct", 0) >= 65:
-        bonus += 3
-    sp = card.get("soccerpunter_stats") or {}
-    if sp.get("combined_under_225_pct", 0) >= 60:
-        bonus += 2
-    if sp.get("h2h_under_25_pct", 0) >= 70:
-        bonus += 2
-    if (fusion.get("sp_profile") or "") in ("defensive", "low_scoring"):
-        bonus += 2
-    if (fusion.get("fotmob_profile") or "") in ("very_slow", "slow"):
-        bonus += 2
-    fm = card.get("fotmob_stats") or {}
-    if fm.get("total_xg", 99) <= 0.5:
-        bonus += 2
-    bd = fusion.get("breakdown") or {}
-    if (bd.get("external_verify") or 0) >= 6:
-        bonus += 3
-    elif (bd.get("external_verify") or 0) >= 3:
-        bonus += 1
-    if (bd.get("market_odds") or 0) >= 6:
-        bonus += 3
-    elif (bd.get("market_odds") or 0) >= 3:
-        bonus += 1
-    mkt = card.get("market_odds") or fusion.get("market_odds_summary") or {}
-    if mkt.get("under_15_implied_pct", 0) >= 68:
-        bonus += 2
-    elif mkt.get("under_05_implied_pct", 0) >= 65:
-        bonus += 1
-    if mkt.get("market_lean") == "strong_under":
-        bonus += 2
-    sd = card.get("sportsdb_stats") or {}
-    if sd.get("total_shots"):
-        bonus += 1
-    return conf + bonus
-
-
-def _market_alive(market: str, period_goals: int) -> bool:
-    if "Under 0.5" in market and period_goals > 0:
-        return False
-    if "Under 1.5" in market and period_goals > 1:
-        return False
-    if "Under 2.5" in market and period_goals > 2:
-        return False
-    return True
-
-
-def _best_pick_per_match(matches: list[dict]) -> list[dict]:
-    legs: list[dict] = []
-
-    for card in matches:
-        best = None
-        best_score = 0
-        period_goals = _period_goals(card)
-
-        for pick in card.get("predictions") or []:
-            market = pick.get("market", "")
-            conf = pick.get("confidence", 0)
-            rec = pick.get("recommendation", "SKIP")
-
-            if rec == "SKIP" or conf < MIN_CONFIDENCE:
-                continue
-            if not _market_alive(market, period_goals):
-                continue
-            if rec not in ("BET", "WATCH"):
-                continue
-
-            score = _leg_score(pick, card)
-            if score > best_score:
-                best_score = score
-                best = {"card": card, "pick": pick}
-
-        if best:
-            legs.append(best)
-
-    legs.sort(key=lambda x: -_leg_score(x["pick"], x["card"]))
-    return legs
-
-
-def _all_qualified_picks(matches: list[dict]) -> list[dict]:
-    """Every pick at or above MIN_CONFIDENCE, sorted by confidence."""
-    picks: list[dict] = []
-    for card in matches:
-        period_goals = _period_goals(card)
-        for pick in card.get("predictions") or []:
-            conf = pick.get("confidence", 0)
-            rec = pick.get("recommendation", "SKIP")
-            market = pick.get("market", "")
-            if conf < MIN_CONFIDENCE or rec == "SKIP":
-                continue
-            if not _market_alive(market, period_goals):
-                continue
-            if rec not in ("BET", "WATCH"):
-                continue
-            picks.append({
-                "card": card,
-                "pick": pick,
-                "confidence": conf,
-                "recommendation": rec,
-                "market": market,
-                "match": f"{card['home_team']} vs {card['away_team']}",
-                "event_id": card.get("event_id", ""),
-                "league_id": int(card.get("league_id") or 0),
-                "half": card.get("half", "fh"),
-                "minute": card.get("minute", 0),
-                "period_minute": card.get("period_minute", 0),
-                "period_score": card.get("period_score", card.get("fh_score", "0-0")),
-                "fusion_verdict": (card.get("combined_analysis") or {}).get("verdict", ""),
-                "is_half_time": card.get("is_half_time", False),
-            })
-    picks.sort(key=lambda x: -x["confidence"])
-    return picks
-
-
-def _split_into_slips(legs: list[dict]) -> list[list[dict]]:
-    if not legs:
-        return []
-
-    if len(legs) <= MAX_LEGS:
-        return [legs] if len(legs) >= MIN_LEGS else []
-
-    slips: list[list[dict]] = []
-    pool = list(legs)
-
-    while pool:
-        if len(pool) <= MAX_LEGS:
-            if len(pool) >= MIN_LEGS:
-                slips.append(pool)
-            elif slips:
-                need = MIN_LEGS - len(pool)
-                last = slips[-1]
-                if len(last) > MIN_LEGS and len(last) - need >= MIN_LEGS:
-                    tail = last[-need:]
-                    slips[-1] = last[:-need]
-                    slips.append(tail + pool)
-                elif len(last) + len(pool) <= MAX_LEGS:
-                    slips[-1] = last + pool
-                else:
-                    slips.append(pool)
+def _unique_events(picks: list[dict], n: int) -> list[dict]:
+    seen: set[str] = set()
+    out: list[dict] = []
+    for p in picks:
+        eid = str(p.get("event_id") or "")
+        if not eid or eid in seen:
+            continue
+        seen.add(eid)
+        out.append(p)
+        if len(out) >= n:
             break
+    return out
 
-        slips.append(pool[:MAX_LEGS])
-        pool = pool[MAX_LEGS:]
 
-    return slips
+def _signature(legs: list[dict]) -> tuple[str, ...]:
+    return tuple(sorted(
+        f"{p.get('event_id')}|{p.get('selection')}" for p in legs
+    ))
+
+
+def _build_themes(picks: list[dict]) -> list[tuple[str, list[dict]]]:
+    themes: list[tuple[str, callable, int]] = [
+        ("Safest 3-fold", lambda p: True, 3),
+        ("Safest 4-fold", lambda p: True, 4),
+        ("Banker 5-fold", lambda p: True, 5),
+        ("Under 3-fold", lambda p: p.get("side") == "UNDER", 3),
+        ("Under 4-fold", lambda p: p.get("side") == "UNDER", 4),
+        ("Over 3-fold", lambda p: p.get("side") == "OVER", 3),
+        ("1H 3-fold", lambda p: p.get("scope") == "fh", 3),
+        ("2H 3-fold", lambda p: p.get("scope") == "sh", 3),
+        ("FT 3-fold", lambda p: p.get("scope") == "ft", 3),
+        ("FT 4-fold", lambda p: p.get("scope") == "ft", 4),
+        ("Slow unders", lambda p: p.get("side") == "UNDER" and p.get("tempo") == "slow", 3),
+        ("Fast overs", lambda p: p.get("side") == "OVER" and p.get("tempo") == "fast", 3),
+        ("U2.5+ unders", lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 2.5, 3),
+        ("U3.5 / U4.5", lambda p: p.get("side") == "UNDER" and float(p.get("line") or 0) >= 3.5, 3),
+        ("O1.5 / O2.5", lambda p: p.get("side") == "OVER" and float(p.get("line") or 0) <= 2.5, 3),
+    ]
+
+    slips: list[tuple[str, list[dict]]] = []
+    used_sigs: set[tuple[str, ...]] = set()
+
+    for name, pred, n_legs in themes:
+        pool = [p for p in picks if pred(p)]
+        legs = _unique_events(pool, n_legs)
+        if len(legs) < MIN_LEGS:
+            continue
+        sig = _signature(legs)
+        if sig in used_sigs:
+            continue
+        used_sigs.add(sig)
+        slips.append((name, legs))
+        if len(slips) >= MAX_ACCAS:
+            return slips
+
+    # Extra staggered 3-folds from the ranked list so we can reach 6–12
+    ranked = _unique_events(picks, 40)
+    for start in range(0, max(0, len(ranked) - MIN_LEGS + 1), 2):
+        if len(slips) >= MAX_ACCAS:
+            break
+        chunk = ranked[start:start + MIN_LEGS]
+        if len(chunk) < MIN_LEGS:
+            break
+        sig = _signature(chunk)
+        if sig in used_sigs:
+            continue
+        used_sigs.add(sig)
+        slips.append((f"Mix {len(slips) + 1}", chunk))
+
+    return slips[:MAX_ACCAS]
 
 
 def _make_leg(entry: dict) -> AccaLeg:
-    card = entry["card"]
-    pick = entry["pick"]
-    conf = pick["confidence"]
-    half = card.get("half", "fh")
-    market_short = pick["market"].replace("First Half Goals", "FH").replace("Second Half Goals", "SH")
-
-    pb = card.get("prophit_stats") or {}
+    card = entry.get("card") or {}
     fusion = card.get("combined_analysis") or {}
+    pb = card.get("prophit_stats") or {}
+    conf = float(entry.get("confidence") or 0)
     return AccaLeg(
-        event_id=card.get("event_id", ""),
-        league_id=int(card.get("league_id") or 0),
-        match=f"{card['home_team']} vs {card['away_team']}",
-        home_team=card["home_team"],
-        away_team=card["away_team"],
-        league=card.get("league", ""),
-        market=pick["market"],
-        selection=market_short,
-        fh_score=card.get("period_score", card.get("fh_score", "0-0")),
-        minute=card.get("minute", 0),
-        period_minute=card.get("period_minute", 0),
+        event_id=str(entry.get("event_id") or ""),
+        league_id=int(entry.get("league_id") or 0),
+        match=entry.get("match") or "",
+        home_team=entry.get("home_team") or card.get("home_team") or "",
+        away_team=entry.get("away_team") or card.get("away_team") or "",
+        league=entry.get("league") or card.get("league") or "",
+        market=entry.get("market") or "",
+        selection=entry.get("selection") or "",
+        fh_score=entry.get("period_score") or card.get("fh_score") or "0-0",
+        minute=int(entry.get("minute") or 0),
+        period_minute=int(entry.get("period_minute") or 0),
         confidence=round(conf, 1),
-        recommendation=pick.get("recommendation", ""),
+        recommendation=entry.get("recommendation") or "BET",
         estimated_odds=_confidence_to_odds(conf),
-        signals=(pick.get("signals") or [])[:3],
-        half=half,
-        period_score=card.get("period_score", card.get("fh_score", "0-0")),
-        full_score=card.get("full_score", "0-0"),
-        prophit_under_15_fh_pct=pb.get("combined_under_15_fh_pct", 0),
-        prophit_goals_form=pb.get("combined_goals_last_n", 0),
-        fusion_verdict=fusion.get("verdict", ""),
-        fusion_agreement=fusion.get("agreement", ""),
-        is_half_time=card.get("is_half_time", False),
-        onexbet_url=card.get("onexbet_url", ""),
+        signals=(entry.get("signals") or [])[:3],
+        half=entry.get("half") or card.get("half") or "fh",
+        period_score=entry.get("period_score") or "0-0",
+        full_score=entry.get("full_score") or "0-0",
+        prophit_under_15_fh_pct=pb.get("combined_under_15_fh_pct", 0) or 0,
+        prophit_goals_form=pb.get("combined_goals_last_n", 0) or 0,
+        fusion_verdict=fusion.get("verdict") or "",
+        fusion_agreement=fusion.get("agreement") or "",
+        is_half_time=bool(entry.get("is_half_time")),
+        onexbet_url=entry.get("onexbet_url") or "",
+        side=entry.get("side") or "",
+        line=float(entry.get("line") or 0),
+        scope=entry.get("scope") or "",
+        tempo=entry.get("tempo") or "",
+        remaining_xg=float(entry.get("remaining_xg") or 0),
     )
 
 
 def _risk_level(avg_conf: float, legs: int) -> str:
-    if avg_conf >= 75 and legs <= 5:
+    if avg_conf >= 86 and legs <= 3:
         return "LOW"
-    if avg_conf >= 65 and legs <= 7:
+    if avg_conf >= 82 and legs <= 4:
         return "MEDIUM"
     return "HIGH"
 
 
 def build_accumulators(matches: list[dict]) -> dict[str, Any]:
-    qualified = _best_pick_per_match(matches)
-    all_60 = _all_qualified_picks(matches)
-    slips_raw = _split_into_slips(qualified)
+    picks = all_ou_picks(matches)
+    themed = _build_themes(picks)
 
     accumulators: list[Accumulator] = []
-    for i, slip in enumerate(slips_raw, start=1):
+    for i, (name, slip) in enumerate(themed, start=1):
         acca_legs = [_make_leg(e) for e in slip]
         odds_list = [leg.estimated_odds for leg in acca_legs]
         prob_list = [leg.confidence / 100 for leg in acca_legs]
-
         combined_odds = round(_product(odds_list), 2)
         combined_prob = round(_product(prob_list) * 100, 1)
         avg_conf = round(sum(leg.confidence for leg in acca_legs) / len(acca_legs), 1)
-
         accumulators.append(Accumulator(
             id=i,
-            name=f"Acca #{i}",
+            name=name,
+            theme=name,
             legs=acca_legs,
             leg_count=len(acca_legs),
             combined_odds=combined_odds,
@@ -305,20 +220,15 @@ def build_accumulators(matches: list[dict]) -> dict[str, Any]:
         ))
 
     return {
-        "qualified_picks": len(qualified),
-        "qualified_picks_60": all_60,
-        "qualified_picks_60_count": len(all_60),
-        "min_confidence": MIN_CONFIDENCE,
+        "qualified_picks": len({(p["event_id"], p["scope"]) for p in picks}),
+        "qualified_picks_60": picks,
+        "qualified_picks_60_count": len(picks),
+        "min_confidence": MIN_ACCA_PCT,
         "accumulator_count": len(accumulators),
         "min_legs": MIN_LEGS,
         "max_legs": MAX_LEGS,
+        "min_accas": MIN_ACCAS,
+        "max_accas": MAX_ACCAS,
         "accumulators": [asdict(a) for a in accumulators],
-        "insufficient_picks": len(qualified) > 0 and len(qualified) < MIN_LEGS,
+        "insufficient_picks": len(picks) > 0 and len(picks) < MIN_LEGS,
     }
-
-
-def _product(values: list[float]) -> float:
-    result = 1.0
-    for v in values:
-        result *= v
-    return result

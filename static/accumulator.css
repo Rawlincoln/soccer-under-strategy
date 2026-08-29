@@ -160,6 +160,10 @@
   color: var(--green);
   margin-right: 6px;
 }
+.leg-pick.over {
+  background: #3d2a1a;
+  color: var(--amber);
+}
 .leg-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
 
 .leg-prophit {

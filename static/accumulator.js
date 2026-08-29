@@ -18,8 +18,12 @@ function fmtConf(c) {
   return Number(c).toFixed(1);
 }
 
-function halfTag(h) {
-  return h === "sh" ? "2H" : "1H";
+function halfTag(h, scope) {
+  const s = (scope || h || "").toLowerCase();
+  if (s === "ft" || s === "full") return "FT";
+  if (s === "sh" || s === "2h") return "2H";
+  if (s === "ht") return "HT";
+  return "1H";
 }
 
 function isHalfTime(item) {
@@ -87,8 +91,8 @@ function renderSummary(data) {
   const totalLegs = accas.reduce((s, a) => s + a.leg_count, 0);
   const minConf = data.min_confidence ?? 60;
   $("accaSummary").innerHTML = `
-    <div class="baseline-card"><div class="label">60%+ predictions</div><div class="value green">${data.qualified_picks_60_count ?? 0}</div></div>
-    <div class="baseline-card"><div class="label">Acca legs (≥${minConf}%)</div><div class="value">${data.qualified_picks ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">80%+ O/U picks</div><div class="value green">${data.qualified_picks_60_count ?? 0}</div></div>
+    <div class="baseline-card"><div class="label">Unique matches</div><div class="value">${data.qualified_picks ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Accumulator slips</div><div class="value green">${data.accumulator_count ?? 0}</div></div>
     <div class="baseline-card"><div class="label">Total acca legs</div><div class="value">${totalLegs}</div></div>
   `;
@@ -108,7 +112,7 @@ function renderPicks60(data) {
   grid.innerHTML = picks.map((item) => `
     <div class="pick-60-card">
       <div class="pick-60-top">
-        ${isHalfTime(item) ? halfTimeBadge() : `<span class="pick-60-half">${halfTag(item.half)}</span>`}
+        ${isHalfTime(item) ? halfTimeBadge() : `<span class="pick-60-half">${halfTag(item.half, item.scope)}</span>`}
         ${minuteBadge(item, item.half)}
         <span class="pick-60-conf">${fmtConf(item.confidence)}%</span>
         ${BetAssistant.recBadgeHtml({
@@ -121,12 +125,14 @@ function renderPicks60(data) {
         })}
       </div>
       <div class="pick-60-match">${item.match} ${link1x(item)}</div>
-      <div class="pick-60-market">${item.market?.replace("First Half Goals", "FH").replace("Second Half Goals", "SH")}</div>
+      <div class="pick-60-market">${item.selection || item.market}</div>
       <div class="pick-60-stats">
-        <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : item.half === "sh" ? `2H +${periodMinute(item) ?? 0}'` : `${halfTag(item.half)} Min`}</div></div>
-        <div class="pick-60-stat"><div class="num">${item.period_score || "—"}</div><div class="lbl">Score</div></div>
+        <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : item.scope === "ft" ? "FT" : item.half === "sh" ? `2H +${periodMinute(item) ?? 0}'` : `${halfTag(item.half, item.scope)} Min`}</div></div>
+        <div class="pick-60-stat"><div class="num">${item.period_score || "—"}</div><div class="lbl">Period</div></div>
+        <div class="pick-60-stat"><div class="num">${item.full_score || "—"}</div><div class="lbl">FT</div></div>
+        <div class="pick-60-stat"><div class="num">${item.tempo || "—"}</div><div class="lbl">Tempo</div></div>
       </div>
-      <div class="pick-60-meta">${item.fusion_verdict ? item.fusion_verdict : "Live pick"}</div>
+      <div class="pick-60-meta">${item.side || ""} ${item.line ?? ""} · rem xG ${item.remaining_xg ?? "—"}</div>
     </div>
   `).join("");
   if (typeof BetAssistant !== "undefined") BetAssistant.bind1xBetLinks(grid);
@@ -143,14 +149,14 @@ function renderAcca(acca, stake) {
           <div class="leg-match">${leg.home_team} vs ${leg.away_team} ${link1x(leg)}</div>
           <div style="display:flex;gap:6px;align-items:center">${leg.is_half_time ? halfTimeBadge() : ""}${minuteBadge(leg, leg.half)}</div>
         </div>
-        <div class="leg-league">${leg.league} · ${halfTag(leg.half)}</div>
+        <div class="leg-league">${leg.league} · ${halfTag(leg.half, leg.scope)}</div>
         <div class="leg-stats">
           <div class="leg-stat"><div class="num">${leg.is_half_time ? "HT" : `${leg.minute ?? "—"}${leg.minute != null ? "'" : ""}`}</div><div class="lbl">${leg.is_half_time ? "Break" : leg.half === "sh" ? `2H +${leg.period_minute ?? Math.max(0, (leg.minute || 0) - 45)}'` : `${halfTag(leg.half)} Min`}</div></div>
           <div class="leg-stat"><div class="num">${leg.period_score || leg.fh_score || "—"}</div><div class="lbl">Period</div></div>
           <div class="leg-stat"><div class="num">${leg.full_score || "—"}</div><div class="lbl">FT</div></div>
           <div class="leg-stat"><div class="num">${fmtConf(leg.confidence)}%</div><div class="lbl">Conf</div></div>
         </div>
-        <span class="leg-pick">${leg.selection}</span>
+        <span class="leg-pick ${(leg.side || "").toLowerCase()}">${leg.selection}</span>
         ${BetAssistant.recBadgeHtml({
           recommendation: leg.recommendation,
           event_id: leg.event_id,
@@ -232,7 +238,7 @@ function renderAccas(data) {
     return;
   }
 
-  container.innerHTML = `<h2 class="section-title acca-title">Accumulator slips (≥${minConf}% legs)</h2>` +
+  container.innerHTML = `<h2 class="section-title acca-title">Accumulator slips (≥${minConf}% O/U · 6–12 slips)</h2>` +
     accas.map((a) => renderAcca(a, stake)).join("");
   if (typeof BetAssistant !== "undefined") {
     BetAssistant.bindActions(container);
@@ -250,7 +256,7 @@ async function fetchData() {
     $("refreshInterval").textContent = data.refresh_seconds || 30;
     $("lastUpdate").textContent = `Updated ${fmtTime(data.updated_at)}`;
     $("connectionStatus").classList.add("live");
-    $("statusText").textContent = `${data.qualified_picks_60_count ?? 0} picks ≥60% · ${data.accumulator_count ?? 0} accas`;
+    $("statusText").textContent = `${data.qualified_picks_60_count ?? 0} picks ≥80% · ${data.accumulator_count ?? 0} accas`;
 
     renderSummary(data);
     renderPicks60(data);

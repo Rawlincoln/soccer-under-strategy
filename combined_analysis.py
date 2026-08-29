@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
 from fotmob_stats import fotmob_live_agreement, fotmob_tempo_profile
+from goal_probability import analyze_goal_probs
 from market_odds import market_odds_score
 from pressure_ou_model import pressure_ou_score
 from shots_volume_model import shots_volume_score
@@ -72,6 +73,7 @@ class CombinedAnalysis:
     market_odds_summary: dict[str, Any] = field(default_factory=dict)
     pressure_summary: dict[str, Any] = field(default_factory=dict)
     shots_volume_summary: dict[str, Any] = field(default_factory=dict)
+    goal_prob_summary: dict[str, Any] = field(default_factory=dict)
 
 
 def _period_elapsed(minute: int, half: str) -> int:
@@ -87,6 +89,25 @@ def _live_tempo_profile(
     sot_pm = stats.shots_on_target / elapsed
     corners_pm = stats.corners / elapsed
     danger_pm = (stats.dangerous_attacks or 0) / elapsed
+
+    # Kickoff silence is not a slow match — wait for a real sample.
+    if elapsed < 10:
+        home_sh = int(getattr(stats, "home_shots", 0) or 0)
+        away_sh = int(getattr(stats, "away_shots", 0) or 0)
+        return 8.0, "thin_sample", {
+            "shots": stats.total_shots,
+            "home_shots": home_sh,
+            "away_shots": away_sh,
+            "shots_per_min": round(shots_pm, 2),
+            "sot": stats.shots_on_target,
+            "corners": stats.corners,
+            "dangerous_attacks": stats.dangerous_attacks or 0,
+            "possession": round(stats.home_possession, 0),
+            "minute": minute,
+            "period_minute": elapsed,
+            "half": half,
+            "thin_sample": True,
+        }
 
     score = 0.0
     if shots_pm < 0.40:
@@ -421,6 +442,21 @@ def build_combined_analysis(
     sv_score, sv_signals, sv_summary = shots_volume_score(
         live_stats, minute, half, total_goals,
     )
+    gp = analyze_goal_probs(
+        live_stats, minute, half, total_goals, market_odds, fotmob_stats,
+    )
+    gp_summary = {
+        "elapsed": gp.elapsed,
+        "minutes_left": gp.minutes_left,
+        "sample_quality": gp.sample_quality,
+        "remaining_xg": gp.remaining_xg,
+        "p_under_05": gp.p_under_05,
+        "p_under_15": gp.p_under_15,
+        "p_under_25": gp.p_under_25,
+        "thin_sample": gp.thin_sample,
+        "live_gpm": gp.live_gpm,
+    }
+    gp_signals = list(gp.signals)
     time_score, time_signals = _time_context_score(total_goals, minute, half)
     agree_score, agreement, agree_signals = _agreement_score(live_profile, form_profile, sp_prof)
 
@@ -446,21 +482,29 @@ def build_combined_analysis(
         ),
     )
 
-    confidence = round(min(max(breakdown.total, 5), 96), 1)
+    # Headline confidence is calibrated P(best alive under), not additive points.
+    if total_goals == 0:
+        model_p = gp.p_under_15
+    elif total_goals == 1:
+        model_p = max(gp.p_under_15, gp.p_under_25 * 0.92)
+    elif total_goals == 2:
+        model_p = gp.p_under_25
+    else:
+        model_p = 5.0
+    fusion_nudge = (breakdown.total - 55.0) * 0.08
+    confidence = round(min(max(model_p + fusion_nudge, 5), 96), 1)
+    if gp.thin_sample:
+        confidence = round(min(confidence, 54), 1)
     if agreement == "CONFLICT":
         confidence = round(max(confidence - 12, 20), 1)
     if fm_agree <= -4:
         confidence = round(max(confidence - 8, 20), 1)
     if mkt_score <= -4:
-        confidence = round(max(confidence - 10, 20), 1)
-    if prs_score <= -6:
         confidence = round(max(confidence - 8, 20), 1)
-    elif prs_score >= 10:
-        confidence = round(min(confidence + 4, 96), 1)
-    if sv_score <= -6:
+    if prs_score <= -6:
         confidence = round(max(confidence - 6, 20), 1)
-    elif sv_score >= 10:
-        confidence = round(min(confidence + 3, 96), 1)
+    if sv_score <= -6:
+        confidence = round(max(confidence - 5, 20), 1)
 
     best_market, best_rec = _pick_best_market(total_goals, confidence, minute, half)
     if agreement == "CONFLICT" and best_rec == "BET":
@@ -469,10 +513,15 @@ def build_combined_analysis(
     fusion_signals = (
         list(agree_signals) + list(fm_signals) + list(sd_signals)
         + list(mkt_signals) + list(prs_signals) + list(sv_signals)
-        + list(time_signals)
+        + list(gp_signals) + list(time_signals)
     )
     elapsed = _period_elapsed(minute, half)
-    if live_profile in ("very_slow", "slow"):
+    if live_profile == "thin_sample":
+        fusion_signals.append(
+            f"1xBet {half.upper()}: too early to read tempo "
+            f"({live_summary.get('shots', 0)} shots in {elapsed}')"
+        )
+    elif live_profile in ("very_slow", "slow"):
         fusion_signals.append(
             f"1xBet {half.upper()}: {live_profile.replace('_', ' ')} tempo "
             f"({live_summary.get('shots', 0)} shots in {elapsed}')"
@@ -547,6 +596,7 @@ def build_combined_analysis(
         market_odds_summary=market_odds or {},
         pressure_summary=prs_summary,
         shots_volume_summary=sv_summary,
+        goal_prob_summary=gp_summary,
     )
 
 

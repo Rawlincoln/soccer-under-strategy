@@ -165,6 +165,7 @@ function renderFusionAnalysis(m) {
   const mkt = f.market_odds_summary || m.market_odds || {};
   const prs = f.pressure_summary || {};
   const sv = f.shots_volume_summary || {};
+  const gp = f.goal_prob_summary || {};
   const bd = f.breakdown || {};
 
   const sdLine = sd.total_shots
@@ -188,14 +189,15 @@ function renderFusionAnalysis(m) {
         <span class="fusion-verdict">${f.verdict}</span>
         <span class="fusion-conf">${fmtConf(f.confidence)}%</span>
         <span class="fusion-agree ${agreementClass(f.agreement)}">${f.agreement}</span>
+        ${gp.thin_sample ? '<span class="sample-chip thin">thin sample</span>' : (gp.sample_quality >= 0.5 ? '<span class="sample-chip solid">solid sample</span>' : gp.sample_quality ? '<span class="sample-chip">building</span>' : "")}
       </div>
-      <div class="fusion-best">Best pick: <strong>${f.best_market}</strong> · ${f.best_recommendation}</div>
+      <div class="fusion-best">Best pick: <strong>${f.best_market}</strong> · ${f.best_recommendation}${gp.p_under_15 ? ` · P(U1.5) ${gp.p_under_15}% · rem xG ${gp.remaining_xg ?? "—"}` : ""}</div>
       <div class="fusion-grid">
         <div class="fusion-col">
           <div class="fusion-col-title">1xBet Live @ ${fmtMinute(m, m.half)}</div>
           <div class="mini-stats">
             <span class="mini-minute">${fmtMinute(m, m.half)}</span>
-            <span>${live.shots ?? 0} shots</span>
+            <span>${live.home_shots ?? "—"}–${live.away_shots ?? "—"} shots</span>
             <span>${live.sot ?? 0} SoT</span>
             <span>${live.corners ?? 0} ck</span>
             <span>${live.dangerous_attacks ?? 0} danger</span>
@@ -344,7 +346,7 @@ function renderMatchCard(m) {
   const statsHtml = stats ? `
     <div class="stats-row">
       ${minuteStatItem({ minute: stats.minute ?? m.minute, half: m.half }, m.half)}
-      <div class="stat-item"><div class="num">${stats.total_shots ?? 0}</div><div class="lbl">Shots</div></div>
+      <div class="stat-item"><div class="num">${stats.home_shots ?? 0}–${stats.away_shots ?? 0}</div><div class="lbl">Shots</div></div>
       <div class="stat-item"><div class="num">${stats.shots_on_target ?? 0}</div><div class="lbl">On Target</div></div>
       <div class="stat-item"><div class="num">${stats.corners ?? 0}</div><div class="lbl">Corners</div></div>
       <div class="stat-item"><div class="num">${stats.dangerous_attacks ?? "—"}</div><div class="lbl">Danger</div></div>

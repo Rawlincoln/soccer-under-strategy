@@ -30,6 +30,17 @@ EXCLUDED_LEAGUE_KEYWORDS = (
     "15 min student",
     "15 minute student",
     "15 minutes student",
+    "reserve",
+    "reserves",
+    "u21",
+    "u-21",
+    "u19",
+    "u-19",
+    "u20",
+    "u23",
+    "youth",
+    "friendly",
+    "friendlies",
 )
 
 # Team-name patterns common in esoccer / small-sided
@@ -73,6 +84,8 @@ def is_excluded_match(
     if league_lower in ("mls+", "mls +") or "mls+" in league_lower:
         return True
     if "mls" in league_lower or "major league soccer" in league_lower:
+        return True
+    if any(tok in league_lower for tok in ("reserve", "u21", "u-21", "u19", "youth", "friendly")):
         return True
 
     if _contains_keyword(combined, ("esoccer", "e-soccer", "esports", "virtual")):

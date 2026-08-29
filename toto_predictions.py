@@ -15,6 +15,7 @@ from prophitbet_stats import PROPHIT_PROVIDER
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
 from team_aliases import (
     apply_team_alias,
+    format_match_location,
     is_national_team,
     parse_onexbet_context,
     team_match_quality,
@@ -68,6 +69,8 @@ class TotoMatchAnalysis:
     home_team: str
     away_team: str
     league: str = ""
+    country: str = ""
+    location: str = ""
     kickoff: str = ""
     pick_primary: str = PICK_HOME
     pick_value: str = PICK_DRAW
@@ -293,6 +296,8 @@ def analyze_market_match(match: TotoMatch) -> TotoMatchAnalysis:
         home_team=match.home_team,
         away_team=match.away_team,
         league=match.league,
+        country=match.country,
+        location=format_match_location(match.country, match.league),
         kickoff=match.kickoff,
         pick_primary=primary,
         pick_value=value,
@@ -323,6 +328,8 @@ def analyze_toto_match(match: TotoMatch) -> TotoMatchAnalysis:
         home_team=match.home_team,
         away_team=match.away_team,
         league=match.league,
+        country=match.country,
+        location=format_match_location(match.country, match.league),
         kickoff=match.kickoff,
         pick_primary=primary,
         pick_value=value,

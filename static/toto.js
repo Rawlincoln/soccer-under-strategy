@@ -163,7 +163,10 @@ function renderMatch(m) {
   const w2 = marketPct(sc, "W2", "L") || 33;
   const cov = m.coverage || {};
   const src = (name, ok) => `<span class="toto-src ${ok ? "ok" : ""}">${name}${ok ? " ✓" : ""}</span>`;
-  const league = m.league ? `<span class="toto-league">${m.league}</span>` : "";
+  const loc = m.location || (m.country && m.league && !String(m.league).toLowerCase().includes(String(m.country).toLowerCase())
+    ? `${m.country} · ${m.league}`
+    : (m.league || m.country || ""));
+  const league = loc ? `<span class="toto-league">${loc}</span>` : "";
 
   return `
     <div class="toto-match-card">

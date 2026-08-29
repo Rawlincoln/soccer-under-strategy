@@ -260,7 +260,7 @@ function renderSlipSettleBar(slip, settlement) {
 }
 
 function renderLegDetail(leg, idx, slip, settlement) {
-  const league = leg.league || "Football";
+  const league = BetAssistant.locationLabel(leg);
   const clock = fmtLegMinute(leg);
   const timeBadge = leg.minutes_left
     ? `${halfTag(leg.half)} ${leg.minute}' · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`

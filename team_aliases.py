@@ -115,6 +115,22 @@ def apply_team_alias(name: str) -> str:
     return name
 
 
+def format_match_location(country: str = "", league: str = "", fallback: str = "Football") -> str:
+    """Country · League for UI, without duplicating country if it's already in the league name."""
+    country = (country or "").strip()
+    league = (league or "").strip()
+    if not country and not league:
+        return fallback
+    if not country:
+        return league
+    if not league:
+        return country
+    cl, ll = country.lower(), league.lower()
+    if ll.startswith(cl) or cl in ll:
+        return league
+    return f"{country} · {league}"
+
+
 def parse_onexbet_context(league: str, country: str = "") -> tuple[str, str, Optional[str]]:
     """
     Extract country hint, league hint, and FotMob ccode from 1xBet labels.

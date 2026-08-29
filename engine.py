@@ -44,6 +44,7 @@ from market_odds import lookup_market_odds
 from pressure_ou_model import pressure_confidence_adjust, pressure_from_summary
 from shots_volume_model import shots_confidence_adjust
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
+from team_aliases import format_match_location
 from under_lines import under_has_cushion
 from thesportsdb_stats import SPORTSDB_PROVIDER
 
@@ -143,6 +144,8 @@ class Prediction:
     event_id: str = ""
     home_team: str = ""
     away_team: str = ""
+    country: str = ""
+    location: str = ""
     prophit_stats: Optional[dict] = None
     soccerpunter_stats: Optional[dict] = None
     fotmob_stats: Optional[dict] = None
@@ -187,6 +190,8 @@ class MatchCard:
     period_minute: int = 0
     league_id: int = 0
     onexbet_url: str = ""
+    country: str = ""
+    location: str = ""
 
 
 class DataCache:
@@ -737,6 +742,9 @@ def analyze_onexbet_match(
         p.event_id = str(m.game_id)
         p.kickoff = m.period_name
         p.status = "1H" if half == "fh" else "2H"
+        p.league = m.league
+        p.country = m.country
+        p.location = format_match_location(m.country, m.league)
     return preds, combined
 
 
@@ -779,6 +787,8 @@ def _build_match_card(
         home_team=m.home_team,
         away_team=m.away_team,
         league=m.league,
+        country=m.country,
+        location=format_match_location(m.country, m.league),
         kickoff=m.period_name,
         status=status,
         score=f"{p_home} - {p_away}",
@@ -822,6 +832,8 @@ def _build_half_time_card(
         home_team=m.home_team,
         away_team=m.away_team,
         league=m.league,
+        country=m.country,
+        location=format_match_location(m.country, m.league),
         kickoff=m.period_name or "Half-time",
         status="HT",
         score=f"{m.fh_home} - {m.fh_away}",
@@ -982,6 +994,9 @@ def _append_pick_signals(
         pd["match"] = f"{card.home_team} vs {card.away_team}"
         pd["home_team"] = card.home_team
         pd["away_team"] = card.away_team
+        pd["league"] = card.league
+        pd["country"] = card.country
+        pd["location"] = card.location or format_match_location(card.country, card.league)
         if p.recommendation in ("BET", "WATCH"):
             bet_signals.append(pd)
         if scored and p.recommendation in ("BET", "WATCH"):
@@ -1111,6 +1126,7 @@ def _scan_live_football(fast: bool = False) -> tuple[
                     home_team=m.home_team,
                     away_team=m.away_team,
                     league=m.league,
+                    country=m.country,
                     score=f"{p_home} - {p_away}",
                     minute=m.minute,
                     period_minute=m.period_minute,

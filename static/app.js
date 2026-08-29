@@ -275,7 +275,7 @@ function renderScoredPicks(sectionId, gridId, items, marketLabel) {
     const st = item.live_stats || {};
     return `
       <div class="signal-card scored-card">
-        <div class="scored-meta">${item.league}</div>
+        <div class="scored-meta">${BetAssistant.locationLabel(item)}</div>
         <div style="font-weight:700;font-size:1.05rem">${item.home_team} vs ${item.away_team} ${link1x(item)}</div>
         <div class="scored-line">
           ${isHalfTime(item) ? halfTimeBadge() : ""}
@@ -312,7 +312,10 @@ function renderBetSignals(signals) {
   grid.innerHTML = signals.map((p) => `
     <div class="signal-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
-        <div style="font-weight:700">${p.match} ${link1x(p)}</div>
+        <div>
+          <div style="font-weight:700">${p.match} ${link1x(p)}</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${BetAssistant.locationLabel(p)}</div>
+        </div>
         <div style="display:flex;gap:6px;align-items:center">${isHalfTime(p) ? halfTimeBadge() : ""}${minuteBadge(p, p.half)}</div>
       </div>
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
@@ -379,7 +382,7 @@ function renderMatchCard(m) {
   return `
     <div class="${cardClass}" data-scored="${m.scored_filter}" data-window="${m.in_entry_window}">
       <div class="match-header">
-        <div class="match-league">${m.league || "Football"} ${atHt ? halfTimeBadge() : `<span class="source-tag">${hl}</span>`} <span class="source-tag">1xBet</span></div>
+        <div class="match-league">${BetAssistant.locationLabel(m)} ${atHt ? halfTimeBadge() : `<span class="source-tag">${hl}</span>`} <span class="source-tag">1xBet</span></div>
         <div class="teams-row">
           <div class="team home"><span>${m.home_team}</span></div>
           <div class="score-block">

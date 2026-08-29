@@ -266,7 +266,7 @@ function renderFusionCard(m) {
     <div class="match-card live fusion-match-card ${tierCls}">
       <div class="match-header">
         <div class="match-league">
-          ${m.league || "Football"}
+          ${BetAssistant.locationLabel(m)}
           ${tierBadge(m)}
           ${marketTag}
           <span class="source-tag">${halfLabel(m.half)}</span>

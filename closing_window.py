@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
 from combined_analysis import HALF_CONFIG
+from team_aliases import format_match_location
 
 CLOSING_START = {"fh": 36, "sh": 81}
 MIN_LOCK_PCT = 95.0
@@ -57,6 +58,8 @@ class ClosingCard:
     kickoff: str = ""
     status: str = ""
     league_id: int = 0
+    country: str = ""
+    location: str = ""
 
 
 def _time_base_lock(period_goals: int, mins_left: int) -> float:
@@ -235,6 +238,7 @@ def build_closing_card(
     home_team: str,
     away_team: str,
     league: str,
+    country: str = "",
     score: str,
     minute: int,
     period_minute: int,
@@ -274,6 +278,8 @@ def build_closing_card(
         home_team=home_team,
         away_team=away_team,
         league=league,
+        country=country,
+        location=format_match_location(country, league),
         score=score,
         minute=minute,
         period_minute=period_minute,

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
+from team_aliases import format_match_location
 from under_lines import under_has_cushion
 from goal_probability import (
     PERIOD_LENGTH,
@@ -283,6 +284,8 @@ class OuPick:
     onexbet_url: str
     signals: list[str]
     recommendation: str = "BET"
+    country: str = ""
+    location: str = ""
 
 
 def extract_ou_picks(card: dict) -> list[OuPick]:
@@ -409,6 +412,10 @@ def _make_pick(
         is_half_time=bool(card.get("is_half_time")),
         onexbet_url=card.get("onexbet_url") or "",
         signals=signals,
+        country=card.get("country") or "",
+        location=card.get("location") or format_match_location(
+            card.get("country") or "", card.get("league") or "",
+        ),
         recommendation="BET",
     )
 

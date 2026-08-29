@@ -125,6 +125,7 @@ function renderPicks60(data) {
         })}
       </div>
       <div class="pick-60-match">${item.match} ${link1x(item)}</div>
+      <div class="pick-60-meta">${BetAssistant.locationLabel(item)}</div>
       <div class="pick-60-market">${item.selection || item.market}</div>
       <div class="pick-60-stats">
         <div class="pick-60-stat"><div class="num">${isHalfTime(item) ? "HT" : `${matchMinute(item) ?? "—"}${matchMinute(item) != null ? "'" : ""}`}</div><div class="lbl">${isHalfTime(item) ? "Break" : item.scope === "ft" ? "FT" : item.half === "sh" ? `2H +${periodMinute(item) ?? 0}'` : `${halfTag(item.half, item.scope)} Min`}</div></div>
@@ -149,7 +150,7 @@ function renderAcca(acca, stake) {
           <div class="leg-match">${leg.home_team} vs ${leg.away_team} ${link1x(leg)}</div>
           <div style="display:flex;gap:6px;align-items:center">${leg.is_half_time ? halfTimeBadge() : ""}${minuteBadge(leg, leg.half)}</div>
         </div>
-        <div class="leg-league">${leg.league} · ${halfTag(leg.half, leg.scope)}</div>
+        <div class="leg-league">${BetAssistant.locationLabel(leg)} · ${halfTag(leg.half, leg.scope)}</div>
         <div class="leg-stats">
           <div class="leg-stat"><div class="num">${leg.is_half_time ? "HT" : `${leg.minute ?? "—"}${leg.minute != null ? "'" : ""}`}</div><div class="lbl">${leg.is_half_time ? "Break" : leg.half === "sh" ? `2H +${leg.period_minute ?? Math.max(0, (leg.minute || 0) - 45)}'` : `${halfTag(leg.half)} Min`}</div></div>
           <div class="leg-stat"><div class="num">${leg.period_score || leg.fh_score || "—"}</div><div class="lbl">Period</div></div>

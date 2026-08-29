@@ -43,7 +43,7 @@ function renderMatchCard(m) {
     <div class="closing-card lock-pick">
       <div class="closing-header">
         <div>
-          <div class="closing-league">${m.league || "Football"}</div>
+          <div class="closing-league">${BetAssistant.locationLabel(m)}</div>
           <div class="closing-teams">${m.home_team} vs ${m.away_team} ${link1x(m)}</div>
         </div>
         <span class="closing-clock">${halfLabel(m.half)} ${m.minute}′ · ${m.minutes_left}′ to ${m.closing_target}</span>

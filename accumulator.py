@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from acca_ou_picks import MIN_ACCA_PCT, all_ou_picks
+from team_aliases import format_match_location
 
 MIN_LEGS = 3
 MAX_LEGS = 5
@@ -49,6 +50,8 @@ class AccaLeg:
     scope: str = ""
     tempo: str = ""
     remaining_xg: float = 0.0
+    country: str = ""
+    location: str = ""
 
 
 @dataclass
@@ -183,6 +186,13 @@ def _make_leg(entry: dict) -> AccaLeg:
         scope=entry.get("scope") or "",
         tempo=entry.get("tempo") or "",
         remaining_xg=float(entry.get("remaining_xg") or 0),
+        country=entry.get("country") or card.get("country") or "",
+        location=entry.get("location")
+        or card.get("location")
+        or format_match_location(
+            entry.get("country") or card.get("country") or "",
+            entry.get("league") or card.get("league") or "",
+        ),
     )
 
 

@@ -48,7 +48,7 @@ function renderBetSignals(signals) {
   section.hidden = false;
   grid.innerHTML = signals.map((s) => `
     <div class="signal-card">
-      <div style="font-size:0.75rem;color:var(--muted)">${s.league}</div>
+      <div style="font-size:0.75rem;color:var(--muted)">${BetAssistant.locationLabel(s, "Basketball")}</div>
       <div style="font-weight:700">${s.match} ${link1x(s)}</div>
       <div style="font-size:0.8rem;color:var(--muted);margin:6px 0">
         ${s.score} · ${s.q3_clock} · ${s.market}
@@ -100,7 +100,7 @@ function renderMatchCard(m) {
     <div class="basketball-card${hasBet ? " bet-pick" : ""}">
       <div class="bb-header">
         <div>
-          <div class="bb-league">${m.league || "Basketball"}</div>
+          <div class="bb-league">${BetAssistant.locationLabel(m, "Basketball")}</div>
           <div class="bb-teams">${m.home_team} vs ${m.away_team} ${link1x(m)}</div>
         </div>
         <span class="bb-q3-badge">${m.q3_clock || "Q3"} · ${qs.game_pct ?? "—"}% played</span>

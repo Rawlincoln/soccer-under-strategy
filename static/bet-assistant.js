@@ -27,6 +27,20 @@ const BetAssistant = (() => {
     return Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
   }
 
+  function locationLabel(item, fallback = "Football") {
+    if (!item) return fallback;
+    if (item.location) return item.location;
+    const country = String(item.country || "").trim();
+    const league = String(item.league || "").trim();
+    if (!country && !league) return fallback;
+    if (!country) return league;
+    if (!league) return country;
+    const cl = country.toLowerCase();
+    const ll = league.toLowerCase();
+    if (ll.startsWith(cl) || ll.includes(cl)) return league;
+    return `${country} · ${league}`;
+  }
+
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -333,7 +347,7 @@ const BetAssistant = (() => {
   function renderLegs(slip) {
     return (slip.legs || []).map((leg, i) => {
       const url = leg.onexbet_url || matchUrl(leg.event_id, leg.league_id);
-      const league = leg.league || "Football";
+      const league = locationLabel(leg);
       const clock = leg.minutes_left
         ? `${leg.minute}' · ${leg.minutes_left}' to ${leg.closing_target || "HT/FT"}`
         : fmtModalMinute(leg);
@@ -510,6 +524,8 @@ const BetAssistant = (() => {
       home_team: leg.home_team,
       away_team: leg.away_team,
       league: leg.league,
+      country: leg.country,
+      location: leg.location,
       market: leg.market,
       selection: leg.selection,
       minute: leg.minute,
@@ -645,5 +661,6 @@ const BetAssistant = (() => {
     setBrowserAlerts,
     requestNotifyPermission,
     fmtMoney,
+    locationLabel,
   };
 })();

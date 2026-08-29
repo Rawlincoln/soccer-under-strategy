@@ -15,6 +15,7 @@ from typing import Any, Optional
 from basketball_filters import is_excluded_basketball_raw
 from bet_assistant import effective_onexbet_android_package, effective_onexbet_site
 from onexbet_basketball import OneXBetBasketballClient, OneXBetBasketballMatch
+from team_aliases import format_match_location
 
 REFRESH_SECONDS = 30
 MIN_DEFINITE_PCT = 70.0
@@ -118,6 +119,8 @@ class BasketballCard:
     definite_pick: Optional[dict[str, Any]] = None
     definite_picks: list[dict[str, Any]] = field(default_factory=list)
     league_id: int = 0
+    country: str = ""
+    location: str = ""
 
 
 def _interp_cumulative_share(game_pct: float, shares: list[float]) -> float:
@@ -649,6 +652,8 @@ def build_basketball_payload() -> dict[str, Any]:
             away_team=match.away_team,
             league=match.league,
             league_id=match.league_id,
+            country=match.country,
+            location=format_match_location(match.country, match.league, fallback="Basketball"),
             score=f"{match.home_score} - {match.away_score}",
             total_points=match.total_points,
             period_name=match.period_name,

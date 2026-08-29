@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
+from under_lines import under_has_cushion
 from goal_probability import (
     PERIOD_LENGTH,
     STOPPAGE,
@@ -54,8 +55,7 @@ def _scope_goals(card: dict, scope: str) -> int:
 
 
 def _under_alive(line: float, goals: int) -> bool:
-    """Need a cushion: U1.5 only at 0-0, U2.5 only at 0 or 1, etc."""
-    return goals < int(line)
+    return under_has_cushion(line, goals)
 
 
 def _over_alive(line: float, goals: int) -> bool:

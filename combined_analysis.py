@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
 from fotmob_stats import fotmob_live_agreement, fotmob_tempo_profile
+from under_lines import best_cushion_under_line
 from goal_probability import analyze_goal_probs
 from market_odds import market_odds_score
 from pressure_ou_model import pressure_ou_score
@@ -371,7 +372,7 @@ def _time_context_score(total_goals: int, minute: int, half: str) -> tuple[float
     if total_goals == 0 and elapsed >= 10:
         return 12.0, [f"0-0 in {label} at {minute}' — building under case"]
     if total_goals == 1 and elapsed >= 25:
-        signals.append(f"1 goal in {label} at {minute}' — under 1.5 still viable")
+        signals.append(f"1 goal in {label} at {minute}' — under 2.5 has a gap")
         return 15.0, signals
     if total_goals == 1 and elapsed >= 15:
         return 11.0, signals
@@ -388,17 +389,13 @@ def _pick_best_market(
     total_goals: int, confidence: float, minute: int, half: str
 ) -> tuple[str, str]:
     sfx = _market_suffix(half)
-    if total_goals >= 3:
+    line = best_cushion_under_line(total_goals)
+    if line is None:
         return f"Under 2.5 {half.upper()}", "SKIP"
-    if total_goals == 2:
-        return f"Under 2.5 {half.upper()}", "BET" if confidence >= 68 else "WATCH"
+    market = f"Under {line:g} {half.upper()}"
     if total_goals == 1:
-        return f"Under 1.5 {half.upper()}", "BET" if confidence >= 66 else "WATCH"
-    u05_rec = "BET" if confidence >= 70 and minute >= (58 if half == "sh" else 18) else "WATCH"
-    u15_rec = "BET" if confidence >= 64 else "WATCH"
-    if u05_rec == "BET" and confidence >= 74:
-        return f"Under 0.5 {half.upper()}", u05_rec
-    return f"Under 1.5 {half.upper()}", u15_rec
+        return market, "BET" if confidence >= 66 else "WATCH"
+    return market, "BET" if confidence >= 64 else "WATCH"
 
 
 def _verdict(confidence: float, agreement: str, recommendation: str) -> str:
@@ -486,8 +483,6 @@ def build_combined_analysis(
     if total_goals == 0:
         model_p = gp.p_under_15
     elif total_goals == 1:
-        model_p = max(gp.p_under_15, gp.p_under_25 * 0.92)
-    elif total_goals == 2:
         model_p = gp.p_under_25
     else:
         model_p = 5.0

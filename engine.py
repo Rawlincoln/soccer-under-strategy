@@ -44,6 +44,7 @@ from market_odds import lookup_market_odds
 from pressure_ou_model import pressure_confidence_adjust, pressure_from_summary
 from shots_volume_model import shots_confidence_adjust
 from soccerpunter_stats import SOCCERPUNTER_PROVIDER
+from under_lines import under_has_cushion
 from thesportsdb_stats import SPORTSDB_PROVIDER
 
 SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3"
@@ -494,8 +495,6 @@ def score_period_under(
     total_score = combined["breakdown"]["total"]
     base_conf = combined["confidence"]
     conflict = combined.get("agreement") == "CONFLICT"
-    sot_pm = stats.shots_on_target / elapsed
-    shots_pm = stats.total_shots / elapsed
 
     if minute < entry_start:
         signals.append(f"Before {half_label} entry window — wait until {entry_start}'")
@@ -518,62 +517,39 @@ def score_period_under(
         return "WATCH" if conf >= bet_at - 8 else "WAIT"
 
     results: dict[str, Prediction] = {}
-    u05_key = f"Under 0.5 {half_label}"
     u15_key = f"Under 1.5 {half_label}"
     u25_key = f"Under 2.5 {half_label}"
 
-    if total_goals == 0:
-        u05_conf = _conf(gp.get("p_under_05") or pressure_confidence_adjust(
-            base_conf + (9 if half == "fh" else 7), pressure, "under_05",
-        ))
-        u05_rec = _rec(u05_conf, 68, entry_end - 2)
-        results[u05_key] = Prediction(
+    def _skip(market: str, reason: str) -> Prediction:
+        return Prediction(
             match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
-            market=f"Under 0.5 {period_name} Goals", confidence=u05_conf, score=total_score,
-            signals=signals.copy(), live_stats=stats, recommendation=u05_rec,
-            home_team=home, away_team=away, prophit_stats=prophit_stats, combined_analysis=combined,
-        )
-    else:
-        results[u05_key] = Prediction(
-            match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
-            market=f"Under 0.5 {period_name} Goals", confidence=5, score=0,
-            signals=[f"1+ {half_label} goals — under 0.5 dead"], recommendation="SKIP",
-            home_team=home, away_team=away, prophit_stats=prophit_stats, combined_analysis=combined,
+            market=market, confidence=5, score=0,
+            signals=[reason], recommendation="SKIP",
+            home_team=home, away_team=away, prophit_stats=prophit_stats,
+            combined_analysis=combined,
         )
 
-    if total_goals == 0:
+    if under_has_cushion(1.5, total_goals):
         u15_raw = gp.get("p_under_15") or shots_confidence_adjust(
             pressure_confidence_adjust(base_conf, pressure, "under_15"),
             shots_vol, "under_15",
         )
         u15_conf = _conf(u15_raw)
         u15_rec = _rec(u15_conf, 68, entry_start)
-    elif total_goals == 1:
-        u15_raw = gp.get("p_under_15") or shots_confidence_adjust(
-            pressure_confidence_adjust(base_conf + 11, pressure, "under_15"),
-            shots_vol, "under_15",
+        results[u15_key] = Prediction(
+            match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
+            market=f"Under 1.5 {period_name} Goals", confidence=u15_conf, score=total_score,
+            signals=signals.copy(), live_stats=stats, recommendation=u15_rec,
+            home_team=home, away_team=away, prophit_stats=prophit_stats,
+            combined_analysis=combined,
         )
-        u15_conf = _conf(u15_raw)
-        if shots_pm < 0.52 and sot_pm < 0.22:
-            u15_conf = _conf(u15_conf + 5)
-            signals.append(f"1 {half_label} goal but tempo still low — under 1.5 holds")
-        late_min = 78 if half == "sh" else 35
-        if minute >= late_min:
-            u15_conf = _conf(u15_conf + 7)
-        u15_rec = _rec(u15_conf, 70, entry_start - 5)
-        signals.append(f"1 {half_label} goal — under 1.5 still alive")
     else:
-        u15_conf, u15_rec = 5, "SKIP"
-        signals.append(f"{total_goals} {half_label} goals — under 1.5 dead")
+        results[u15_key] = _skip(
+            f"Under 1.5 {period_name} Goals",
+            f"{total_goals} {half_label} goal(s) — U1.5 needs 0-0 (leave a gap)",
+        )
 
-    results[u15_key] = Prediction(
-        match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
-        market=f"Under 1.5 {period_name} Goals", confidence=u15_conf, score=total_score,
-        signals=signals.copy(), live_stats=stats, recommendation=u15_rec,
-        home_team=home, away_team=away, prophit_stats=prophit_stats, combined_analysis=combined,
-    )
-
-    if total_goals <= 1:
+    if under_has_cushion(2.5, total_goals):
         u25_raw = gp.get("p_under_25") or shots_confidence_adjust(
             pressure_confidence_adjust(
                 base_conf + (17 if half == "fh" else 14), pressure, "under_25",
@@ -582,28 +558,20 @@ def score_period_under(
         )
         u25_conf = _conf(u25_raw)
         u25_rec = _rec(u25_conf, 72, entry_start)
-    elif total_goals == 2:
-        u25_raw = gp.get("p_under_25") or shots_confidence_adjust(
-            pressure_confidence_adjust(base_conf + 7, pressure, "under_25"),
-            shots_vol, "under_25",
+        if total_goals == 1:
+            signals.append(f"1 {half_label} goal — U2.5 has a one-goal gap")
+        results[u25_key] = Prediction(
+            match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
+            market=f"Under 2.5 {period_name} Goals", confidence=u25_conf, score=total_score,
+            signals=signals.copy(), live_stats=stats, recommendation=u25_rec,
+            home_team=home, away_team=away, prophit_stats=prophit_stats,
+            combined_analysis=combined,
         )
-        u25_conf = _conf(u25_raw)
-        slow_min = 72 if half == "sh" else 30
-        if shots_pm < 0.52 and minute >= slow_min:
-            u25_conf = _conf(u25_conf + 9)
-            signals.append(f"2 {half_label} goals but tempo slowing — under 2.5 viable")
-        u25_rec = _rec(u25_conf, 72, entry_start - 5)
-        signals.append(f"2 {half_label} goals — under 2.5 still alive")
     else:
-        u25_conf, u25_rec = 5, "SKIP"
-        signals.append(f"{total_goals} {half_label} goals — under 2.5 dead")
-
-    results[u25_key] = Prediction(
-        match=f"{home} vs {away}", league=league, kickoff="", status="LIVE",
-        market=f"Under 2.5 {period_name} Goals", confidence=u25_conf, score=total_score,
-        signals=signals.copy(), live_stats=stats, recommendation=u25_rec,
-        home_team=home, away_team=away, prophit_stats=prophit_stats, combined_analysis=combined,
-    )
+        results[u25_key] = _skip(
+            f"Under 2.5 {period_name} Goals",
+            f"{total_goals} {half_label} goals — U2.5 needs 0-0 or 1-0 (leave a gap)",
+        )
 
     return results
 
@@ -800,8 +768,8 @@ def _build_match_card(
         p_home, p_away, p_goals = m.sh_home, m.sh_away, m.sh_goals
         status = "2H"
 
-    under_15_alive = p_goals <= 1
-    under_25_alive = p_goals <= 2
+    under_15_alive = under_has_cushion(1.5, p_goals)
+    under_25_alive = under_has_cushion(2.5, p_goals)
     scored = p_goals >= 1
     qualified_preds = _filter_preds_60(preds)
 
@@ -864,8 +832,8 @@ def _build_half_time_card(
         fh_goals=m.fh_goals,
         fh_score=f"{m.fh_home}-{m.fh_away}",
         source="1xbet",
-        under_15_alive=m.fh_goals <= 1,
-        under_25_alive=m.fh_goals <= 2,
+        under_15_alive=under_has_cushion(1.5, m.fh_goals),
+        under_25_alive=under_has_cushion(2.5, m.fh_goals),
         scored_filter=m.fh_goals >= 1,
         prophit_stats=prophit_stats,
         soccerpunter_stats=soccerpunter_stats,

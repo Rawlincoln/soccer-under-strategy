@@ -232,11 +232,13 @@ def analyze_shots_volume(
 
     # Prefer market: tighter volume → U1.5; mid band → U2.5
     if period_goals >= 2:
-        preferred = "under_25" if period_goals == 2 else ""
-    elif result.in_combined_band and proj_total < 22 and period_goals <= 1:
+        preferred = ""
+    elif period_goals == 1:
+        preferred = "under_25"
+    elif result.in_combined_band and proj_total < 22:
         preferred = "under_15"
     elif result.in_combined_band or result.period_combined_band:
-        preferred = "under_25" if period_goals >= 1 else "under_15"
+        preferred = "under_15"
     elif proj_total > 34:
         preferred = ""
     else:

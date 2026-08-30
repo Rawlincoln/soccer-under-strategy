@@ -31,6 +31,7 @@ from onexbet_client import (
     onexbet_match_url,
     onexbet_toto_url,
 )
+from acca_ledger import ledger_payload
 from engine import REFRESH_SECONDS, DataCache, build_fusion_payload
 from toto_predictions import TotoCache
 
@@ -68,7 +69,7 @@ def _ensure_toto_cache(type_id: int = 1):
         _toto_started_types.add(type_id)
 
 STATIC = Path(__file__).parent / "static"
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "50")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "51")
 
 
 def _no_cache(resp: Response) -> Response:
@@ -93,6 +94,11 @@ def index():
 @app.route("/accumulator")
 def accumulator_page():
     return _serve_html("accumulator.html")
+
+
+@app.route("/review")
+def review_page():
+    return _serve_html("review.html")
 
 
 @app.route("/strategy")
@@ -278,6 +284,11 @@ def api_onexbet_match_link():
         "url": url,
         "numeric_url": onexbet_match_url(game_id, lid, site=site, sport=sport),
     })
+
+
+@app.route("/api/acca-review")
+def api_acca_review():
+    return jsonify(ledger_payload())
 
 
 @app.route("/api/accumulators")

@@ -1,0 +1,86 @@
+.review-list {
+  max-width: 1100px;
+  margin: 0 auto 48px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.review-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.review-card.status-won { border-top: 3px solid var(--green); }
+.review-card.status-lost { border-top: 3px solid var(--red); }
+.review-card.status-pending { border-top: 3px solid var(--amber); }
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px 8px;
+}
+
+.review-name { font-weight: 700; }
+.review-when { font-size: 0.78rem; color: var(--muted); font-family: var(--mono); }
+
+.review-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.review-badge.won { background: #22c55e22; color: var(--green); }
+.review-badge.lost { background: #ef444422; color: var(--red); }
+.review-badge.pending { background: #f59e0b22; color: var(--amber); }
+.review-badge.core { background: var(--surface2); color: var(--muted); }
+.review-badge.short { background: #22c55e18; color: var(--green); }
+.review-badge.long { background: #f59e0b22; color: var(--amber); }
+
+.review-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.review-stat .label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; }
+.review-stat .value { font-family: var(--mono); font-weight: 700; }
+.review-stat .value.profit-up { color: var(--green); }
+.review-stat .value.profit-down { color: var(--red); }
+
+.review-leg {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.review-leg.won { background: #22c55e08; }
+.review-leg.lost { background: #ef444408; }
+
+.review-leg-sel { font-weight: 600; color: var(--green); }
+.review-leg.lost .review-leg-sel { color: var(--red); }
+.review-leg-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+.review-leg-result { font-family: var(--mono); font-size: 0.8rem; text-align: right; }
+
+.review-verdict {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.review-verdict.won { color: var(--green); background: #22c55e10; }
+.review-verdict.lost { color: var(--red); background: #ef444410; }
+.review-verdict.pending { color: var(--amber); }

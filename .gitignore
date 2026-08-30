@@ -12,4 +12,5 @@ data/soccerpunter/
 data/assistant_config.json
 data/assistant_state.json
 data/assistant_alerts.json
+data/acca_ledger.json
 data/betwinner_sample.html

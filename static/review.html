@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title>Pro Punter · Acca Review</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ASSET_VERSION}}" />
+  <link rel="stylesheet" href="/static/accumulator.css?v={{ASSET_VERSION}}" />
+  <link rel="stylesheet" href="/static/review.css?v={{ASSET_VERSION}}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">📋</span>
+        <div>
+          <h1>Pro Punter</h1>
+          <p class="subtitle">Acca review · predicted vs final score · would you have won at those odds</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/">Soccer Live</a>
+        <a href="/fusion">Fusion</a>
+        <a href="/toto">1xBet Toto</a>
+        <a href="/closing">Goal Lock</a>
+        <a href="/basketball">Basketball O/U</a>
+        <a href="/accumulator">Accumulators</a>
+        <a href="/review" class="active">Acca Review</a>
+        <a href="/strategy">100K Strategy</a>
+        <a href="/assistant">Assistant</a>
+      </nav>
+      <div class="status-pill" id="connectionStatus">
+        <span class="pulse"></span>
+        <span id="statusText">Loading ledger…</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="acca-summary" id="reviewSummary"></section>
+
+  <section class="stake-panel">
+    <div class="filter-tabs" id="statusTabs">
+      <button class="tab active" data-status="all">All</button>
+      <button class="tab" data-status="pending">Pending</button>
+      <button class="tab" data-status="won">Won</button>
+      <button class="tab" data-status="lost">Lost</button>
+    </div>
+    <button class="btn-refresh" id="btnRefresh">↻ Settle now</button>
+  </section>
+
+  <section class="review-list" id="reviewList">
+    <div class="loading">Loading recorded accumulators…</div>
+  </section>
+
+  <footer class="footer">
+    Slips are saved when live accas are published. Settlement uses final 1xBet scores.
+    Assumed stake £<span id="stakeNote">10</span> per slip at the odds shown at call time.
+  </footer>
+
+  <script src="/static/review.js?v={{ASSET_VERSION}}"></script>
+</body>
+</html>

@@ -31,6 +31,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _usable_event_id(eid: str) -> bool:
+    return str(eid or "").isdigit() and len(str(eid)) >= 5
+
+
+def _split_score(raw: Any) -> tuple[int, int]:
+    text = str(raw or "0-0").replace(":", "-").replace("–", "-")
+    parts = text.split("-")
+    try:
+        return int(parts[0].strip()), int(parts[1].strip())
+    except (ValueError, IndexError):
+        return 0, 0
+
+
 def _parse_ts(iso: str) -> float:
     try:
         return datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp()
@@ -149,6 +162,11 @@ def snapshot_accumulators(payload: dict[str, Any]) -> int:
 
 
 def _grade_leg(leg: dict[str, Any], score: dict[str, Any]) -> Optional[bool]:
+    """True=won, False=lost, None=still open.
+
+    Unders/overs that are already busted (or already landed) settle immediately,
+    without waiting for 1xBet to keep a finished match on the live feed.
+    """
     side = (leg.get("side") or "").upper()
     line = float(leg.get("line") or 0)
     scope = (leg.get("scope") or "ft").lower()
@@ -156,26 +174,94 @@ def _grade_leg(leg: dict[str, Any], score: dict[str, Any]) -> Optional[bool]:
         return None
 
     finished = bool(score.get("finished"))
-    ht_or_later = bool(score.get("ht_or_later"))
+    ht_or_later = bool(score.get("ht_or_later")) or finished
     if scope == "fh":
-        if not ht_or_later:
-            return None
         goals = int(score.get("fh_goals") or 0)
+        closed = ht_or_later
     elif scope == "sh":
-        if not finished:
-            return None
         goals = int(score.get("sh_goals") or 0)
+        closed = finished
     else:
-        if not finished:
-            return None
         goals = int(score.get("ft_goals") or 0)
+        closed = finished
 
-    leg["goals_used"] = goals
-    leg["final_fh"] = score.get("fh_score") or ""
-    leg["final_ft"] = score.get("ft_score") or ""
+    if score:
+        leg["goals_used"] = goals
+        if score.get("fh_score"):
+            leg["final_fh"] = score.get("fh_score") or ""
+        if score.get("ft_score"):
+            leg["final_ft"] = score.get("ft_score") or ""
+
     if side == "UNDER":
-        return goals < line
-    return goals > line
+        if goals >= line:
+            return False
+        if closed:
+            return True
+        return None
+    if goals > line:
+        return True
+    if closed:
+        return False
+    return None
+
+
+def ingest_live_matches(matches: list[dict[str, Any]]) -> None:
+    """Write current live scores into the cache so settlement survives 1xBet dropping FT games."""
+    now = _now()
+    with _lock:
+        data = _load()
+        cache = data.setdefault("score_cache", {})
+        seen: set[str] = set()
+        for m in matches or []:
+            eid = str(m.get("event_id") or "")
+            if not _usable_event_id(eid):
+                continue
+            seen.add(eid)
+            ft_h, ft_a = _split_score(m.get("full_score") or m.get("score") or "0-0")
+            fh_h, fh_a = _split_score(m.get("fh_score") or "0-0")
+            half = (m.get("half") or "").lower()
+            ht = bool(m.get("is_half_time") or half == "ht" or str(m.get("status") or "").upper() == "HT")
+            ft_goals = ft_h + ft_a
+            fh_goals = int(m.get("fh_goals") or 0)
+            if half == "fh" and not ht:
+                fh_goals = ft_goals
+                fh_h, fh_a = ft_h, ft_a
+            elif not fh_goals:
+                fh_goals = fh_h + fh_a
+            sh_goals = max(0, ft_goals - fh_goals)
+            minute = int(m.get("minute") or 0)
+            period_name = str(m.get("period_name") or "")
+            finished = str(m.get("status") or "").upper() in {"FT", "AET", "PEN"}
+            period = 2 if half in {"sh", "ht"} or ht else 1
+            if is_match_finished(period, period_name, minute):
+                finished = True
+            cache[eid] = {
+                "fh_goals": fh_goals,
+                "sh_goals": sh_goals,
+                "ft_goals": ft_goals,
+                "fh_score": f"{fh_h}-{fh_a}",
+                "ft_score": f"{ft_h}-{ft_a}",
+                "finished": finished,
+                "ht_or_later": finished or ht or half in {"ht", "sh"},
+                "minute": minute,
+                "period_name": period_name,
+                "fetched_at": now,
+                "seen_live": True,
+                "misses": 0,
+            }
+        for eid, rec in cache.items():
+            if eid in seen:
+                continue
+            rec["misses"] = min(20, int(rec.get("misses") or 0) + 1)
+            rec["seen_live"] = False
+            minute = int(rec.get("minute") or 0)
+            if rec.get("ht_or_later") and rec["misses"] >= 2:
+                rec["finished"] = True
+            elif minute >= 85 and rec["misses"] >= 2:
+                rec["finished"] = True
+                rec["ht_or_later"] = True
+        if seen or cache:
+            _save(data)
 
 
 def fetch_score(game_id: str) -> dict[str, Any]:
@@ -212,8 +298,16 @@ def fetch_score(game_id: str) -> dict[str, Any]:
     }
 
 
-def settle_pending(limit: int = 20) -> int:
-    """Settle pending snapshots that have finished (or FH-complete) scores."""
+def _apply_known_leg_results(legs: list[dict[str, Any]], results: list[Optional[bool]]) -> None:
+    for leg, won in zip(legs, results):
+        if won is True:
+            leg["result"] = "won"
+        elif won is False:
+            leg["result"] = "lost"
+
+
+def settle_pending(limit: int = 40) -> int:
+    """Settle pending snapshots from cached live scores, then 1xBet detail as backup."""
     with _lock:
         data = _load()
         snaps = data.get("snapshots") or []
@@ -223,9 +317,13 @@ def settle_pending(limit: int = 20) -> int:
         for s in pending:
             for leg in s.get("legs") or []:
                 eid = str(leg.get("event_id") or "")
-                if eid and eid not in cache:
+                if not _usable_event_id(eid):
+                    continue
+                rec = cache.get(eid) or {}
+                stale = not rec or int(rec.get("misses") or 0) >= 1
+                if stale and eid not in event_ids:
                     event_ids.append(eid)
-        unique = list(dict.fromkeys(event_ids))
+        unique = event_ids[:24]
 
     scores: dict[str, dict] = {}
     if unique:
@@ -236,10 +334,15 @@ def settle_pending(limit: int = 20) -> int:
                     scores[eid] = score
 
     settled = 0
+    dirty = bool(scores)
     with _lock:
         data = _load()
         cache = data.setdefault("score_cache", {})
-        cache.update(scores)
+        for eid, score in scores.items():
+            prev = cache.get(eid) or {}
+            merged = dict(prev)
+            merged.update(score)
+            cache[eid] = merged
         for snap in data.get("snapshots") or []:
             if snap.get("status") != "pending":
                 continue
@@ -253,15 +356,16 @@ def settle_pending(limit: int = 20) -> int:
                 if not score:
                     results.append(None)
                     continue
-                won = _grade_leg(leg, score)
-                if won is None:
-                    results.append(None)
-                    continue
-                leg["result"] = "won" if won else "lost"
-                results.append(won)
-            if any(r is None for r in results):
+                results.append(_grade_leg(leg, score))
+            before = [leg.get("result") for leg in legs]
+            _apply_known_leg_results(legs, results)
+            if [leg.get("result") for leg in legs] != before:
+                dirty = True
+            lost_any = any(r is False for r in results)
+            all_won = bool(results) and all(r is True for r in results)
+            if not lost_any and not all_won:
                 continue
-            won_slip = all(results)
+            won_slip = all_won and not lost_any
             snap["status"] = "won" if won_slip else "lost"
             snap["settled_at"] = _now()
             stake = float(snap.get("stake") or ASSUMED_STAKE)
@@ -269,7 +373,8 @@ def settle_pending(limit: int = 20) -> int:
             snap["payout"] = round(stake * odds, 2) if won_slip else 0.0
             snap["profit"] = round(snap["payout"] - stake, 2)
             settled += 1
-        if settled or scores:
+            dirty = True
+        if dirty:
             _save(data)
     return settled
 

@@ -86,6 +86,12 @@ function riskClass(level) {
   return { LOW: "low", MEDIUM: "medium", HIGH: "high" }[level] || "medium";
 }
 
+function money(n) {
+  const v = Number(n || 0);
+  const sign = v > 0 ? "+" : "";
+  return `${sign}£${v.toFixed(2)}`;
+}
+
 function renderSummary(data) {
   const shortN = (data.short_accumulators || []).length;
   const longN = (data.long_accumulators || []).length;
@@ -96,6 +102,34 @@ function renderSummary(data) {
     <div class="baseline-card"><div class="label">Slips</div><div class="value green">${data.accumulator_count ?? 0} · ${shortN} · ${longN}</div></div>
   `;
   $("accaCount").textContent = `${(data.accumulator_count ?? 0) + shortN + longN} accas`;
+}
+
+function renderResults(review) {
+  const box = $("accaResults");
+  if (!box) return;
+  if (!review) {
+    box.innerHTML = "";
+    return;
+  }
+  const snaps = (review.snapshots || []).filter((s) => s.status === "won" || s.status === "lost").slice(0, 8);
+  box.innerHTML = `
+    <div class="acca-results-head">
+      <h2 class="section-title">Won &amp; lost</h2>
+      <a class="acca-results-link" href="/review">Full review →</a>
+    </div>
+    <div class="acca-results-stats">
+      <div class="baseline-card"><div class="label">Won</div><div class="value green">${review.won_count ?? 0}</div></div>
+      <div class="baseline-card"><div class="label">Lost</div><div class="value">${review.lost_count ?? 0}</div></div>
+      <div class="baseline-card"><div class="label">Pending</div><div class="value">${review.pending_count ?? 0}</div></div>
+      <div class="baseline-card"><div class="label">P/L</div><div class="value ${(review.profit || 0) >= 0 ? "green" : ""}">${money(review.profit)}</div></div>
+    </div>
+    ${snaps.length ? `<div class="acca-results-list">${snaps.map((s) => `
+      <div class="acca-result-row ${s.status}">
+        <span class="acca-result-name">${s.name || "Acca"}</span>
+        <span class="acca-result-meta">${s.leg_count} legs · @${Number(s.combined_odds || 0).toFixed(2)}</span>
+        <span class="acca-result-badge">${s.status === "won" ? "WON" : "LOST"} ${money(s.profit)}</span>
+      </div>`).join("")}</div>` : `<div class="insufficient-msg">No settled accas yet — results appear here after legs finish or go bust.</div>`}
+  `;
 }
 
 function renderPicks60(data, gridId = "picks60Grid", picksKey = "qualified_picks_60", emptyMsg = "") {
@@ -249,6 +283,12 @@ async function fetchData() {
     $("statusText").textContent = `${data.qualified_picks_60_count ?? 0} core · ${data.short_picks_count ?? 0} short · ${data.long_picks_count ?? 0} long`;
 
     renderSummary(data);
+    try {
+      const reviewRes = await fetch("/api/acca-review");
+      renderResults(await reviewRes.json());
+    } catch {
+      renderResults(null);
+    }
     renderPicks60(data);
     renderPicks60(data, "picksShortGrid", "short_picks", "No short-price (≥80%, odds under 1.30) picks right now.");
     renderPicks60(data, "picksLongGrid", "long_picks", "No longshot (≥80%, odds over 2.50) picks right now.");

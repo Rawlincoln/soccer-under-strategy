@@ -28,6 +28,62 @@
   z-index: 1;
 }
 
+.acca-results {
+  max-width: 1200px;
+  margin: 0 auto 24px;
+  padding: 0 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.acca-results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.acca-results-link {
+  color: var(--green);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.acca-results-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.acca-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acca-result-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.acca-result-row.won { border-left: 3px solid var(--green); }
+.acca-result-row.lost { border-left: 3px solid var(--red); }
+.acca-result-name { font-weight: 700; }
+.acca-result-meta { color: var(--muted); font-size: 0.78rem; font-family: var(--mono); }
+.acca-result-badge { font-family: var(--mono); font-weight: 700; text-transform: uppercase; font-size: 0.78rem; }
+.acca-result-row.won .acca-result-badge { color: var(--green); }
+.acca-result-row.lost .acca-result-badge { color: var(--red); }
+
 .stake-panel {
   max-width: 1200px;
   margin: 0 auto 24px;

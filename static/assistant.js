@@ -151,17 +151,19 @@ function renderBetJournal(wf) {
     const defaultProfit = s.potential_profit || s.stake || wf.stake_per_slip || 5000;
 
     if (settled) {
+      const won = s.result === "won";
       const pnl = Number(s.profit);
-      const pnlCls = pnl >= 0 ? "won" : "lost";
-      const pnlText = pnl >= 0 ? `+${fmtMoney(pnl)}` : fmtMoney(pnl);
+      const pnlCls = won ? "won" : "lost";
+      const pnlText = won ? `+${fmtMoney(pnl)}` : fmtMoney(pnl);
+      const when = s.settled_at ? new Date(s.settled_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : time;
       return `
         <div class="asst-bet-row ${pnlCls}">
           <div class="asst-bet-main">
             ${wave}
             <div class="asst-bet-title">${s.title}</div>
-            <div class="asst-bet-meta">${s.type} · Stake ${fmtMoney(s.stake)} · ${time}</div>
+            <div class="asst-bet-meta">${s.type} · Stake ${fmtMoney(s.stake)} · ${when}</div>
           </div>
-          <div class="asst-bet-pnl ${pnlCls}">${pnlText}</div>
+          <div class="asst-bet-pnl ${pnlCls}"><span class="asst-bet-result">${won ? "WON" : "LOST"}</span> ${pnlText}</div>
         </div>`;
     }
 

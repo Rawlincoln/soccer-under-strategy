@@ -15,7 +15,7 @@ from typing import Any, Optional
 import requests
 
 from accumulator import MIN_CONFIDENCE, build_accumulators
-from acca_ledger import snapshot_accumulators
+from acca_ledger import ingest_live_matches, snapshot_accumulators
 from bet_assistant import (
     build_assistant_payload,
     effective_onexbet_android_package,
@@ -1198,6 +1198,7 @@ def build_dashboard_payload() -> dict[str, Any]:
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
     try:
+        ingest_live_matches(match_dicts)
         snapshot_accumulators(accumulators)
     except Exception:
         pass
@@ -1279,6 +1280,7 @@ def build_all_payloads(fast: bool = False) -> tuple[dict[str, Any], dict[str, An
     match_dicts = [asdict(c) for c in cards]
     accumulators = build_accumulators(match_dicts)
     try:
+        ingest_live_matches(match_dicts)
         snapshot_accumulators(accumulators)
     except Exception:
         pass

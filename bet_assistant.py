@@ -29,6 +29,8 @@ DATA_DIR = Path(__file__).parent / "data"
 STATE_PATH = DATA_DIR / "assistant_state.json"
 CONFIG_PATH = DATA_DIR / "assistant_config.json"
 ALERTS_PATH = DATA_DIR / "assistant_alerts.json"
+RESULTS_PATH = DATA_DIR / "assistant_results.json"
+MAX_RESULT_HISTORY = 150
 
 DAILY_TARGET = 100_000
 STAKE_PER_SLIP = 5_000
@@ -127,8 +129,9 @@ class AssistantStore:
     def load_state(self) -> WorkflowState:
         today = _today()
         raw = self._read_json(STATE_PATH, {})
+        slips = list(raw.get("placed_slips") or [])
         if not raw or raw.get("date") != today:
-            return WorkflowState(date=today)
+            return WorkflowState(date=today, placed_slips=slips)
         return WorkflowState(
             date=today,
             losses=int(raw.get("losses", 0)),
@@ -136,7 +139,7 @@ class AssistantStore:
             slips_placed=int(raw.get("slips_placed", 0)),
             profit_recorded=float(raw.get("profit_recorded", 0)),
             loss_streak=int(raw.get("loss_streak", 0)),
-            placed_slips=list(raw.get("placed_slips", [])),
+            placed_slips=slips,
         )
 
     def save_state(self, state: WorkflowState) -> None:
@@ -639,8 +642,9 @@ def build_workflow(
                 "slip": asdict(slip),
             })
 
-    total_staked = sum(float(s.get("stake") or 0) for s in state.placed_slips)
-    settled = [s for s in state.placed_slips if s.get("result") is not None]
+    journal = _merged_placed_slips(state)
+    total_staked = sum(float(s.get("stake") or 0) for s in journal)
+    settled = [s for s in journal if s.get("result") is not None]
     total_decided = state.wins + state.losses
     win_rate = round(state.wins / total_decided * 100, 1) if total_decided else 0.0
     net_pnl = round(sum(float(s.get("profit") or 0) for s in settled), 2)
@@ -683,15 +687,49 @@ def build_workflow(
         "waves": waves,
         "active_wave": active_wave,
         "recommendations": recommendations,
-        "placed_slips": state.placed_slips,
+        "placed_slips": journal,
         "settled_count": len(settled),
-        "pending_count": len(state.placed_slips) - len(settled),
+        "pending_count": len([s for s in journal if s.get("result") is None]),
         "total_staked": round(total_staked, 2),
         "win_rate_pct": win_rate,
         "net_pnl": net_pnl,
         "total_won": total_won,
         "total_lost": total_lost,
     }
+
+
+def _load_result_history() -> list[dict[str, Any]]:
+    if not RESULTS_PATH.exists():
+        return []
+    try:
+        raw = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if isinstance(raw, list):
+        return raw
+    return list(raw.get("results") or [])
+
+
+def _save_result_history(rows: list[dict[str, Any]]) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    RESULTS_PATH.write_text(json.dumps(rows[-MAX_RESULT_HISTORY:], indent=2), encoding="utf-8")
+
+
+def _archive_settled_slip(entry: dict[str, Any]) -> None:
+    if entry.get("result") not in ("won", "lost"):
+        return
+    rows = _load_result_history()
+    slip_id = entry.get("id")
+    rows = [r for r in rows if r.get("id") != slip_id]
+    rows.append(dict(entry))
+    _save_result_history(rows)
+
+
+def _merged_placed_slips(state: WorkflowState) -> list[dict[str, Any]]:
+    current = list(state.placed_slips or [])
+    seen = {s.get("id") for s in current}
+    history = [h for h in _load_result_history() if h.get("id") not in seen]
+    return history + current
 
 
 def _apply_settlement(
@@ -713,6 +751,7 @@ def _apply_settlement(
         entry["profit"] = round(-stake, 2)
         state.losses += 1
         state.loss_streak += 1
+    _archive_settled_slip(entry)
 
     reset_reason = None
     if state.profit_recorded >= target:
@@ -722,7 +761,7 @@ def _apply_settlement(
 
     if reset_reason:
         previous = asdict(state)
-        state = WorkflowState(date=_today())
+        state = WorkflowState(date=_today(), placed_slips=list(previous.get("placed_slips") or []))
         STORE.save_state(state)
         return {
             "ok": True,
@@ -883,7 +922,10 @@ def log_bet_result(
 
 
 def reset_workflow() -> dict[str, Any]:
-    state = WorkflowState(date=_today())
+    previous = STORE.load_state()
+    for slip in previous.placed_slips:
+        _archive_settled_slip(slip)
+    state = WorkflowState(date=_today(), placed_slips=list(previous.placed_slips))
     STORE.save_state(state)
     return {"ok": True, "state": asdict(state)}
 

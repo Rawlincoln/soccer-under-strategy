@@ -288,6 +288,12 @@
 
 .asst-bet-pnl.won { color: var(--green); }
 .asst-bet-pnl.lost { color: #ff6666; }
+.asst-bet-result {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
 
 .asst-bet-settle {
   display: flex;

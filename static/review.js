@@ -57,10 +57,13 @@ function renderSnap(s) {
   `).join("");
 
   let verdict = "Still in play — not settled yet.";
+  const decidedLegs = (s.legs || []).filter((leg) => leg.result === "won" || leg.result === "lost").length;
   if (st === "won") {
-    verdict = `You would have WON. £${Number(s.stake || 10).toFixed(0)} at ${Number(s.combined_odds).toFixed(2)} returns £${Number(s.payout).toFixed(2)} (profit ${money(s.profit)}).`;
+    verdict = `WON. £${Number(s.stake || 10).toFixed(0)} at ${Number(s.combined_odds).toFixed(2)} returns £${Number(s.payout).toFixed(2)} (profit ${money(s.profit)}).`;
   } else if (st === "lost") {
-    verdict = `You would have LOST. Stake £${Number(s.stake || 10).toFixed(0)} is gone (P/L ${money(s.profit)}).`;
+    verdict = `LOST. Stake £${Number(s.stake || 10).toFixed(0)} is gone (P/L ${money(s.profit)}).`;
+  } else if (decidedLegs) {
+    verdict = `${decidedLegs}/${s.legs?.length || 0} legs already decided — waiting on the rest.`;
   }
 
   return `
